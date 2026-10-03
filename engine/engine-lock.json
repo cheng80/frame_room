@@ -35,6 +35,11 @@
       "path": "tests/gen/test_gen.py",
       "upstreamSha256": "70a12e0120dcef954d1a2c9bc98ed0472166d8285b405a23debd76c20f71ef01",
       "forkSha256": "687f996968d0ca0740553816ad8e0091c452bfdc5e36f99ccc425ed321576057"
+    },
+    {
+      "path": "sprite_gen/frames/extract.py",
+      "upstreamSha256": "2e347dfce9f9dfd471ffcb1c841c69209b6d940a35f24555e67aea7cb71242cb",
+      "forkSha256": "f11c14cd5f35d3f36041cb309e6b33964c4e722c57c809dd4ffa101000f052c6"
     }
   ],
   "environment": {

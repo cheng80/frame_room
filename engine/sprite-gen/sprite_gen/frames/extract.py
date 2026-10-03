@@ -2281,6 +2281,22 @@ def register_row_frames(frames: list, slack_x: int = 8, slack_y: int = 3) -> lis
     return registered
 
 
+def conform_registered_row(frames: list, logical_width: int, logical_height: int, detail_bias: bool = True) -> list:
+    # 정합 이동 후 union은 개별 프레임의 물리 캡보다 커질 수 있다. 배치 전에
+    # 공통 캔버스를 같은 배율로 축소한다. 프레임별 bbox 재크롭은 정합을 깨므로
+    # conform_row_logical을 다시 호출하지 않는다.
+    width, height = frames[0].size
+    scale = min(1.0, logical_width / width, logical_height / height)
+    if scale == 1.0:
+        return frames
+    target_width = max(1, round(width * scale))
+    target_height = max(1, round(height * scale))
+    return [
+        binarize_alpha(_kcentroid_downscale(frame, target_width, target_height, detail_bias))
+        for frame in frames
+    ]
+
+
 def _content_center_top(sprite: Image.Image, cell_height: int) -> int:
     bbox = sprite.getbbox()
     content_top, content_bottom = bbox[1::2] if bbox else (0, sprite.height)
@@ -3454,6 +3470,15 @@ def _run_locked(args: argparse.Namespace, run_dir: Path):
         if parts is None:
             continue
         registered = register_row_frames([f for p in parts for f in p["logical"]])
+        cap_w = max(1, cell_width // pp_scale)
+        cap_h = max(1, (cell_height - safe_margin_y) // pp_scale)
+        before_size = registered[0].size
+        registered = conform_registered_row(registered, cap_w, cap_h, pp_detail_bias)
+        if registered[0].size != before_size:
+            all_warnings.append(
+                f"{state}: registered row exceeds the physical cap {cap_w}x{cap_h} "
+                f"— common canvas reduced from {before_size} to {registered[0].size} "
+                "to prevent placement clipping")
         labels = None
         takes_summary = None
         if len(parts) > 1:
