@@ -112,10 +112,12 @@
 .animation-workspace .aw-timeline-scroll{overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;min-height:0;flex:1;padding:7px 9px}
 .animation-workspace .aw-timeline-track{display:flex;align-items:stretch;gap:7px;min-width:100%;height:100%;min-height:68px;width:max-content}
 .animation-workspace .aw-frame-slot{position:relative;display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:3px;width:74px;min-width:74px;padding:4px;background:#22303c;border:1px solid #4b5966;overflow:hidden}
-.animation-workspace .aw-slot-number{position:absolute;top:5px;left:5px;padding:1px 3px;background:#163024;font:8px monospace;color:#c3f4d9;z-index:1}
+.animation-workspace .aw-slot-number{position:absolute;top:5px;left:5px;padding:1px 3px;background:#163024;font-size:10px;font-weight:600;color:#c3f4d9;z-index:1}
 .animation-workspace .aw-slot-image{display:flex;align-items:center;justify-content:center;height:42px;min-height:24px;flex:1;overflow:hidden;border-radius:2px;padding:3px}
 .animation-workspace .aw-slot-image img{max-width:100%;max-height:100%;image-rendering:pixelated;object-fit:contain}
 .animation-workspace .aw-frame-slot>span:last-child{font-size:9px;text-align:center;flex-shrink:0;line-height:1.25}
+.animation-workspace .aw-slot-details{display:flex;flex-direction:column;gap:2px}
+.animation-workspace .aw-slot-position{color:#a5b7c5}
 .animation-workspace .aw-timeline-empty{display:flex;align-items:center;justify-content:center;gap:12px;min-width:260px;flex:1;font-size:11px;color:#a1b3bf}
 .animation-workspace .aw-timing-controls{display:flex;align-items:center;gap:10px;min-height:45px;flex-shrink:0;padding:5px 10px;border-top:1px solid var(--aw-line);background:#1c2730;overflow-x:auto;scrollbar-width:thin}
 .animation-workspace .aw-timing-controls>.field{margin:0;display:flex;flex-direction:row;align-items:center;gap:6px;flex-shrink:0;position:relative}
@@ -130,6 +132,9 @@
 .animation-workspace .aw-property-group:last-child{margin-bottom:0;border-bottom:0;padding-bottom:0}
 .animation-workspace .aw-property-group>h3{font-size:11px;letter-spacing:.2px;color:#d0dfe8;margin-bottom:12px;font-weight:600}
 .animation-workspace .aw-property-group .number-grid{gap:0 8px}
+.animation-workspace .aw-file-info{display:grid;grid-template-columns:auto minmax(0,1fr);gap:7px 10px;margin:0;font-size:10px;line-height:1.5}
+.animation-workspace .aw-file-info dt{color:#a5b7c5}
+.animation-workspace .aw-file-info dd{margin:0;overflow-wrap:anywhere;min-width:0}
 .animation-workspace .aw-property-group fieldset{border:0;padding:0;margin:0;min-width:0}
 .animation-workspace .aw-button-pair{display:flex;gap:7px;margin-top:12px}
 .animation-workspace .aw-button-pair>button{flex:1}

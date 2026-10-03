@@ -1,5 +1,5 @@
 import {useEffect,useId,useRef,useState,type KeyboardEvent} from 'react';
-import {ArrowLeft,ArrowRight,CheckCircle2,Copy,ImagePlus,Layers,PanelLeft,PanelRight,Plus,Scissors,SlidersHorizontal,Sparkles,Trash2,X} from 'lucide-react';
+import {ArrowLeft,ArrowLeftRight,ArrowRight,CheckCircle2,Copy,ImagePlus,Layers,PanelLeft,PanelRight,Plus,Scissors,SlidersHorizontal,Sparkles,Trash2,X} from 'lucide-react';
 import type {Studio} from './useStudio';
 import {EditorCanvas} from './Canvas';
 import {CandidateReview} from './CandidateReview';
@@ -68,7 +68,9 @@ export function EditStep({s,clipId,onClip,onAction,onSelectionChange}:Props){
   },[activeFrameVersionId,activeAssetId,onSelectionChange]);
   const assetById=new Map(p.assets.map(a=>[a.assetId,a]));
   const frameById=new Map(p.frames.map(f=>[f.frameVersionId,f]));
+  const frameNumberById=new Map(p.frames.map((f,i)=>[f.frameVersionId,i+1]));
   const candidateAsset=selectedFrame?assetById.get(selectedFrame.imageAssetId):undefined;
+  const candidateRawAsset=selectedFrame?assetById.get(selectedFrame.rawAssetId):undefined;
   const candidateSource=candidateAsset?assetProvenanceLabel(candidateAsset,assetById):undefined;
   const group=p.alignmentGroups.find(g=>g.frameVersionIds.includes(occurrence?.frameVersionId||''));
   const defaultPivot={x:(group?.cell.width||512)/2,y:(group?.cell.height||512)/2};
@@ -104,6 +106,12 @@ export function EditStep({s,clipId,onClip,onAction,onSelectionChange}:Props){
     [ids[i],ids[j]]=[ids[j],ids[i]];
     clipEdit('reorderOccurrences',{occurrenceIds:ids});
     s.setNotice(`선택 슬롯을 ${j+1}번째로 이동했습니다.`);
+  }
+  function reverse(){
+    if(blocked||!clip||clip.occurrences.length<2)return;
+    if(occurrence)setSelected(occurrence.occurrenceId);
+    clipEdit('reorderOccurrences',{occurrenceIds:clip.occurrences.map(o=>o.occurrenceId).reverse()});
+    s.setNotice('재생 순서를 뒤집었습니다.');
   }
   function setTransform(changes:Partial<Transform>){if(occurrence)clipEdit('setTransform',{occurrenceId:occurrence.occurrenceId,transform:{...transform,...changes}});}
   function pixel(point:Point){
@@ -193,9 +201,18 @@ export function EditStep({s,clipId,onClip,onAction,onSelectionChange}:Props){
       </section>
 
       <section className="aw-timeline" aria-label="재생 순서와 표시 시간">
-        <div className="aw-timeline-heading"><h2>재생 순서 <span>{clip?.occurrences.length||0}</span></h2><span>{duration}ms · {clip?.loop?'반복':'마지막 유지'}</span><div className="aw-sequence-actions"><button type="button" aria-label="선택 슬롯 앞으로 이동" title="앞으로 · Alt+←" disabled={blocked||index<=0} onClick={()=>move(-1)}><ArrowLeft size={14}/></button><button type="button" aria-label="선택 슬롯 뒤로 이동" title="뒤로 · Alt+→" disabled={blocked||!clip||index<0||index>=clip.occurrences.length-1} onClick={()=>move(1)}><ArrowRight size={14}/></button><button type="button" aria-label="슬롯 복제" title="슬롯 복제" disabled={blocked||!occurrence} onClick={duplicate}><Copy size={14}/></button><button type="button" aria-label="순서에서 제거" title="순서에서 제거 · Delete" className="danger-text" disabled={blocked||!occurrence} onClick={()=>occurrence&&clipEdit('removeOccurrence',{occurrenceId:occurrence.occurrenceId})}><Trash2 size={14}/></button></div></div>
+        <div className="aw-timeline-heading"><h2>재생 순서 <span>{clip?.occurrences.length||0}</span></h2><span>{duration}ms · {clip?.loop?'반복':'마지막 유지'}</span><div className="aw-sequence-actions"><button type="button" aria-label="재생 순서 리버스" title="리버스 · 전체 재생 순서 뒤집기" disabled={blocked||!clip||clip.occurrences.length<2} onClick={reverse}><ArrowLeftRight size={14}/>리버스</button><button type="button" aria-label="선택 슬롯 앞으로 이동" title="앞으로 · Alt+←" disabled={blocked||index<=0} onClick={()=>move(-1)}><ArrowLeft size={14}/></button><button type="button" aria-label="선택 슬롯 뒤로 이동" title="뒤로 · Alt+→" disabled={blocked||!clip||index<0||index>=clip.occurrences.length-1} onClick={()=>move(1)}><ArrowRight size={14}/></button><button type="button" aria-label="슬롯 복제" title="슬롯 복제" disabled={blocked||!occurrence} onClick={duplicate}><Copy size={14}/></button><button type="button" aria-label="순서에서 제거" title="순서에서 제거 · Delete" className="danger-text" disabled={blocked||!occurrence} onClick={()=>occurrence&&clipEdit('removeOccurrence',{occurrenceId:occurrence.occurrenceId})}><Trash2 size={14}/></button></div></div>
         <div className="aw-timeline-scroll" tabIndex={0} aria-label="재생 순서. 좌우 키로 선택, Alt 좌우로 순서 이동, Delete로 제거" onKeyDown={timelineKeys}>
-          <div className="aw-timeline-track">{clip?.occurrences.map((o,i)=>{const frame=frameById.get(o.frameVersionId),asset=frame?assetById.get(frame.imageAssetId):undefined;return <button type="button" key={o.occurrenceId} className={`aw-frame-slot ${occurrence?.occurrenceId===o.occurrenceId?'is-selected':''}`} aria-pressed={occurrence?.occurrenceId===o.occurrenceId} aria-label={`슬롯 ${i+1}, ${o.durationMs}밀리초`} onClick={()=>selectOccurrence(o.occurrenceId)}><span className="aw-slot-number">{String(i+1).padStart(2,'0')}</span><span className="aw-slot-image checker">{asset&&<img src={asset.url} alt=""/>}</span><span>{o.durationMs} ms</span></button>;})}{!clip?.occurrences.length&&<div className="aw-timeline-empty"><span>재생할 프레임이 없습니다.</span><button type="button" onClick={()=>{setLibraryTab('candidates');setView('library');}}>후보에서 추가</button></div>}</div>
+          <div className="aw-timeline-track">{clip?.occurrences.map((o,i)=>{
+            const frame=frameById.get(o.frameVersionId),asset=frame?assetById.get(frame.imageAssetId):undefined;
+            const frameNumber=frameNumberById.get(o.frameVersionId);
+            const frameLabel=frameNumber?`후보 ${String(frameNumber).padStart(2,'0')}`:'후보 없음';
+            return <button type="button" key={o.occurrenceId} className={`aw-frame-slot ${occurrence?.occurrenceId===o.occurrenceId?'is-selected':''}`} aria-pressed={occurrence?.occurrenceId===o.occurrenceId} aria-label={`슬롯 ${i+1}, ${frameLabel}, ${o.durationMs}밀리초`} title={`${frameLabel} · 재생 순서 ${i+1}\n${asset?.originalFilename||''}\n${o.frameVersionId}`} onClick={()=>selectOccurrence(o.occurrenceId)}>
+              <span className="aw-slot-number">{frameLabel}</span>
+              <span className="aw-slot-image checker">{asset&&<img src={asset.url} alt=""/>}</span>
+              <span className="aw-slot-details"><span className="aw-slot-position">순서 {String(i+1).padStart(2,'0')}</span><span>{o.durationMs} ms</span></span>
+            </button>;
+          })}{!clip?.occurrences.length&&<div className="aw-timeline-empty"><span>재생할 프레임이 없습니다.</span><button type="button" onClick={()=>{setLibraryTab('candidates');setView('library');}}>후보에서 추가</button></div>}</div>
         </div>
         <div className="aw-timing-controls">{occurrence?<><Select label="슬롯 표시 시간" value={occurrence.timingMode} onChange={e=>clipEdit('setTiming',{occurrenceId:occurrence.occurrenceId,timingMode:e.target.value,durationMs:e.target.value==='fps'?Math.round(1000/clip!.defaultFps):occurrence.durationMs})}><option value="fps">기본 FPS 따름</option><option value="explicit">직접 지정</option></Select><Num label="표시 시간 (ms)" value={occurrence.durationMs} min={1} max={60000} onChange={durationMs=>clipEdit('setTiming',{occurrenceId:occurrence.occurrenceId,timingMode:'explicit',durationMs})}/><span className="aw-timing-hint">같은 후보도 슬롯마다 독립적으로 저장됩니다.</span></>:<span>빈 순서는 출력되지 않습니다. 후보를 추가하세요.</span>}</div>
       </section>
@@ -204,6 +221,15 @@ export function EditStep({s,clipId,onClip,onAction,onSelectionChange}:Props){
         <div className="aw-pane-heading"><h2><SlidersHorizontal size={14}/>속성</h2><button type="button" className="aw-pane-close" aria-label="속성 패널 닫기" onClick={closePane}><X size={15}/></button></div>
         <div className="aw-tabs" role="tablist" aria-label="속성 종류" onKeyDown={tabKeys}>{(['slot','pixel','review','next'] as const).map(tab=><button type="button" key={tab} id={`${id}-inspector-tab-${tab}`} role="tab" aria-selected={inspectorTab===tab} aria-controls={`${id}-inspector-${tab}`} tabIndex={inspectorTab===tab?0:-1} onClick={()=>setInspectorTab(tab)}>{{slot:'슬롯',pixel:'픽셀',review:'수동 승인',next:'다음 작업'}[tab]}</button>)}</div>
         <div id={`${id}-inspector-slot`} className="aw-inspector-content aw-scroll" role="tabpanel" aria-labelledby={`${id}-inspector-tab-slot`} hidden={inspectorTab!=='slot'}>
+          {selectedFrame&&<section className="aw-property-group" aria-label="선택 이미지 파일 정보"><h3>선택 이미지 파일</h3><dl className="aw-file-info">
+            <dt>후보</dt><dd>후보 {String(frameNumberById.get(selectedFrame.frameVersionId)).padStart(2,'0')}</dd>
+            {canvasTarget==='timeline'&&occurrence&&<><dt>재생 순서</dt><dd>{index+1} / {clip?.occurrences.length}</dd></>}
+            <dt>파일명</dt><dd>{candidateAsset?.originalFilename||'파일 정보 없음'}</dd>
+            <dt>크기</dt><dd>{candidateAsset?`${candidateAsset.width} × ${candidateAsset.height} px`:'정보 없음'}</dd>
+            <dt>형식</dt><dd>{candidateAsset?.mediaType||'정보 없음'}</dd>
+            <dt>출처</dt><dd>{candidateSource?.label||'출처 확인 필요'}{candidateSource?.originLabel&&<> · {candidateSource.originLabel}</>}</dd>
+            {candidateRawAsset&&candidateRawAsset.assetId!==candidateAsset?.assetId&&<><dt>원본 파일</dt><dd>{candidateRawAsset.originalFilename}</dd></>}
+          </dl></section>}
           {clip?<><section className="aw-property-group"><h3>동작</h3><Input label="동작 이름" value={clip.name} maxLength={200} onChange={e=>clipEdit('updateClip',{changes:{name:e.target.value}})}/><Select label="동작에 사용할 승인 기준" value={clip.referenceRevisionId||''} onChange={e=>clipEdit('updateClip',{changes:{referenceRevisionId:e.target.value}})}><option value="">기준 연결 필요</option>{p.references.filter(r=>r.approval==='approved').map(r=><option key={r.referenceRevisionId} value={r.referenceRevisionId}>승인 {short(r.referenceRevisionId)}</option>)}</Select><Num label="기본 FPS" value={clip.defaultFps} min={1} max={60} onChange={defaultFps=>clipEdit('updateClip',{changes:{defaultFps}})}/><Check label="반복 재생" checked={clip.loop} onChange={loop=>clipEdit('updateClip',{changes:{loop}})}/><small>단발 재생은 마지막 프레임을 유지합니다.</small></section>{occurrence?<><section className="aw-property-group"><h3>슬롯 {index+1} · 이동·변형</h3><div className="number-grid">{(['dx','dy','scaleX','scaleY','rotationDeg','shearX','shearY'] as const).map(k=><Num key={k} label={{dx:'이동 X',dy:'이동 Y',scaleX:'가로 배율',scaleY:'세로 배율',rotationDeg:'회전 (°)',shearX:'기울기 X',shearY:'기울기 Y'}[k]} value={transform[k]} step={['scaleX','scaleY','shearX','shearY'].includes(k)?.05:1} min={k.startsWith('scale')?.05:undefined} max={k.startsWith('scale')?8:undefined} onChange={v=>setTransform({[k]:v})}/>)}<Num label="변형 중심 X" value={transform.pivot.x} onChange={x=>setTransform({pivot:{...transform.pivot,x}})}/><Num label="변형 중심 Y" value={transform.pivot.y} onChange={y=>setTransform({pivot:{...transform.pivot,y}})}/></div><Check label="좌우 반전" checked={transform.flipX} onChange={flipX=>setTransform({flipX})}/><Check label="상하 반전" checked={transform.flipY} onChange={flipY=>setTransform({flipY})}/><button type="button" disabled={blocked} onClick={()=>setTransform(defaultTransform(defaultPivot))}>변형 초기화</button></section><section className="aw-property-group"><h3>편집 보기</h3><Check label="이전·다음 프레임 겹쳐 보기" checked={onion} onChange={setOnion}/><button type="button" disabled={!onAction} onClick={()=>action('align',{frameVersionId:occurrence.frameVersionId})}>공통 크기·발 정렬 열기</button></section></>:<p className="aw-empty">후보를 순서에 추가한 뒤 슬롯을 선택하세요.</p>}</>:<div className="aw-empty"><p>먼저 동작을 만드세요.</p><button type="button" onClick={()=>{setLibraryTab('clips');setNewClipOpen(true);setView('library');}}>새 동작 만들기</button></div>}
         </div>
         <div id={`${id}-inspector-pixel`} className="aw-inspector-content aw-scroll" role="tabpanel" aria-labelledby={`${id}-inspector-tab-pixel`} hidden={inspectorTab!=='pixel'}>
