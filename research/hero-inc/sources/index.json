@@ -1,0 +1,98 @@
+{
+  "researched_at": "2026-10-03",
+  "timezone": "Asia/Seoul",
+  "sources": [
+    {
+      "id": "hero-notes",
+      "url": "https://suile-21173.web.app/hero-inc/prompts",
+      "title": "캐릭터 제작 노트",
+      "observed_scope": "브라우저 본문·펼침 코드·대기/웅크림 상호작용 확인"
+    },
+    {
+      "id": "threads-profile",
+      "url": "https://www.threads.com/@odlog_daily?hl=ko",
+      "title": "개발자 Threads",
+      "observed_scope": "프로필·작성자 필터 검색·관련 답글 확인; 전체 게시물 전수조사 아님"
+    },
+    {
+      "id": "threads-engine",
+      "url": "https://www.threads.com/@odlog_daily/post/Dbcix0xjztJ",
+      "title": "sprite-gen 사용 답글",
+      "observed_scope": "사용 언급 확인; 당시 수정본·버전 미확인"
+    },
+    {
+      "id": "threads-editor",
+      "url": "https://www.threads.com/@odlog_daily/post/DbiGHN0D1b_",
+      "title": "자체 편집기 답글",
+      "observed_scope": "상위 글은 VFX 궤적 작업이므로 캐릭터 통합 앱의 증거로 단정 불가"
+    },
+    {
+      "id": "threads-parent",
+      "url": "https://www.threads.com/@odlog_daily/post/DbiE5s-igOC",
+      "title": "편집기 답글의 상위 글",
+      "observed_scope": "VFX 궤적 작업 맥락"
+    },
+    {
+      "id": "youtube-channel",
+      "url": "https://www.youtube.com/@hero_inc-l6u",
+      "title": "용사주식회사 YouTube",
+      "observed_scope": "일반 영상 8개 메타데이터 및 관련 영상 2개 한국어 자막"
+    },
+    {
+      "id": "youtube-character",
+      "url": "https://www.youtube.com/watch?v=SWtjWL5ipEM&t=450s",
+      "title": "캐릭터 제작 제약",
+      "observed_scope": "07:30~08:17 자막; 이후 PXF 부분은 범위 제외"
+    },
+    {
+      "id": "youtube-background",
+      "url": "https://www.youtube.com/watch?v=yzUjQj1YGyg&t=70s",
+      "title": "배경과 캐릭터 가독성",
+      "observed_scope": "01:10~01:30 자막; 배경 제작은 구현 범위 제외"
+    },
+    {
+      "id": "sprite-gen",
+      "url": "https://github.com/aldegad/sprite-gen",
+      "title": "sprite-gen 저장소",
+      "observed_scope": "원격 README 및 로컬 설치 문서·CLI 도움말; 실제 생성 미실행"
+    },
+    {
+      "id": "curation",
+      "url": "https://github.com/aldegad/sprite-gen/blob/main/docs/curation.md",
+      "title": "큐레이션 계약",
+      "observed_scope": "저장·변형·출력 규칙; 실제 실행 UI 검증 필요"
+    },
+    {
+      "id": "dot-guide",
+      "url": "https://help.openai.com/en/articles/20001530-getting-started-with-your-dot",
+      "title": "dot 공식 안내",
+      "observed_scope": "dot 대화에서 작업 요청 가능; Slack은 별도 연결"
+    }
+  ],
+  "local_artifacts": [
+    "research/hero-inc/sources/SWtjWL5ipEM.info.json",
+    "research/hero-inc/sources/SWtjWL5ipEM.ko.txt",
+    "research/hero-inc/sources/SWtjWL5ipEM.ko.vtt",
+    "research/hero-inc/sources/youtube-channel.json",
+    "research/hero-inc/sources/yzUjQj1YGyg.en.vtt",
+    "research/hero-inc/sources/yzUjQj1YGyg.info.json",
+    "research/hero-inc/sources/yzUjQj1YGyg.ko.txt",
+    "research/hero-inc/sources/yzUjQj1YGyg.ko.vtt"
+  ],
+  "engine": {
+    "installed_path": "/Users/cheng80/.codex/skills/sprite-gen",
+    "skill_version": "2.12.1",
+    "verified": "CLI --help",
+    "not_verified": [
+      "실제 이미지 생성",
+      "전체 처리 파이프라인",
+      "인증",
+      "원격 main과 설치본 일치"
+    ]
+  },
+  "handoff": {
+    "sent_to_mydot": false,
+    "reason": "전용 전송 도구 없음; Codex 앱 직접 제어 차단; 내장 브라우저 ChatGPT 로그아웃"
+  },
+  "implementation_status": "조사·명세 작성, 포크와 앱 구현 전"
+}

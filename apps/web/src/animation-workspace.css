@@ -1,0 +1,244 @@
+/* Scoped editor surface. The parent provides the available viewport height. */
+.animation-workspace{height:100%;width:100%;min-width:0;min-height:0;overflow:hidden;container:animation-workspace / inline-size;--aw-top-height:44px;--aw-timeline-height:178px;--aw-line:#34404b;--aw-panel:#182028;--aw-inset:#141b22;--aw-selected:#294235;color:#e2eaf0;background:#111820}
+.animation-workspace .aw-layout{position:relative;display:grid;grid-template-columns:220px minmax(0,1fr) 280px;grid-template-rows:var(--aw-top-height) minmax(0,1fr) var(--aw-timeline-height);height:100%;min-height:0;min-width:0;overflow:hidden}
+.animation-workspace [hidden]{display:none!important}
+.animation-workspace button{min-height:30px;padding:5px 8px;border-radius:4px;font-size:11px;line-height:1.35;gap:5px;flex-shrink:0}
+.animation-workspace button svg{flex-shrink:0}
+.animation-workspace button:focus-visible,.animation-workspace [tabindex]:focus-visible{outline:2px solid #b2d8ff;outline-offset:-2px}
+.animation-workspace button[aria-pressed=true],.animation-workspace .is-selected{background:var(--aw-selected);border-color:#8ccca3;color:#dcffe9}
+.animation-workspace h2,.animation-workspace h3,.animation-workspace p{margin:0}
+.animation-workspace small{font-size:10px;line-height:1.6}
+.animation-workspace .field{margin:0 0 10px;gap:4px}
+.animation-workspace .field>label{font-size:11px;color:#b6c4d0}
+.animation-workspace .field input,.animation-workspace .field select{font-size:12px;min-height:32px;padding:5px 8px;border-radius:4px}
+.animation-workspace .field textarea{font-size:12px;min-height:74px;padding:7px;border-radius:4px}
+.animation-workspace .check{font-size:11px;min-height:30px;margin:2px 0;gap:7px}
+.animation-workspace .check input{width:15px;min-height:15px}
+.animation-workspace .caption{font-size:10px;line-height:1.6;margin-top:9px}
+.animation-workspace .badge{font-size:9px;padding:3px 6px;border-radius:4px}
+.animation-workspace .aw-scroll{min-height:0;min-width:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#4b5966 transparent}
+.animation-workspace .aw-toolbar{grid-column:1/-1;grid-row:1;display:flex;align-items:center;gap:10px;padding:6px 10px;min-width:0;background:#1c252e;border-bottom:1px solid var(--aw-line);z-index:4;overflow:hidden}
+.animation-workspace .aw-document{display:flex;align-items:center;gap:9px;min-width:0;flex:1;font-size:12px}
+.animation-workspace .aw-document>strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:230px;font-weight:600}
+.animation-workspace .aw-document>span{color:#a1b1be;font-size:10px;white-space:nowrap}
+.animation-workspace .aw-document>svg{flex-shrink:0;color:#b3d9bf}
+.animation-workspace .aw-toolbar-actions{display:flex;gap:5px;margin-left:auto;min-width:0;align-items:center}
+.animation-workspace .aw-view-switch{display:none;gap:4px;align-items:center;min-width:0}
+.animation-workspace .aw-pane{display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden;background:var(--aw-panel)}
+.animation-workspace .aw-library{grid-column:1;grid-row:2/4;border-right:1px solid var(--aw-line)}
+.animation-workspace .aw-inspector{grid-column:3;grid-row:2/4;border-left:1px solid var(--aw-line)}
+.animation-workspace .aw-pane-heading{display:flex;align-items:center;justify-content:space-between;min-height:37px;padding:5px 12px;flex-shrink:0}
+.animation-workspace .aw-pane-heading h2{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;line-height:1.4;letter-spacing:0}
+.animation-workspace .aw-pane-close{display:none}
+.animation-workspace .aw-source-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;padding:0 9px 9px;flex-shrink:0}
+.animation-workspace .aw-source-actions button{font-size:10px;padding:5px 3px;white-space:nowrap}
+.animation-workspace .aw-tabs{display:flex;flex-shrink:0;border-block:1px solid var(--aw-line);background:#141c23;padding:0 5px;min-height:34px}
+.animation-workspace .aw-tabs>button{flex:1;border:0;border-bottom:2px solid transparent;background:transparent;color:#aebecb;border-radius:0;min-height:34px;font-size:11px}
+.animation-workspace .aw-tabs>button[aria-selected=true]{border-bottom-color:#a2e8bf;color:#c6f8d8;background:#203028}
+.animation-workspace .aw-tabs>button>span{font-size:9px;color:#a6baae;margin-left:3px}
+.animation-workspace .aw-library-content{display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden}
+.animation-workspace .aw-clip-list,.animation-workspace .aw-candidate-list{flex:1;padding:7px}
+.animation-workspace .aw-clip{width:100%;display:flex;text-align:left;justify-content:flex-start;gap:8px;padding:10px 8px;margin-bottom:4px;min-height:57px;background:transparent;border:1px solid transparent;min-width:0;flex-shrink:1}
+.animation-workspace .aw-clip>span:nth-child(2){display:flex;flex-direction:column;min-width:0;flex:1;gap:3px}
+.animation-workspace .aw-clip strong{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.animation-workspace .aw-clip-icon{height:28px;width:25px;color:#9ac2a9;display:grid;place-items:center;flex-shrink:0}
+.animation-workspace .aw-clip .aw-state{font-size:9px;color:#b6ccbf;padding:2px 4px;background:#21332a;border-radius:3px}
+.animation-workspace .aw-pane-footer{padding:9px;border-top:1px solid var(--aw-line);background:#19222a;display:flex;flex-direction:column;gap:7px;flex-shrink:0;max-height:50%;overflow:auto}
+.animation-workspace .aw-wide{width:100%}
+.animation-workspace .aw-create-clip{padding-top:4px}
+.animation-workspace .aw-filter{padding:3px 10px;border-bottom:1px solid #2b3741;flex-shrink:0}
+.animation-workspace .aw-filter .check{font-size:10px}
+.animation-workspace .aw-candidate{display:flex;width:100%;padding:6px;align-items:center;text-align:left;justify-content:flex-start;gap:8px;background:#1a232c;border:1px solid #33414a;margin-bottom:7px;min-width:0}
+.animation-workspace .aw-candidate-thumb{width:66px;height:72px;flex-shrink:0;display:flex;justify-content:center;align-items:center;border-radius:3px;overflow:hidden;padding:5px}
+.animation-workspace .aw-candidate-thumb img{max-width:100%;max-height:100%;image-rendering:pixelated;object-fit:contain}
+.animation-workspace .aw-candidate-info{min-width:0;display:flex;flex-direction:column;gap:3px;overflow-wrap:anywhere}
+.animation-workspace .aw-candidate-info>strong{font-size:11px}
+.animation-workspace .aw-candidate-info>small{font-size:9px;line-height:1.45}
+.animation-workspace .aw-empty{font-size:12px;color:#a9bdca;text-align:center;padding:20px 10px;line-height:1.8}
+.animation-workspace .aw-empty button{margin-top:9px}
+.animation-workspace .aw-center{grid-column:2;grid-row:2;display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden;background:#10171e}
+.animation-workspace .aw-canvas-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:36px;flex-shrink:0;padding:4px 9px;border-bottom:1px solid var(--aw-line);background:#18222a;overflow:auto;scrollbar-width:thin}
+.animation-workspace .aw-canvas-heading>span{font-size:10px;white-space:nowrap;color:#acbeca}
+.animation-workspace .aw-target-switch{display:flex;gap:3px}
+.animation-workspace .aw-target-switch button{font-size:10px;min-height:26px;padding:3px 8px;background:transparent;border-color:transparent}
+.animation-workspace .aw-target-switch button[aria-pressed=true]{background:#304239;border-color:#536f5f}
+.animation-workspace .aw-canvas-area{display:grid;grid-template-columns:minmax(0,1fr);min-height:0;min-width:0;flex:1;overflow:hidden}
+.animation-workspace .aw-canvas-area.with-reference{grid-template-columns:minmax(0,.72fr) minmax(0,1fr)}
+.animation-workspace .aw-reference{min-width:0;min-height:0;display:flex;flex-direction:column;overflow:hidden;border-right:1px solid var(--aw-line);background:#172029}
+.animation-workspace .aw-reference-heading{min-height:34px;padding:5px 8px;display:flex;align-items:center;gap:6px;flex-shrink:0;flex-wrap:wrap}
+.animation-workspace .aw-reference-heading>strong{font-size:11px}
+.animation-workspace .aw-reference-heading>small{font:9px monospace;color:#abc0b2}
+.animation-workspace .aw-reference-heading button{margin-left:auto;min-height:24px;padding:3px;border:0;background:transparent}
+.animation-workspace .aw-reference-image{flex:1;min-height:0;overflow:auto;display:flex;align-items:flex-start;padding:16px}
+.animation-workspace .aw-reference-image img{margin:auto;max-width:100%;max-height:100%;object-fit:contain;image-rendering:pixelated}
+.animation-workspace .aw-reference>p{padding:7px 10px;font-size:10px;color:#acc0b2;max-height:48px;overflow:auto;flex-shrink:0;line-height:1.6}
+.animation-workspace .aw-canvas-host{min-width:0;min-height:0;overflow:hidden;position:relative}
+.animation-workspace .aw-canvas-host .canvas-shell{display:flex;flex-direction:column;height:100%;min-height:0;min-width:0;margin:0;border:0;border-radius:0;overflow:hidden}
+.animation-workspace .aw-canvas-host .canvas-toolbar{padding:5px 7px;gap:5px;min-height:42px;flex-shrink:0;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:thin}
+.animation-workspace .aw-canvas-host .canvas-toolbar .field{flex:0 0 100px;min-width:100px;margin:0}
+.animation-workspace .aw-canvas-host .canvas-toolbar>.badge{flex-shrink:0;font-size:8px;white-space:nowrap}
+.animation-workspace .aw-canvas-host .canvas-toolbar button{min-height:28px;white-space:nowrap;padding:4px 6px}
+.animation-workspace .aw-canvas-host .canvas-toolbar>.muted{flex-shrink:0;font-size:10px}
+.animation-workspace .aw-canvas-host .canvas-toolbar .field>label{font-size:9px}
+.animation-workspace .aw-canvas-host .canvas-toolbar select{min-height:26px;font-size:10px;padding:3px 6px}
+.animation-workspace .aw-canvas-host .stage{flex:1;min-height:0;max-height:none;min-width:0;padding:12px;align-items:flex-start;justify-content:flex-start;overflow:auto;overscroll-behavior:contain}
+.animation-workspace .aw-canvas-host .stage canvas{margin:auto;flex-shrink:0}
+.animation-workspace .aw-canvas-host .stage .empty{margin:auto;padding:15px;max-width:300px}
+.animation-workspace .aw-canvas-host .stage .empty-glyph{font-size:25px;margin-bottom:5px}
+.animation-workspace .aw-canvas-host .stage .empty h3{font-size:12px}
+.animation-workspace .aw-canvas-host .stage .empty p{font-size:10px;margin:7px 0}
+.animation-workspace .aw-canvas-host .playbar{flex-shrink:0;min-height:45px;flex-wrap:nowrap;justify-content:flex-start;gap:7px;padding:5px 8px;overflow-x:auto;scrollbar-width:thin;font-size:10px}
+.animation-workspace .aw-canvas-host .playbar>*{flex-shrink:0}
+.animation-workspace .aw-canvas-host .playbar .field{margin:0;min-width:84px;width:84px}
+.animation-workspace .aw-canvas-host .playbar .field>label{font-size:9px}
+.animation-workspace .aw-canvas-host .playbar select{min-height:26px;padding:3px 5px;font-size:10px}
+.animation-workspace .aw-canvas-host .playbar .check{font-size:10px;white-space:nowrap}
+.animation-workspace .aw-canvas-host .canvas-shell>.caption{padding:3px 9px;margin:0;min-height:20px;flex-shrink:0;font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.animation-workspace .aw-canvas-host .canvas-shell>.error{max-height:90px;overflow:auto;flex-shrink:0;margin:0;border-radius:0;padding:7px;font-size:11px}
+.animation-workspace .aw-raw-preview{height:100%;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+.animation-workspace .aw-raw-heading,.animation-workspace .aw-raw-caption{display:flex;align-items:center;gap:8px;padding:7px 10px;flex-wrap:wrap;background:#1b252e;flex-shrink:0}
+.animation-workspace .aw-raw-heading{justify-content:space-between;border-bottom:1px solid var(--aw-line)}
+.animation-workspace .aw-raw-image{flex:1;min-height:0;overflow:auto;display:flex;align-items:flex-start;padding:20px}
+.animation-workspace .aw-raw-image img{margin:auto;max-width:100%;max-height:100%;object-fit:contain;image-rendering:pixelated}
+.animation-workspace .aw-raw-caption{font-size:10px;color:#adc0cd;border-top:1px solid var(--aw-line)}
+.animation-workspace .aw-raw-caption button{margin-left:auto}
+.animation-workspace .aw-timeline{grid-column:2;grid-row:3;display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden;border-top:1px solid #4a5a66;background:#17212a}
+.animation-workspace .aw-timeline-heading{display:flex;align-items:center;gap:12px;min-height:35px;max-height:35px;flex-shrink:0;padding:4px 9px;border-bottom:1px solid #2f3e49}
+.animation-workspace .aw-timeline-heading h2{font-size:11px;letter-spacing:0;white-space:nowrap}
+.animation-workspace .aw-timeline-heading h2>span{color:#abc1b2;margin-left:5px;font-size:10px}
+.animation-workspace .aw-timeline-heading>span{font-size:10px;color:#a5b7c5;white-space:nowrap}
+.animation-workspace .aw-sequence-actions{display:flex;gap:4px;margin-left:auto}
+.animation-workspace .aw-sequence-actions>button{min-height:26px;min-width:27px;padding:4px 5px}
+.animation-workspace .aw-timeline-scroll{overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;min-height:0;flex:1;padding:7px 9px}
+.animation-workspace .aw-timeline-track{display:flex;align-items:stretch;gap:7px;min-width:100%;height:100%;min-height:68px;width:max-content}
+.animation-workspace .aw-frame-slot{position:relative;display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:3px;width:74px;min-width:74px;padding:4px;background:#22303c;border:1px solid #4b5966;overflow:hidden}
+.animation-workspace .aw-slot-number{position:absolute;top:5px;left:5px;padding:1px 3px;background:#163024;font:8px monospace;color:#c3f4d9;z-index:1}
+.animation-workspace .aw-slot-image{display:flex;align-items:center;justify-content:center;height:42px;min-height:24px;flex:1;overflow:hidden;border-radius:2px;padding:3px}
+.animation-workspace .aw-slot-image img{max-width:100%;max-height:100%;image-rendering:pixelated;object-fit:contain}
+.animation-workspace .aw-frame-slot>span:last-child{font-size:9px;text-align:center;flex-shrink:0;line-height:1.25}
+.animation-workspace .aw-timeline-empty{display:flex;align-items:center;justify-content:center;gap:12px;min-width:260px;flex:1;font-size:11px;color:#a1b3bf}
+.animation-workspace .aw-timing-controls{display:flex;align-items:center;gap:10px;min-height:45px;flex-shrink:0;padding:5px 10px;border-top:1px solid var(--aw-line);background:#1c2730;overflow-x:auto;scrollbar-width:thin}
+.animation-workspace .aw-timing-controls>.field{margin:0;display:flex;flex-direction:row;align-items:center;gap:6px;flex-shrink:0;position:relative}
+.animation-workspace .aw-timing-controls>.field>label{font-size:10px;white-space:nowrap}
+.animation-workspace .aw-timing-controls>.field>select{font-size:10px;min-height:28px;width:109px;padding:3px 5px}
+.animation-workspace .aw-timing-controls>.field>input{width:76px;min-height:28px;padding:3px 5px;font-size:11px}
+.animation-workspace .aw-timing-controls>.field>small{max-width:140px;font-size:9px;line-height:1.4}
+.animation-workspace .aw-timing-hint{font-size:9px;color:#a2b5c1;white-space:nowrap;margin-left:auto}
+.animation-workspace .aw-timing-controls>span{font-size:10px;color:#acbeca}
+.animation-workspace .aw-inspector-content{padding:12px;flex:1}
+.animation-workspace .aw-property-group{margin-bottom:18px;padding-bottom:16px;border-bottom:1px solid #34414d}
+.animation-workspace .aw-property-group:last-child{margin-bottom:0;border-bottom:0;padding-bottom:0}
+.animation-workspace .aw-property-group>h3{font-size:11px;letter-spacing:.2px;color:#d0dfe8;margin-bottom:12px;font-weight:600}
+.animation-workspace .aw-property-group .number-grid{gap:0 8px}
+.animation-workspace .aw-property-group fieldset{border:0;padding:0;margin:0;min-width:0}
+.animation-workspace .aw-button-pair{display:flex;gap:7px;margin-top:12px}
+.animation-workspace .aw-button-pair>button{flex:1}
+.animation-workspace .aw-review-actions{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.animation-workspace .aw-review-actions>button{font-size:10px;flex:1 0 45%;padding:5px}
+.animation-workspace .aw-inspector .candidate-review{background:transparent;border:0;border-radius:0;padding:0;margin:12px 0 0}
+.animation-workspace .aw-inspector .candidate-review h3{font-size:11px}
+.animation-workspace .aw-inspector .candidate-review>.row:first-child{gap:6px;margin-bottom:10px}
+.animation-workspace .aw-inspector .candidate-review>.row>.field{flex:1 0 100%;margin-bottom:8px;min-width:0}
+.animation-workspace .aw-inspector .comparison-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+.animation-workspace .aw-inspector .comparison-grid figcaption{font-size:9px;gap:2px;margin-bottom:4px}
+.animation-workspace .aw-inspector .comparison-grid figcaption .mono{font-size:8px}
+.animation-workspace .aw-inspector .comparison-grid figure>small{font-size:9px}
+.animation-workspace .aw-inspector .comparison-image{height:115px;padding:5px;border-radius:3px}
+.animation-workspace .aw-inspector .candidate-review .review-reason{padding:9px;margin:10px 0}
+.animation-workspace .aw-inspector .candidate-review .review-reason p{font-size:11px}
+.animation-workspace .aw-inspector .candidate-review>.row:last-child{display:flex;flex-direction:column;align-items:stretch;gap:6px}
+.animation-workspace .aw-clip-review{margin:16px 0 0}
+.animation-workspace .aw-clip-review>summary{font-size:11px;color:#d7e6ed;padding:7px 0;border-bottom:1px solid #40505b;min-height:32px}
+.animation-workspace .aw-review-inset{padding-top:12px;min-width:0}
+.animation-workspace .aw-review-inset>.two-columns{display:block}
+.animation-workspace .aw-review-inset .panel{padding:0;margin:0 0 18px;border:0;border-radius:0;background:transparent}
+.animation-workspace .aw-review-inset .panel-heading{margin:0 0 11px}
+.animation-workspace .aw-review-inset .panel-heading h2{font-size:12px}
+.animation-workspace .aw-review-inset .panel-heading .eyebrow{font-size:8px;letter-spacing:1px;margin-bottom:5px}
+.animation-workspace .aw-review-inset p{font-size:11px;margin-bottom:9px;line-height:1.6}
+.animation-workspace .aw-review-inset .list-card,.animation-workspace .aw-review-inset .job-card{padding:10px;margin:10px 0;border-radius:5px}
+.animation-workspace .aw-review-inset .list-card h3{font-size:12px}
+.animation-workspace .aw-review-inset .row{gap:5px}
+.animation-workspace .aw-review-inset .check{font-size:10px}
+.animation-workspace .aw-review-inset .callout{margin-top:10px;padding:10px}
+.animation-workspace .aw-review-inset .list-card .primary{width:100%;font-size:10px;margin-top:5px}
+.animation-workspace .aw-backdrop{display:none}
+
+@container animation-workspace (max-width:1099px){
+  .animation-workspace .aw-layout{grid-template-columns:minmax(0,1fr)}
+  .animation-workspace .aw-view-switch{display:flex}
+  .animation-workspace .aw-document>span{display:none}
+  .animation-workspace .aw-document>strong{max-width:140px}
+  .animation-workspace .aw-center,.animation-workspace .aw-timeline{grid-column:1}
+  .animation-workspace .aw-library,.animation-workspace .aw-inspector{display:none;position:absolute;grid-column:auto;grid-row:auto;inset:var(--aw-top-height) auto 0 0;z-index:7;width:260px;max-width:85%;box-shadow:10px 0 30px #0005;border-right:1px solid #566c61}
+  .animation-workspace .aw-inspector{inset:var(--aw-top-height) 0 0 auto;width:300px;border-right:0;border-left:1px solid #566c61;box-shadow:-10px 0 30px #0005}
+  .animation-workspace[data-view=library] .aw-library,.animation-workspace[data-view=inspector] .aw-inspector{display:flex}
+  .animation-workspace .aw-pane-close{display:inline-flex;min-height:26px;padding:4px}
+  .animation-workspace[data-view=library] .aw-backdrop,.animation-workspace[data-view=inspector] .aw-backdrop{display:block;position:absolute;inset:var(--aw-top-height) 0 0;z-index:6;background:#080e1566;border:0;border-radius:0;cursor:default;padding:0}
+  .animation-workspace .aw-timing-hint{display:none}
+}
+@container animation-workspace (max-width:680px){
+  .animation-workspace .aw-document{display:none}
+  .animation-workspace .aw-toolbar{gap:5px;padding-inline:6px}
+  .animation-workspace .aw-view-switch>button{font-size:10px;padding-inline:5px}
+  .animation-workspace .aw-toolbar-actions>button{font-size:10px;padding-inline:5px}
+  .animation-workspace .aw-timing-controls>.field>label{font-size:9px}
+  .animation-workspace .aw-timeline-heading>span{display:none}
+  .animation-workspace .aw-canvas-area.with-reference{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .animation-workspace .aw-reference-heading>small{display:none}
+  .animation-workspace .aw-canvas-host .canvas-shell>.caption{display:none}
+}
+@container animation-workspace (max-width:480px){
+  .animation-workspace .aw-layout{--aw-top-height:76px;--aw-timeline-height:168px}
+  .animation-workspace .aw-toolbar{flex-wrap:wrap;gap:3px;padding:4px 7px;align-content:center}
+  .animation-workspace .aw-view-switch{width:100%;height:32px;gap:5px}
+  .animation-workspace .aw-view-switch>button{flex:1;min-height:30px}
+  .animation-workspace .aw-toolbar-actions{width:100%;justify-content:flex-end;gap:5px;height:30px}
+  .animation-workspace .aw-toolbar-actions>button{min-height:27px}
+  .animation-workspace .aw-toolbar-actions>button:first-child{margin-right:auto}
+  .animation-workspace .aw-library,.animation-workspace .aw-inspector{position:static;inset:auto;grid-column:1;grid-row:2/4;width:100%;max-width:none;box-shadow:none;border:0;z-index:1}
+  .animation-workspace[data-view=library] .aw-center,.animation-workspace[data-view=library] .aw-timeline,.animation-workspace[data-view=inspector] .aw-center,.animation-workspace[data-view=inspector] .aw-timeline{display:none}
+  .animation-workspace[data-view=library] .aw-backdrop,.animation-workspace[data-view=inspector] .aw-backdrop{display:none}
+  .animation-workspace .aw-pane-close{display:none}
+  .animation-workspace .aw-pane-heading{min-height:32px}
+  .animation-workspace .aw-canvas-heading{padding:3px 6px;min-height:33px}
+  .animation-workspace .aw-canvas-heading>span{font-size:9px}
+  .animation-workspace .aw-target-switch>button{font-size:9px;padding:3px 6px}
+  .animation-workspace .aw-canvas-host .canvas-toolbar{min-height:35px}
+  .animation-workspace .aw-canvas-host .playbar{min-height:40px}
+  .animation-workspace .aw-reference-heading{padding:3px 5px;gap:3px;min-height:30px}
+  .animation-workspace .aw-reference-heading>strong{font-size:10px}
+  .animation-workspace .aw-reference-image{padding:8px}
+  .animation-workspace .aw-reference>p{font-size:9px;max-height:38px;padding:4px 6px}
+  .animation-workspace .aw-timeline-heading{padding-inline:6px;gap:5px;min-height:32px;max-height:32px}
+  .animation-workspace .aw-timeline-heading h2{font-size:10px}
+  .animation-workspace .aw-sequence-actions{gap:3px}
+  .animation-workspace .aw-sequence-actions>button{min-width:26px;padding:3px}
+  .animation-workspace .aw-timeline-scroll{padding:6px}
+  .animation-workspace .aw-timing-controls{gap:6px;padding:4px 6px;min-height:40px}
+  .animation-workspace .aw-timing-controls>.field{gap:3px}
+  .animation-workspace .aw-timing-controls>.field>select{width:99px;font-size:9px}
+  .animation-workspace .aw-timing-controls>.field>input{width:61px;font-size:10px}
+  .animation-workspace .aw-timing-controls>.field>label{font-size:8px}
+  .animation-workspace .aw-raw-heading{padding:5px;gap:5px}
+  .animation-workspace .aw-raw-heading>.badge{font-size:8px}
+  .animation-workspace .aw-raw-image{padding:12px}
+  .animation-workspace .aw-raw-caption{padding:5px;font-size:9px}
+}
+@media(prefers-reduced-motion:reduce){.animation-workspace *{scroll-behavior:auto!important;transition:none!important}}
+@media(forced-colors:active){.animation-workspace .is-selected,.animation-workspace button[aria-pressed=true]{outline:2px solid Highlight}.animation-workspace .aw-tabs>button[aria-selected=true]{border-bottom-color:Highlight}.animation-workspace .aw-pane,.animation-workspace .aw-timeline{border-color:CanvasText}}
+/* Short editor windows keep the bitmap useful instead of spending height on chrome. */
+@media(max-height:700px){
+ .animation-workspace .aw-layout{--aw-top-height:36px;--aw-timeline-height:140px}
+ .animation-workspace .aw-toolbar{padding-block:2px}
+ .animation-workspace .aw-canvas-host .canvas-toolbar{min-height:40px;padding-block:5px}
+ .animation-workspace .aw-canvas-host .canvas-toolbar>.badge{display:none}
+ .animation-workspace .aw-canvas-host .canvas-toolbar .field>label,
+ .animation-workspace .aw-canvas-host .playbar .field>label{position:absolute;width:1px;height:1px;clip-path:inset(50%);overflow:hidden;white-space:nowrap}
+ .animation-workspace .aw-canvas-host .playbar{min-height:40px;padding-block:4px}
+ .animation-workspace .aw-canvas-host .canvas-shell>.caption{display:none}
+ .animation-workspace .aw-timeline-track{min-height:0}
+ .animation-workspace .aw-timeline-heading{min-height:32px;max-height:32px}
+ .animation-workspace .aw-timing-controls{min-height:38px;padding-block:4px}
+}
+@media(max-height:700px) and (max-width:480px){.animation-workspace .aw-layout{--aw-top-height:68px}}

@@ -1,0 +1,2 @@
+# 고정된 외부 엔진은 원본 해시 검증을 위해 줄바꿈·공백을 보존한다.
+engine/sprite-gen/** -text -whitespace

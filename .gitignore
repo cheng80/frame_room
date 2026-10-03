@@ -1,0 +1,67 @@
+# 로컬 프로젝트·원본·생성 결과와 실행 기록
+.data/
+/artifacts/
+/output/
+/diagnostics/
+
+# 연구 원본·캡처·외부 다운로드는 로컬 보존, 출처 목록은 포함
+/research/**/artifacts/
+/research/**/sources/*
+!/research/**/sources/index.json
+/research/**/excluded/
+
+# 환경 설정·인증 정보·개인 키 (값 없는 예제는 포함)
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+.codex/
+.claude/
+.netrc
+.npmrc
+auth.json
+credentials.json
+credentials.*.json
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+
+# 설치 의존성·빌드 결과
+node_modules/
+dist/
+build/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.tsbuildinfo
+/apps/web/public/guide/frame-room-guide.zip
+
+# 테스트·브라우저·도구 캐시
+.pytest_cache/
+.pytest-cache/
+.mypy_cache/
+.ruff_cache/
+.cache/
+.coverage
+.coverage.*
+coverage/
+htmlcov/
+.playwright-cli/
+test-results/
+playwright-report/
+/engine/.*test-tmp/
+*.log
+
+# 운영체제·편집기 임시 파일
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+*.swo
+*~

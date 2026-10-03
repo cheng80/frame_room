@@ -1,0 +1,35 @@
+{
+  "checkedAtLocalDate": "2026-10-03",
+  "timezone": "Asia/Seoul",
+  "scope": "문서 존재·로컬 링크·JSON 예시·요구/시험 ID·미실행 표기; 앱 실행 검증 아님",
+  "markdownDocuments": 9,
+  "localLinksChecked": 46,
+  "jsonExamplesParsed": 2,
+  "requirementCount": 12,
+  "acceptanceTestCount": 34,
+  "acceptanceStatuses": {
+    "NOT_RUN": 34
+  },
+  "manualConsistencyChecks": [
+    "React+Vite/Python 구조",
+    "고정 engine commit",
+    "저장 ACK와 optional engineRevision",
+    "immutable asset/공통 배율/overflow",
+    "FPS/duration 및 hold-last",
+    "동일 bake/full RGBA parity",
+    "전체 UI/실제 provider와 모의 구분",
+    "내부 provider 재시도·동시성 통제"
+  ],
+  "issues": [],
+  "documents": {
+    "README.md": "b89e20d0b4e486859fd8cb834df84b863681d55cd3c408881552ae9eb15b4dfd",
+    "PRD.md": "86eea0a65e62a686687bf6b79ba8867184b0f620c00c3d5e048d092d56d46b9f",
+    "UX_DESIGN.md": "d2c4db44ba6ba6051f59eded4b95a90b2e719c6c2cb9ce674de9a9b9c0c0a69e",
+    "ARCHITECTURE.md": "5e6d19d408824b5b3217bab5c95cf7a10131a0470fec06e113b832c9300d935d",
+    "DATA_API_SPEC.md": "e7504af10360323752bdfd3dee89c721b395a681bb7f6d365f0371a6fa4909a6",
+    "IMPLEMENTATION_PLAN.md": "900906bc52a289f4ac9af3a68ff0e2240b4c567aaf507dddeb15d4eb07098133",
+    "ACCEPTANCE_TESTS.md": "50a1b61cd2bebf33d6beaff64e1eb09b14d68342d2bf13d47cc99b94880cdcb9",
+    "DECISIONS.md": "316a9784ec472051079d28fdc78182ccc0a634026cfc41e7fb11aa5158e6a7d2",
+    "HANDOFF.md": "bc4bfa533bf3d66680eaf312a32288f932b9dee9f7066cc1a8ea978efef01bad"
+  }
+}

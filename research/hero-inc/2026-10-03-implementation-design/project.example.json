@@ -1,0 +1,282 @@
+{
+  "schemaVersion": 1,
+  "exampleOnly": true,
+  "implementationStatus": "design-only",
+  "projectId": "project-example",
+  "headRevision": 12,
+  "engine": {
+    "version": "2.12.1",
+    "commit": "b058341f7543f3adcbea227bd4e6b7587895b1bc"
+  },
+  "assets": [
+    {
+      "assetId": "asset-standing",
+      "sha256": "1418d1e4f9160405dcbb680cf0a1ea426977c8feda96c5922d337ce3c211b7eb",
+      "originalFilename": "pose-0-aligned.png",
+      "mediaType": "image/png",
+      "width": 512,
+      "height": 512,
+      "storageKey": "artifacts/source-assets/pose-0-aligned.png",
+      "provenance": {
+        "kind": "import-converted-webp",
+        "sourceUrl": "https://suile-21173.web.app/hero-inc-guide/pose-0-aligned.webp",
+        "distribution": "research-fixture-only"
+      }
+    },
+    {
+      "assetId": "asset-horizontal",
+      "sha256": "9288c7d80dd3b879c8ea90ee759d5ddc07785b5ec7c9d26ba99d1c7239871126",
+      "originalFilename": "pose-1-aligned.png",
+      "mediaType": "image/png",
+      "width": 512,
+      "height": 512,
+      "storageKey": "artifacts/source-assets/pose-1-aligned.png",
+      "provenance": {
+        "kind": "import-converted-webp",
+        "sourceUrl": "https://suile-21173.web.app/hero-inc-guide/pose-1-aligned.webp",
+        "distribution": "research-fixture-only"
+      }
+    },
+    {
+      "assetId": "asset-crouching",
+      "sha256": "5206e3d761b79c1985de5faadaf26ae633101c01050ebc53c8d5a37baddd7ec8",
+      "originalFilename": "pose-3-aligned.png",
+      "mediaType": "image/png",
+      "width": 512,
+      "height": 512,
+      "storageKey": "artifacts/source-assets/pose-3-aligned.png",
+      "provenance": {
+        "kind": "import-converted-webp",
+        "sourceUrl": "https://suile-21173.web.app/hero-inc-guide/pose-3-aligned.webp",
+        "distribution": "research-fixture-only"
+      }
+    }
+  ],
+  "referenceRevisions": [
+    {
+      "referenceRevisionId": "ref-example-1",
+      "identityAssetId": "asset-standing",
+      "styleAssetIds": [],
+      "poseAssetIds": [],
+      "fixedTraits": [
+        "얼굴",
+        "모자",
+        "제복",
+        "총",
+        "색",
+        "몸·머리 비율"
+      ],
+      "allowedChanges": [
+        "관절 자세"
+      ],
+      "forbiddenTransfers": [],
+      "facing": "right",
+      "bodyMeasurement": null,
+      "approval": {
+        "status": "pending",
+        "approvedAt": null
+      }
+    }
+  ],
+  "alignmentGroups": [
+    {
+      "alignmentGroupId": "align-public-example",
+      "referenceRevisionId": "ref-example-1",
+      "mode": "preserve-source-scale",
+      "sharedScale": 1,
+      "approvedBodyHeight": null,
+      "targetBodyHeight": null,
+      "bodyMeasurementStatus": "not-measured",
+      "cell": {
+        "width": 512,
+        "height": 512,
+        "edgePadding": 2,
+        "bottomPadding": 18
+      },
+      "targetAnchor": [
+        256,
+        494
+      ],
+      "overflowPolicy": "review",
+      "resampler": "nearest",
+      "roundingVersion": "floor-v-plus-half-v1",
+      "frames": [
+        {
+          "frameVersionId": "fv-standing-1",
+          "sourceAnchor": [
+            256,
+            494
+          ],
+          "method": "lower-band-candidate",
+          "contactMode": "needs-review",
+          "manualApproval": false
+        },
+        {
+          "frameVersionId": "fv-horizontal-1",
+          "sourceAnchor": [
+            256,
+            494
+          ],
+          "method": "lower-band-candidate",
+          "contactMode": "needs-review",
+          "manualApproval": false
+        },
+        {
+          "frameVersionId": "fv-crouching-1",
+          "sourceAnchor": [
+            256.5,
+            494
+          ],
+          "method": "lower-band-candidate",
+          "contactMode": "needs-review",
+          "manualApproval": false
+        }
+      ],
+      "frameVersionIds": [
+        "fv-standing-1",
+        "fv-horizontal-1",
+        "fv-crouching-1"
+      ],
+      "groupRevisionId": "alignrev-example-1",
+      "bodyMeasurement": null
+    }
+  ],
+  "frameVersions": [
+    {
+      "frameId": "frame-standing",
+      "frameVersionId": "fv-standing-1",
+      "generationVersionId": null,
+      "rawAssetId": "asset-standing",
+      "sourceRect": [
+        0,
+        0,
+        512,
+        512
+      ],
+      "sourceToFrameTransform": [
+        1,
+        0,
+        0,
+        1,
+        0,
+        0
+      ],
+      "nativeScaleGroupId": "native-public-aligned",
+      "qa": {
+        "appearance": "unreviewed",
+        "sourceAlpha": "measured",
+        "anchor": "candidate"
+      }
+    },
+    {
+      "frameId": "frame-horizontal",
+      "frameVersionId": "fv-horizontal-1",
+      "generationVersionId": null,
+      "rawAssetId": "asset-horizontal",
+      "sourceRect": [
+        0,
+        0,
+        512,
+        512
+      ],
+      "sourceToFrameTransform": [
+        1,
+        0,
+        0,
+        1,
+        0,
+        0
+      ],
+      "nativeScaleGroupId": "native-public-aligned",
+      "qa": {
+        "appearance": "unreviewed",
+        "sourceAlpha": "measured",
+        "anchor": "candidate"
+      }
+    },
+    {
+      "frameId": "frame-crouching",
+      "frameVersionId": "fv-crouching-1",
+      "generationVersionId": null,
+      "rawAssetId": "asset-crouching",
+      "sourceRect": [
+        0,
+        0,
+        512,
+        512
+      ],
+      "sourceToFrameTransform": [
+        1,
+        0,
+        0,
+        1,
+        0,
+        0
+      ],
+      "nativeScaleGroupId": "native-public-aligned",
+      "qa": {
+        "appearance": "unreviewed",
+        "sourceAlpha": "measured",
+        "anchor": "candidate"
+      }
+    }
+  ],
+  "clips": [
+    {
+      "clipId": "clip-example",
+      "clipRevisionId": "cliprev-example-1",
+      "stateId": "aim-example",
+      "facing": "right",
+      "loop": false,
+      "endBehavior": "hold-last",
+      "defaultFps": 10,
+      "occurrences": [
+        {
+          "occurrenceId": "occ-1",
+          "frameVersionId": "fv-standing-1",
+          "durationMs": 80,
+          "authoredOffsetPx": [
+            0,
+            0
+          ],
+          "transform": {
+            "scale": 1,
+            "rotation": 0,
+            "flipX": false
+          },
+          "pixelEditRevision": null
+        },
+        {
+          "occurrenceId": "occ-2",
+          "frameVersionId": "fv-horizontal-1",
+          "durationMs": 120,
+          "authoredOffsetPx": [
+            0,
+            0
+          ],
+          "transform": {
+            "scale": 1,
+            "rotation": 0,
+            "flipX": false
+          },
+          "pixelEditRevision": null
+        },
+        {
+          "occurrenceId": "occ-3",
+          "frameVersionId": "fv-crouching-1",
+          "durationMs": 200,
+          "authoredOffsetPx": [
+            0,
+            0
+          ],
+          "transform": {
+            "scale": 1,
+            "rotation": 0,
+            "flipX": false
+          },
+          "pixelEditRevision": null
+        }
+      ]
+    }
+  ]
+}

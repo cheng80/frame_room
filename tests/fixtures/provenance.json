@@ -1,0 +1,50 @@
+[
+  {
+    "fixtureId": "robot-idle",
+    "kind": "SYNTHETIC",
+    "sourceUri": "make_fixtures.py",
+    "originalSha256": "be42b20bd7ead2b44cff2844570355bf01630d7f4545bdf0b3f47d3b8e427cd5",
+    "decodedFingerprint": "f97f1ccf02d1d3f660bedde062b120123ed8a8eaf33c438dc094ca6358af1eb4",
+    "generatorVersion": "1",
+    "seed": 0,
+    "approvedLandmarks": {
+      "foot": {
+        "x": 64,
+        "y": 114
+      }
+    },
+    "rightsNote": "Original geometric test fixture; CC0"
+  },
+  {
+    "fixtureId": "robot-step",
+    "kind": "SYNTHETIC",
+    "sourceUri": "make_fixtures.py",
+    "originalSha256": "a79969f00875329ac5663b60adbda2c7473a90d109154f9ca037c1f3e7847986",
+    "decodedFingerprint": "507bd7cfe6be3719471ec8cf30231e7eaf63194023271f3449de3d778733c5bf",
+    "generatorVersion": "1",
+    "seed": 0,
+    "approvedLandmarks": {
+      "foot": {
+        "x": 64,
+        "y": 114
+      }
+    },
+    "rightsNote": "Original geometric test fixture; CC0"
+  },
+  {
+    "fixtureId": "robot-crouch",
+    "kind": "SYNTHETIC",
+    "sourceUri": "make_fixtures.py",
+    "originalSha256": "2bad88d217c815e50d9d880d8e0ab50b36c1f182d611719359165a2e7771bc11",
+    "decodedFingerprint": "35852d52aae265770cd062c31d155a1550738190b021303f36ea2ba4300f0705",
+    "generatorVersion": "1",
+    "seed": 0,
+    "approvedLandmarks": {
+      "foot": {
+        "x": 64,
+        "y": 114
+      }
+    },
+    "rightsNote": "Original geometric test fixture; CC0"
+  }
+]

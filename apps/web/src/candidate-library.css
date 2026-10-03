@@ -1,0 +1,23 @@
+.cl-library{min-width:0;min-height:0;overflow:auto;overscroll-behavior:contain}
+.cl-library .cl-note,.cl-library .cl-meta{font-size:11px;line-height:1.5;margin:5px 0;overflow-wrap:anywhere;color:#b9c6d1}
+.cl-library .cl-group{border:1px solid #34434f;border-radius:6px;margin-bottom:10px;overflow:hidden;background:#141d25}
+.cl-library summary{cursor:pointer;overflow-wrap:anywhere;font-size:11px;line-height:1.5;padding:8px;color:#e1eaf1}
+.cl-library .cl-group>summary{background:#202c37}
+.cl-library .cl-group>summary>span{display:block;padding-left:13px;font-size:10px;color:#bbc9d5}
+.cl-library .cl-group-info{padding:5px 8px 8px;border-bottom:1px solid #34434f}
+.cl-library .cl-link{display:block;width:100%;min-width:0;text-align:left;white-space:normal;overflow-wrap:anywhere;font-size:11px;line-height:1.5;padding:5px 6px;background:transparent;color:#9edaf6;border:1px solid #344754;border-radius:4px;margin:4px 0}
+.cl-library .cl-link span{font-size:10px;color:#b9c6d1}
+.cl-library a{color:#9edaf6;overflow-wrap:anywhere;text-decoration:underline;text-underline-offset:2px}
+.cl-library .cl-entry{padding:6px;border-bottom:1px solid #34434f}
+.cl-library .cl-entry:last-child{border-bottom:0}
+.animation-workspace .cl-library .aw-candidate{margin-bottom:0}
+.animation-workspace .cl-library .aw-candidate-thumb{width:48px;height:58px}
+.cl-library .cl-entry-detail>summary{padding:6px 2px;color:#bed6e5}
+.cl-library .cl-lineage{padding:5px 0;border-top:1px solid #2e3c47}
+.cl-library .cl-lineage>small{font-size:10px;color:#b9c6d1}
+.cl-library .cl-uses{display:grid;gap:4px;margin-top:6px}
+.cl-library .cl-uses button{font-size:11px;line-height:1.5;text-align:left;white-space:normal;overflow-wrap:anywhere;padding:7px;min-height:32px}
+.cl-library .cl-history{border-top:1px solid #34434f;padding-top:4px}
+.cl-library .cl-history article{padding:8px 4px;border-bottom:1px solid #34434f;font-size:11px}
+.cl-library :is(summary,button,a):focus-visible{outline:2px solid #8fd8fa;outline-offset:-2px}
+@media(pointer:coarse){.cl-library summary,.cl-library .cl-link,.cl-library .cl-uses button{min-height:44px}}

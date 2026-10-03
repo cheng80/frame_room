@@ -1,0 +1,9 @@
+# Run from repository root; requirements.lock.txt records the installed resolution.
+-e ./engine/sprite-gen[dev]
+fastapi
+uvicorn
+python-multipart
+httpx
+pytest
+pillow
+numpy

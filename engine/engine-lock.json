@@ -1,0 +1,95 @@
+{
+  "schemaVersion": 1,
+  "engineVersion": "2.12.1",
+  "engineCommit": "b058341f7543f3adcbea227bd4e6b7587895b1bc",
+  "version": "2.12.1",
+  "commit": "b058341f7543f3adcbea227bd4e6b7587895b1bc",
+  "upstream": {
+    "repository": "https://github.com/aldegad/sprite-gen",
+    "tag": "v2.12.1",
+    "commit": "b058341f7543f3adcbea227bd4e6b7587895b1bc",
+    "archive": "research/hero-inc/2026-10-03-implementation-design/sources/engine-upstream/v2.12.1.tar.gz",
+    "archiveSha256": "b9142061b0c6cfe8e02fec7243ff4f07aba8a7d9f57130d8e805476aa8fc875f",
+    "fileCount": 360,
+    "inventory": "upstream-files.sha256.json"
+  },
+  "license": {
+    "spdx": "Apache-2.0",
+    "files": {
+      "LICENSE": "4dd13869245e356246a5b770723247bbb80a8f07a181d1d3d873a1734297cdb9",
+      "NOTICE": "0ac4097ea925ae623b611e489abaa5b2824146d98d04f2cdb86c95c5e2382ef0"
+    }
+  },
+  "patches": [
+    {
+      "path": "sprite_gen/gen/__init__.py",
+      "upstreamSha256": "ceaa876def2a070f09ab01a51c35d78fd075e9293c8f34431f5ad2f1bb4f5ef1",
+      "forkSha256": "a8d151754c5c461fb0ede9e91fe9efefbab2fea1db9eb54f4022bb433f34533e"
+    },
+    {
+      "path": "sprite_gen/gen/codex_provider.py",
+      "upstreamSha256": "8452ab62bc621cb0dab5debc3179bfd41b0c27ffce299bb22f597b1d9d6a012a",
+      "forkSha256": "2cfc0572cfdfbb1439a37fad92e579018772a9bb7af6eed53addea00cd9bf726"
+    },
+    {
+      "path": "tests/gen/test_gen.py",
+      "upstreamSha256": "70a12e0120dcef954d1a2c9bc98ed0472166d8285b405a23debd76c20f71ef01",
+      "forkSha256": "687f996968d0ca0740553816ad8e0091c452bfdc5e36f99ccc425ed321576057"
+    }
+  ],
+  "environment": {
+    "python": "3.12.13",
+    "platform": "macOS-26.7-arm64-arm-64bit",
+    "venv": "engine/sprite-gen/.venv",
+    "editable": "engine/sprite-gen",
+    "dependencies": {
+      "annotated-doc": "0.0.5",
+      "annotated-types": "0.8.0",
+      "anyio": "4.15.1",
+      "certifi": "2026.7.22",
+      "click": "8.5.0",
+      "fastapi": "0.142.2",
+      "h11": "0.16.0",
+      "httpcore": "1.0.9",
+      "httpx": "0.28.1",
+      "idna": "3.20",
+      "iniconfig": "2.3.0",
+      "numpy": "2.5.3",
+      "opentelemetry-api": "1.45.0",
+      "packaging": "26.3",
+      "pillow": "12.3.0",
+      "pluggy": "1.6.0",
+      "pydantic": "2.13.5",
+      "pydantic_core": "2.46.5",
+      "pygments": "2.21.0",
+      "pytest": "9.1.1",
+      "pytest-timeout": "2.4.0",
+      "python-multipart": "0.0.32",
+      "setuptools": "84.0.0",
+      "sprite-gen": "2.12.1",
+      "starlette": "1.7.0",
+      "typing-inspection": "0.4.4",
+      "typing_extensions": "4.16.0",
+      "uvicorn": "0.54.0"
+    }
+  },
+  "dependencyLock": {
+    "file": "requirements.lock.txt",
+    "sha256": "645c1dec7c8ca1143958a7a0a36bc98211f7e489da268f0d11cffdd1586e0f60"
+  },
+  "adapter": {
+    "version": "1.2.0",
+    "file": "adapters/spritegen/provider.py",
+    "sha256": "976470a7e35594f45791847005462407b4a814b035d316a1c8b6d41421dc1788"
+  },
+  "validation": {
+    "externalGenerationCalls": 0,
+    "login": "ChatGPT login-ready; not generation success",
+    "quota": "unknown",
+    "testsPassed": 108,
+    "warnings": 18,
+    "scope": "local provider/engine regressions; no external generation",
+    "providerTestsPassed": 48,
+    "upstreamGenerationTestsPassed": 60
+  }
+}

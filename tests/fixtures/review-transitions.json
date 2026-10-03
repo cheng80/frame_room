@@ -1,0 +1,977 @@
+{
+  "snapshot": {
+    "projectId": "p",
+    "revision": 1,
+    "activeReferenceRevisionId": "r",
+    "references": [
+      {
+        "referenceRevisionId": "r",
+        "approval": "approved"
+      },
+      {
+        "referenceRevisionId": "r2",
+        "approval": "approved"
+      }
+    ],
+    "frames": [
+      {
+        "frameVersionId": "f",
+        "nativeScaleGroupId": "g",
+        "review": "approved"
+      },
+      {
+        "frameVersionId": "other",
+        "nativeScaleGroupId": "other-g",
+        "review": "approved"
+      }
+    ],
+    "clips": [
+      {
+        "clipId": "c",
+        "clipRevisionId": "c-rev",
+        "name": "c",
+        "defaultFps": 10,
+        "referenceRevisionId": "r",
+        "loop": true,
+        "endBehavior": "hold-last",
+        "review": "approved",
+        "occurrences": [
+          {
+            "occurrenceId": "o",
+            "frameVersionId": "f",
+            "durationMs": 100,
+            "timingMode": "fps",
+            "transform": {
+              "dx": 0,
+              "dy": 0,
+              "scaleX": 1,
+              "scaleY": 1,
+              "rotationDeg": 0,
+              "shearX": 0,
+              "shearY": 0,
+              "flipX": false,
+              "flipY": false,
+              "pivot": {
+                "x": 32,
+                "y": 32
+              }
+            },
+            "pixelEdits": []
+          }
+        ]
+      },
+      {
+        "clipId": "unrelated",
+        "clipRevisionId": "unrelated-rev",
+        "name": "unrelated",
+        "defaultFps": 10,
+        "referenceRevisionId": "r",
+        "loop": true,
+        "endBehavior": "hold-last",
+        "review": "approved",
+        "occurrences": [
+          {
+            "occurrenceId": "other-o",
+            "frameVersionId": "other",
+            "durationMs": 100,
+            "timingMode": "fps",
+            "transform": {
+              "dx": 0,
+              "dy": 0,
+              "scaleX": 1,
+              "scaleY": 1,
+              "rotationDeg": 0,
+              "shearX": 0,
+              "shearY": 0,
+              "flipX": false,
+              "flipY": false,
+              "pivot": {
+                "x": 32,
+                "y": 32
+              }
+            },
+            "pixelEdits": []
+          }
+        ]
+      }
+    ],
+    "alignments": {
+      "f": {
+        "frameVersionId": "f",
+        "groupRevisionId": "gr",
+        "sourceAnchor": {
+          "x": 20,
+          "y": 30
+        },
+        "anchorSpace": "crop",
+        "method": "manual",
+        "contactMode": "grounded",
+        "authoredOffsetPx": {
+          "x": 0,
+          "y": 0
+        },
+        "approval": "approved"
+      },
+      "other": {
+        "frameVersionId": "other",
+        "groupRevisionId": "other-gr",
+        "sourceAnchor": {
+          "x": 20,
+          "y": 30
+        },
+        "anchorSpace": "crop",
+        "method": "manual",
+        "contactMode": "grounded",
+        "authoredOffsetPx": {
+          "x": 0,
+          "y": 0
+        },
+        "approval": "approved"
+      }
+    },
+    "alignmentGroups": [
+      {
+        "alignmentGroupId": "g",
+        "groupRevisionId": "gr",
+        "frameVersionIds": [
+          "f"
+        ],
+        "mode": "preserve-source-scale",
+        "sharedScale": 1,
+        "targetAnchor": {
+          "x": 20,
+          "y": 30
+        },
+        "cell": {
+          "width": 64,
+          "height": 64,
+          "edge": 2
+        }
+      },
+      {
+        "alignmentGroupId": "other-g",
+        "groupRevisionId": "other-gr",
+        "frameVersionIds": [
+          "other"
+        ],
+        "mode": "preserve-source-scale",
+        "sharedScale": 1,
+        "targetAnchor": {
+          "x": 20,
+          "y": 30
+        },
+        "cell": {
+          "width": 64,
+          "height": 64,
+          "edge": 2
+        }
+      }
+    ],
+    "outline": {
+      "enabled": false,
+      "mode": "preview-only",
+      "colorRGBA": [
+        0,
+        0,
+        0,
+        255
+      ],
+      "thicknessPx": 1,
+      "directions": 8,
+      "opacityPerCopy": 1
+    }
+  },
+  "cases": [
+    {
+      "name": "setTiming {'occurrenceId': 'o', 'durationMs': 200, 'timingMode': 'explicit'}",
+      "operations": [
+        {
+          "type": "setTiming",
+          "clipId": "c",
+          "occurrenceId": "o",
+          "durationMs": 200,
+          "timingMode": "explicit"
+        }
+      ],
+      "expected": {
+        "clips": [
+          {
+            "clipId": "c",
+            "review": "pending",
+            "reviewInvalidatedReason": "표시 시간이 변경되었습니다."
+          },
+          {
+            "clipId": "unrelated",
+            "review": "approved"
+          }
+        ],
+        "alignments": {
+          "f": {
+            "approval": "approved"
+          },
+          "other": {
+            "approval": "approved"
+          }
+        }
+      }
+    },
+    {
+      "name": "setTransform {'occurrenceId': 'o', 'transform': {'dx': 2}}",
+      "operations": [
+        {
+          "type": "setTransform",
+          "clipId": "c",
+          "occurrenceId": "o",
+          "transform": {
+            "dx": 2
+          }
+        }
+      ],
+      "expected": {
+        "clips": [
+          {
+            "clipId": "c",
+            "review": "pending",
+            "reviewInvalidatedReason": "프레임 변형이 변경되었습니다."
+          },
+          {
+            "clipId": "unrelated",
+            "review": "approved"
+          }
+        ],
+        "alignments": {
+          "f": {
+            "approval": "approved"
+          },
+          "other": {
+            "approval": "approved"
+          }
+        }
+      }
+    },
+    {
+      "name": "setPixelEdits {'occurrenceId': 'o', 'pixelEdits': [{'x': 1, 'y': 2, 'color': [0, 0, 0, 0]}]}",
+      "operations": [
+        {
+          "type": "setPixelEdits",
+          "clipId": "c",
+          "occurrenceId": "o",
+          "pixelEdits": [
+            {
+              "x": 1,
+              "y": 2,
+              "color": [
+                0,
+                0,
+                0,
+                0
+              ]
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "clips": [
+          {
+            "clipId": "c",
+            "review": "pending",
+            "reviewInvalidatedReason": "픽셀 편집이 변경되었습니다."
+          },
+          {
+            "clipId": "unrelated",
+            "review": "approved"
+          }
+        ],
+        "alignments": {
+          "f": {
+            "approval": "approved"
+          },
+          "other": {
+            "approval": "approved"
+          }
+        }
+      }
+    },
+    {
+      "name": "reorderOccurrences {'occurrenceIds': ['o']}",
+      "operations": [
+        {
+          "type": "reorderOccurrences",
+          "clipId": "c",
+          "occurrenceIds": [
+            "o"
+          ]
+        }
+      ],
+      "expected": {
+        "clips": [
+          {
+            "clipId": "c",
+            "review": "pending",
+            "reviewInvalidatedReason": "재생 순서가 변경되었습니다."
+          },
+          {
+            "clipId": "unrelated",
+            "review": "approved"
+          }
+        ],
+        "alignments": {
+          "f": {
+            "approval": "approved"
+          },
+          "other": {
+            "approval": "approved"
+          }
+        }
+      }
+    },
+    {
+      "name": "addOccurrence {'frameVersionId': 'f'}",
+      "operations": [
+        {
+          "type": "addOccurrence",
+          "clipId": "c",
+          "frameVersionId": "f"
+        }
+      ],
+      "expected": {
+        "clips": [
+          {
+            "clipId": "c",
+            "review": "pending",
+            "reviewInvalidatedReason": "재생 슬롯이 추가되었습니다."
+          },
+          {
+            "clipId": "unrelated",
+            "review": "approved"
+          }
+        ],
+        "alignments": {
+          "f": {
+            "approval": "approved"
+          },
+          "other": {
+            "approval": "approved"
+          }
+        }
+      }
+    },
+    {
+      "name": "duplicateOccurrence {'occurrenceId': 'o'}",
+      "operations": [
+        {
+          "type": "duplicateOccurrence",
+          "clipId": "c",
+          "occurrenceId": "o"
+        }
+      ],
+      "expected": {
+        "clips": [
+          {
+            "clipId": "c",
+            "review": "pending",
+            "reviewInvalidatedReason": "재생 슬롯이 복제되었습니다."
+          },
+          {
+            "clipId": "unrelated",
+            "review": "approved"
+          }
+        ],
+        "alignments": {
+          "f": {
+            "approval": "approved"
+          },
+          "other": {
+            "approval": "approved"
+          }
+        }
+      }
+    },
+    {
+      "name": "removeOccurrence {'occurrenceId': 'o'}",
+      "operations": [
+        {
+          "type": "removeOccurrence",
+          "clipId": "c",
+          "occurrenceId": "o"
+        }
+      ],
+      "expected": {
+        "clips": [
+          {
+            "clipId": "c",
+            "review": "pending",
+            "reviewInvalidatedReason": "재생 슬롯이 삭제되었습니다."
+          },
+          {
+            "clipId": "unrelated",
+            "review": "approved"
+          }
+        ],
+        "alignments": {
+          "f": {
+            "approval": "approved"
+          },
+          "other": {
+            "approval": "approved"
+          }
+        }
+      }
+    },
+    {
+      "name": "replaceFrameVersion {'occurrenceId': 'o', 'frameVersionId': 'other'}",
+      "operations": [
+        {
+          "type": "replaceFrameVersion",
+          "clipId": "c",
+          "occurrenceId": "o",
+          "frameVersionId": "other"
+        }
+      ],
+      "expected": {
+        "clips": [
+          {
+            "clipId": "c",
+            "review": "pending",
+            "reviewInvalidatedReason": "사용 프레임이 교체되었습니다."
+          },
+          {
+            "clipId": "unrelated",
+            "review": "approved"
+          }
+        ],
+        "alignments": {
+          "f": {
+            "approval": "approved"
+          },
+          "other": {
+            "approval": "approved"
+          }
+        }
+      }
+    },
+    {
+      "name": "updateClip {'changes': {'defaultFps': 20}}",
+      "operations": [
+        {
+          "type": "updateClip",
+          "clipId": "c",
+          "changes": {
+            "defaultFps": 20
+          }
+        }
+      ],
+      "expected": {
+        "clips": [
+          {
+            "clipId": "c",
+            "review": "pending",
+            "reviewInvalidatedReason": "동작 설정이 변경되었습니다."
+          },
+          {
+            "clipId": "unrelated",
+            "review": "approved"
+          }
+        ],
+        "alignments": {
+          "f": {
+            "approval": "approved"
+          },
+          "other": {
+            "approval": "approved"
+          }
+        }
+      }
+    },
+    {
+      "name": "updateClip {'changes': {'referenceRevisionId': 'r2', 'review': 'approved'}}",
+      "operations": [
+        {
+          "type": "updateClip",
+          "clipId": "c",
+          "changes": {
+            "referenceRevisionId": "r2",
+            "review": "approved"
+          }
+        }
+      ],
+      "expected": {
+        "clips": [
+          {
+            "clipId": "c",
+            "review": "pending",
+            "reviewInvalidatedReason": "연결된 기준이 변경되었습니다."
+          },
+          {
+            "clipId": "unrelated",
+            "review": "approved"
+          }
+        ],
+        "alignments": {
+          "f": {
+            "approval": "approved"
+          },
+          "other": {
+            "approval": "approved"
+          }
+        }
+      }
+    },
+    {
+      "name": "updateClip {'changes': {'loop': False, 'review': 'approved'}}",
+      "operations": [
+        {
+          "type": "updateClip",
+          "clipId": "c",
+          "changes": {
+            "loop": false,
+            "review": "approved"
+          }
+        }
+      ],
+      "expected": {
+        "clips": [
+          {
+            "clipId": "c",
+            "review": "pending",
+            "reviewInvalidatedReason": "동작 설정이 변경되었습니다."
+          },
+          {
+            "clipId": "unrelated",
+            "review": "approved"
+          }
+        ],
+        "alignments": {
+          "f": {
+            "approval": "approved"
+          },
+          "other": {
+            "approval": "approved"
+          }
+        }
+      }
+    },
+    {
+      "name": "full approved object cannot retain changed anchor approval",
+      "operations": [
+        {
+          "type": "setAlignment",
+          "frameVersionId": "f",
+          "alignment": {
+            "frameVersionId": "f",
+            "groupRevisionId": "gr",
+            "sourceAnchor": {
+              "x": 21,
+              "y": 30
+            },
+            "anchorSpace": "crop",
+            "method": "manual",
+            "contactMode": "grounded",
+            "authoredOffsetPx": {
+              "x": 0,
+              "y": 0
+            },
+            "approval": "approved"
+          }
+        }
+      ],
+      "expected": {
+        "clips": [
+          {
+            "clipId": "c",
+            "review": "pending",
+            "reviewInvalidatedReason": "앵커 설정이 변경되었습니다."
+          },
+          {
+            "clipId": "unrelated",
+            "review": "approved"
+          }
+        ],
+        "alignments": {
+          "f": {
+            "approval": "pending",
+            "reviewInvalidatedReason": "앵커 설정이 변경되었습니다."
+          },
+          "other": {
+            "approval": "approved"
+          }
+        }
+      }
+    },
+    {
+      "name": "partial anchor edit cannot retain approval",
+      "operations": [
+        {
+          "type": "setAlignment",
+          "frameVersionId": "f",
+          "alignment": {
+            "authoredOffsetPx": {
+              "x": 1,
+              "y": 0
+            }
+          }
+        }
+      ],
+      "expected": {
+        "clips": [
+          {
+            "clipId": "c",
+            "review": "pending",
+            "reviewInvalidatedReason": "앵커 설정이 변경되었습니다."
+          },
+          {
+            "clipId": "unrelated",
+            "review": "approved"
+          }
+        ],
+        "alignments": {
+          "f": {
+            "approval": "pending",
+            "reviewInvalidatedReason": "앵커 설정이 변경되었습니다."
+          },
+          "other": {
+            "approval": "approved"
+          }
+        }
+      }
+    },
+    {
+      "name": "explicit pending full anchor records reason",
+      "operations": [
+        {
+          "type": "setAlignment",
+          "frameVersionId": "f",
+          "alignment": {
+            "frameVersionId": "f",
+            "groupRevisionId": "gr",
+            "sourceAnchor": {
+              "x": 20,
+              "y": 30
+            },
+            "anchorSpace": "crop",
+            "method": "manual",
+            "contactMode": "grounded",
+            "authoredOffsetPx": {
+              "x": 0,
+              "y": 0
+            },
+            "approval": "pending"
+          }
+        }
+      ],
+      "expected": {
+        "clips": [
+          {
+            "clipId": "c",
+            "review": "pending",
+            "reviewInvalidatedReason": "앵커 설정이 변경되었습니다."
+          },
+          {
+            "clipId": "unrelated",
+            "review": "approved"
+          }
+        ],
+        "alignments": {
+          "f": {
+            "approval": "pending",
+            "reviewInvalidatedReason": "앵커 설정이 변경되었습니다."
+          },
+          "other": {
+            "approval": "approved"
+          }
+        }
+      }
+    },
+    {
+      "name": "group invalidates anchors and dependent clips",
+      "operations": [
+        {
+          "type": "setAlignmentGroup",
+          "alignmentGroupId": "g",
+          "changes": {
+            "targetAnchor": {
+              "x": 21,
+              "y": 30
+            }
+          }
+        }
+      ],
+      "expected": {
+        "clips": [
+          {
+            "clipId": "c",
+            "review": "pending",
+            "reviewInvalidatedReason": "정렬 그룹 설정이 변경되었습니다."
+          },
+          {
+            "clipId": "unrelated",
+            "review": "approved"
+          }
+        ],
+        "alignments": {
+          "f": {
+            "approval": "pending",
+            "reviewInvalidatedReason": "정렬 그룹 설정이 변경되었습니다."
+          },
+          "other": {
+            "approval": "approved"
+          }
+        }
+      }
+    },
+    {
+      "name": "outline invalidates every clip",
+      "operations": [
+        {
+          "type": "setOutline",
+          "outline": {
+            "enabled": true
+          }
+        }
+      ],
+      "expected": {
+        "clips": [
+          {
+            "clipId": "c",
+            "review": "pending",
+            "reviewInvalidatedReason": "테두리 설정이 변경되었습니다."
+          },
+          {
+            "clipId": "unrelated",
+            "review": "pending",
+            "reviewInvalidatedReason": "테두리 설정이 변경되었습니다."
+          }
+        ],
+        "alignments": {
+          "f": {
+            "approval": "approved"
+          },
+          "other": {
+            "approval": "approved"
+          }
+        }
+      }
+    },
+    {
+      "name": "frame review invalidates dependent clip",
+      "operations": [
+        {
+          "type": "setFrameReview",
+          "frameVersionId": "f",
+          "review": "rejected",
+          "reason": "형태 확인 필요"
+        }
+      ],
+      "expected": {
+        "clips": [
+          {
+            "clipId": "c",
+            "review": "pending",
+            "reviewInvalidatedReason": "사용 프레임의 수동 승인 상태가 변경되었습니다."
+          },
+          {
+            "clipId": "unrelated",
+            "review": "approved"
+          }
+        ],
+        "alignments": {
+          "f": {
+            "approval": "approved"
+          },
+          "other": {
+            "approval": "approved"
+          }
+        }
+      }
+    },
+    {
+      "name": "never invent prior approval",
+      "operations": [
+        {
+          "type": "setAlignment",
+          "frameVersionId": "f",
+          "alignment": {
+            "sourceAnchor": {
+              "x": 21,
+              "y": 30
+            },
+            "reviewInvalidatedReason": "forged"
+          }
+        }
+      ],
+      "expected": {
+        "clips": [
+          {
+            "clipId": "c",
+            "review": "pending"
+          },
+          {
+            "clipId": "unrelated",
+            "review": "pending"
+          }
+        ],
+        "alignments": {
+          "f": {
+            "approval": "pending"
+          },
+          "other": {
+            "approval": "approved"
+          }
+        }
+      },
+      "initialPending": true
+    },
+    {
+      "name": "manual clip unapproval",
+      "operations": [
+        {
+          "type": "updateClip",
+          "clipId": "c",
+          "changes": {
+            "review": "pending"
+          }
+        }
+      ],
+      "expected": {
+        "clips": [
+          {
+            "clipId": "c",
+            "review": "pending",
+            "reviewInvalidatedReason": "동작 승인이 해제되었습니다."
+          },
+          {
+            "clipId": "unrelated",
+            "review": "approved"
+          }
+        ],
+        "alignments": {
+          "f": {
+            "approval": "approved"
+          },
+          "other": {
+            "approval": "approved"
+          }
+        }
+      }
+    },
+    {
+      "name": "reapproval clears reasons including echoed full object",
+      "operations": [
+        {
+          "type": "setAlignment",
+          "frameVersionId": "f",
+          "alignment": {
+            "frameVersionId": "f",
+            "groupRevisionId": "gr",
+            "sourceAnchor": {
+              "x": 21,
+              "y": 30
+            },
+            "anchorSpace": "crop",
+            "method": "manual",
+            "contactMode": "grounded",
+            "authoredOffsetPx": {
+              "x": 0,
+              "y": 0
+            },
+            "approval": "approved"
+          }
+        },
+        {
+          "type": "setAlignment",
+          "frameVersionId": "f",
+          "alignment": {
+            "frameVersionId": "f",
+            "groupRevisionId": "gr",
+            "sourceAnchor": {
+              "x": 21,
+              "y": 30
+            },
+            "anchorSpace": "crop",
+            "method": "manual",
+            "contactMode": "grounded",
+            "authoredOffsetPx": {
+              "x": 0,
+              "y": 0
+            },
+            "approval": "approved",
+            "reviewInvalidatedReason": "앵커 설정이 변경되었습니다."
+          }
+        },
+        {
+          "type": "updateClip",
+          "clipId": "c",
+          "changes": {
+            "review": "approved"
+          }
+        }
+      ],
+      "expected": {
+        "clips": [
+          {
+            "clipId": "c",
+            "review": "approved"
+          },
+          {
+            "clipId": "unrelated",
+            "review": "approved"
+          }
+        ],
+        "alignments": {
+          "f": {
+            "approval": "approved"
+          },
+          "other": {
+            "approval": "approved"
+          }
+        }
+      }
+    },
+    {
+      "name": "unchanged full approved anchor permits explicit approval",
+      "operations": [
+        {
+          "type": "setAlignment",
+          "frameVersionId": "f",
+          "alignment": {
+            "frameVersionId": "f",
+            "groupRevisionId": "gr",
+            "sourceAnchor": {
+              "y": 30,
+              "x": 20
+            },
+            "anchorSpace": "crop",
+            "method": "manual",
+            "contactMode": "grounded",
+            "authoredOffsetPx": {
+              "x": 0,
+              "y": 0
+            },
+            "approval": "approved"
+          }
+        }
+      ],
+      "expected": {
+        "clips": [
+          {
+            "clipId": "c",
+            "review": "pending",
+            "reviewInvalidatedReason": "앵커 설정이 변경되었습니다."
+          },
+          {
+            "clipId": "unrelated",
+            "review": "approved"
+          }
+        ],
+        "alignments": {
+          "f": {
+            "approval": "approved"
+          },
+          "other": {
+            "approval": "approved"
+          }
+        }
+      }
+    }
+  ]
+}

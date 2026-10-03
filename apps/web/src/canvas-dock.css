@@ -1,0 +1,48 @@
+/* Only the animation workspace owns a viewport-height dock. Other pages keep
+   their existing natural-height canvas/viewer layout. */
+.animation-workspace .canvas-shell {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  max-height: 100%;
+  margin-bottom: 0;
+  overflow: hidden;
+}
+
+.animation-workspace .canvas-shell > .canvas-toolbar,
+.animation-workspace .canvas-shell > .playbar {
+  flex: 0 0 auto;
+  min-width: 0;
+  gap: 6px;
+  padding: 8px 10px;
+}
+
+.animation-workspace .canvas-shell > .stage {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  max-height: none;
+  padding: 12px;
+  overflow: auto;
+  /* Manual zoom scrolls from the start instead of clipping half the bitmap. */
+  align-items: safe center;
+  justify-content: safe center;
+  overscroll-behavior: contain;
+}
+
+.animation-workspace .canvas-shell > .caption {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 4px 10px 7px;
+}
+
+.animation-workspace .canvas-shell > .error {
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: 25%;
+  overflow: auto;
+  margin: 0;
+}

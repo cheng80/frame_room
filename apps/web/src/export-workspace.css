@@ -1,0 +1,142 @@
+/* Export owns the dialog's available height; scroll only its work areas. */
+.editor-tool .tool-content-export {
+  overflow: hidden;
+  scrollbar-gutter: auto;
+}
+
+.export-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 350px);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 12px;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.export-workspace .export-view-switch { display: none; }
+
+.editor-tool .export-workspace .panel,
+.export-workspace > .export-preview,
+.export-workspace .export-sidebar > .panel {
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 12px;
+}
+
+.export-workspace > .export-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.export-workspace .export-preview-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex: 0 0 auto;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.export-workspace .export-preview-heading h2 { margin: 0; font-size: 14px; }
+.export-workspace .export-preview-heading .caption { margin: 3px 0 0; }
+.export-workspace .export-preview-heading .row { gap: 5px; }
+.export-workspace .export-preview-heading button { min-height: 32px; padding: 5px 8px; font-size: 11px; }
+.export-workspace .export-preview-version { flex: 0 0 auto; margin: 0; }
+.export-workspace .export-preview-empty { flex: 1; min-height: 0; overflow: auto; display: grid; align-items: center; }
+
+/* RuntimePlayer's standalone sizing remains unchanged outside this workspace. */
+.export-workspace .canvas-shell {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  overflow: hidden;
+}
+
+.export-workspace .canvas-shell > .canvas-toolbar,
+.export-workspace .canvas-shell > .playbar {
+  flex: 0 0 auto;
+  min-width: 0;
+  gap: 6px;
+  padding: 8px;
+}
+
+.export-workspace .canvas-shell > .stage {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  max-height: none;
+  padding: 12px;
+  overflow: auto;
+  align-items: safe center;
+  justify-content: safe center;
+  overscroll-behavior: contain;
+}
+
+.export-workspace .canvas-shell > .caption { flex: 0 0 auto; margin: 0; padding: 4px 8px 7px; }
+.export-workspace .canvas-shell > .error { flex: 0 1 auto; min-height: 0; max-height: 25%; overflow: auto; margin: 0; }
+
+.export-workspace .export-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.export-workspace .export-settings {
+  flex: 0 1 auto;
+  max-height: 60%;
+  overflow: auto;
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
+}
+
+.export-workspace .export-settings > .panel-heading { margin-bottom: 8px; }
+.export-workspace .export-settings > p { font-size: 12px; }
+.export-workspace .export-actions { gap: 6px; margin: 10px 0; }
+.export-workspace .export-actions > button { flex: 1 1 120px; font-size: 12px; }
+.export-workspace .export-format-help { margin: 8px 0; }
+.export-workspace .export-format-help .deliverables { font-size: 11px; }
+.export-workspace .export-settings .gate-list { font-size: 11px; padding: 8px 8px 8px 24px; }
+
+.export-workspace .export-history {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.export-workspace .export-history > .panel-heading { flex: 0 0 auto; margin-bottom: 8px; }
+.export-workspace .export-history-list {
+  flex: 1 1 0;
+  min-height: 0;
+  min-width: 0;
+  overflow: auto;
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
+}
+.export-workspace .export-history-list .list-card { margin: 0 0 8px; padding: 10px; font-size: 11px; overflow-wrap: anywhere; }
+.export-workspace .export-history-list .row { gap: 6px; }
+.export-workspace .export-history-list .button,
+.export-workspace .export-history-list button { max-width: 100%; font-size: 11px; min-height: 32px; padding: 5px 8px; overflow-wrap: anywhere; }
+.export-workspace .export-history-list .export-current { border-color: var(--mint); }
+.export-workspace .export-history-list .empty { padding: 20px 8px; }
+
+@media (max-width: 600px) {
+  .export-workspace { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); gap: 8px; }
+  .export-workspace .export-view-switch { display: flex; gap: 6px; }
+  .export-workspace .export-view-switch button { flex: 1; min-height: 34px; padding: 6px 8px; font-size: 12px; }
+  .export-workspace .export-view-switch button[aria-pressed=true] { background: #243b2e; color: #c8f4d8; border-color: #4a7057; }
+  .export-workspace[data-view=preview] > .export-sidebar { display: none; }
+  .export-workspace[data-view=settings] > .export-preview { display: none; }
+  .export-workspace .export-sidebar { gap: 8px; }
+}

@@ -1,0 +1,19 @@
+.workflow-inspection,.next-work-panel{min-width:0;overflow-wrap:anywhere}
+.workflow-inspection{border-top:1px solid #40505b;padding-top:12px;margin-top:14px}
+.workflow-inspection>button{margin-top:8px;max-width:100%;white-space:normal}
+.workflow-inspection>small,.inspection-issues small,.next-work-list small{display:block;color:#aebfcc;font-size:11px;line-height:1.6}
+.workflow-status{font-size:12px;font-weight:600;padding-block:10px;color:#e8cf94}
+.next-work-list,.inspection-issues{list-style:none;padding:0;margin:12px 0;display:grid;gap:12px}
+.next-work-list>li{padding-bottom:10px;border-bottom:1px solid #34414d}
+.next-work-list button{width:100%;justify-content:flex-start;text-align:left;white-space:normal;margin-bottom:5px}
+.inspection-issues>li{padding:10px;border:1px solid #4f4941;border-radius:5px;background:#25282c;min-width:0}
+.inspection-issues strong{font-size:11px;color:#e8cf94}
+.inspection-issues p{font-size:11px;line-height:1.6;margin:5px 0!important}
+.inspection-issues button{margin-top:8px;white-space:normal}
+.inspection-issues details{font-size:10px;margin-top:8px}
+.inspection-issues code{font-size:10px;overflow-wrap:anywhere}
+.animation-workspace .aw-next-button{color:#d3ecd9;border-color:#587462}
+.animation-workspace .aw-next-button span{max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.approval-explanation{padding:8px;border-left:2px solid #a3b8c6;background:#1c2832;font-size:11px;line-height:1.65;margin-block:8px}
+.approval-recheck{color:#ead39d;font-size:11px;line-height:1.65}
+@container animation-workspace (max-width:680px){.animation-workspace .aw-next-button span{max-width:125px}}
