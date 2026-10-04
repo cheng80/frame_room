@@ -27,7 +27,7 @@ def upload(c,p,data=None):
     r=c.post('/v1/projects/'+p['projectId']+'/assets',files=[('files',('sprite.png',data or png(),'image/png'))]);assert r.status_code==201,r.text
     return load(c,p),r.json()['assets'][0]
 def run_job(jid):
-    j=s.get_job(jid);out=s.DATA/'jobs'/jid/j['attemptId']/'staging';out.mkdir(parents=True,exist_ok=True)
+    j=s.get_job(jid);out=s.job_directory(jid)/j['attemptId']/'staging';out.mkdir(parents=True,exist_ok=True)
     result=execute(j,out);publish(j,{'ok':True,'result':result});return s.get_job(jid)
 def queue(c,p,operation,asset_ids=[],params={}):
     r=c.post('/v1/projects/'+p['projectId']+'/jobs',json={'operation':operation,'inputRevision':p['revision'],'assetIds':asset_ids,'params':params,'idempotencyKey':s.uid()});assert r.status_code==202,r.text
@@ -49,6 +49,198 @@ def test_upload_batch_atomic_immutable_and_duplicate(client):
     assert len(load(c,p)['assets'])==1
     p,b=upload(c,p,png((0,255,0,255)));assert a['sha256']!=b['sha256'];assert s.digest(path.read_bytes())==h
     r=c.post('/v1/projects/'+p['projectId']+'/duplicate',json={'expectedRevision':p['revision'],'name':'사본'});assert r.status_code==201;assert r.json()['projectId']!=p['projectId']
+
+def deletion_state():
+    """Snapshot only the fixture's temporary store, including retained bytes."""
+    with s.connect() as db:
+        rows={table:[tuple(row) for row in db.execute(f'SELECT * FROM {table} ORDER BY rowid')]
+              for table in ('projects','revisions','assets','jobs','events','artifacts','exports')}
+    files={str(path.relative_to(s.DATA)):path.read_bytes()
+           for directory in ('assets','jobs','artifacts','uploads')
+           for path in (s.DATA/directory).rglob('*') if path.is_file()}
+    return rows,files
+
+
+def test_delete_project_removes_records_preserves_shared_assets_and_other_project(client):
+    c=client;p,asset=approved(c)
+    p=edit(c,p,[{'type':'updateClip','clipId':p['clips'][0]['clipId'],'changes':{'review':'approved'}}])
+    pid=p['projectId'];url='/v1/projects/'+pid
+    export_body={'savedRevision':p['revision'],'clipRevisionIds':[p['clips'][0]['clipRevisionId']],'idempotencyKey':s.uid()}
+    response=c.post(url+'/exports',json=export_body);assert response.status_code==202,response.text
+    exported=response.json();run_job(exported['jobId'])
+    duplicate=c.post(url+'/duplicate',json={'expectedRevision':p['revision'],'name':'공유 원본 사본'})
+    assert duplicate.status_code==201
+    other=duplicate.json();other_url='/v1/projects/'+other['projectId']
+    other_export=c.post(other_url+'/exports',json={**export_body,'savedRevision':other['revision'],'clipRevisionIds':[other['clips'][0]['clipRevisionId']],'idempotencyKey':s.uid()})
+    assert other_export.status_code==202,other_export.text
+    other_output=other_export.json();other_job=run_job(other_output['jobId'])
+    before,files=deletion_state()
+    deleted_jobs={row[0] for row in before['jobs'] if row[1]==pid}
+    deleted_artifacts=[row[0] for row in before['artifacts'] if row[1] in deleted_jobs]
+    assert deleted_artifacts and len(deleted_jobs)>=2
+    assert c.get(url+'/revisions').json()['revisions']
+    assert c.get('/v1/exports/'+exported['exportId']).status_code==200
+    response=c.request('DELETE',url,json={'expectedRevision':p['revision']})
+    assert response.status_code==200 and response.json()=={'deletedProjectId':pid}
+    assert {item['projectId'] for item in c.get('/v1/projects').json()['projects']}=={other['projectId']}
+    for suffix in ('','/revisions','/jobs','/exports'):
+        response=c.get(url+suffix)
+        assert response.status_code==404 and response.json()['code']=='PROJECT_NOT_FOUND'
+    for jid in deleted_jobs:
+        for suffix in ('','/events'):
+            response=c.get('/v1/jobs/'+jid+suffix)
+            assert response.status_code==404 and response.json()['code']=='JOB_NOT_FOUND'
+        assert c.post('/v1/jobs/'+jid+'/retry',json={'idempotencyKey':s.uid()}).status_code==404
+        assert c.post('/v1/jobs/'+jid+'/cancel',json={'expectedStatus':'succeeded'}).status_code==404
+    for aid in deleted_artifacts:
+        assert c.get('/v1/artifacts/'+aid+'/download').status_code==404
+    assert c.get('/v1/exports/'+exported['exportId']).status_code==404
+    # Old revisions, idempotency keys, and job endpoints cannot resurrect this ID.
+    assert c.post(url+'/restore-revision',json={'expectedRevision':p['revision'],'targetRevision':1}).status_code==404
+    assert c.post(url+'/duplicate',json={'expectedRevision':p['revision'],'name':'부활 금지'}).status_code==404
+    assert c.patch(url+'/edits',json={'expectedRevision':p['revision'],'operations':[{'type':'updateCharacter','name':'부활 금지'}]}).status_code==404
+    assert c.post(url+'/exports',json=export_body).status_code==404
+    assert c.post(url+'/jobs',json={'operation':'inspect','inputRevision':p['revision'],'idempotencyKey':s.uid()}).status_code==404
+    assert c.post(url+'/backup',json={'savedRevision':p['revision']}).status_code==404
+    assert c.request('DELETE',url,json={'expectedRevision':p['revision']}).status_code==404
+    after,remaining_files=deletion_state()
+    for table in ('projects','revisions','jobs','exports'):
+        key_index=1 if table=='jobs' else 2 if table=='exports' else 0
+        assert after[table]==[row for row in before[table] if row[key_index]!=pid],table
+    for table in ('events','artifacts'):
+        key_index=0 if table=='events' else 1
+        assert after[table]==[row for row in before[table] if row[key_index] not in deleted_jobs],table
+    assert after['assets']==before['assets']
+    assert remaining_files==files
+    assert load(c,other)==other
+    assert asset['assetId'] in {a['assetId'] for a in other['assets']}
+    for a in other['assets']:
+        response=c.get(a['url']);assert response.status_code==200
+        assert s.digest(response.content)==a['sha256']
+    assert c.get('/v1/exports/'+other_output['exportId']).status_code==200
+    for artifact in other_job['artifacts']:
+        assert c.get(artifact['url']).status_code==200
+
+
+@pytest.mark.parametrize('status',['queued','running','cancel_requested'])
+def test_delete_project_rejects_active_jobs_without_changes(client,status):
+    c=client;p,asset=upload(c,new(c));j=queue(c,p,'extract',[asset['assetId']],{'mode':'whole'})
+    with s.transaction() as db:
+        job=s.get_job(j['jobId'],db);job['status']=status;s.write_job(db,job)
+    before=deletion_state()
+    response=c.request('DELETE','/v1/projects/'+p['projectId'],json={'expectedRevision':p['revision']})
+    assert response.status_code==409 and response.json()['code']=='PROJECT_BUSY'
+    assert '취소' in response.json()['message']
+    assert deletion_state()==before
+    # A cancellation request is still active; only its terminal result unblocks deletion.
+    with s.transaction() as db:
+        job=s.get_job(j['jobId'],db);job['status']='canceled';s.write_job(db,job)
+    assert c.request('DELETE','/v1/projects/'+p['projectId'],json={'expectedRevision':p['revision']}).status_code==200
+
+
+@pytest.mark.parametrize('status',['succeeded','needs_review','failed','canceled','interrupted','provider_outcome_unknown'])
+def test_delete_project_allows_terminal_jobs(client,status):
+    c=client;p=new(c);j=queue(c,p,'inspect')
+    with s.transaction() as db:
+        job=s.get_job(j['jobId'],db);job['status']=status;s.write_job(db,job)
+    response=c.request('DELETE','/v1/projects/'+p['projectId'],json={'expectedRevision':p['revision']})
+    assert response.status_code==200
+    assert c.post('/v1/jobs/'+j['jobId']+'/retry',json={'idempotencyKey':s.uid()}).status_code==404
+    with s.connect() as db:
+        assert not db.execute('SELECT 1 FROM events WHERE job_id=?',(j['jobId'],)).fetchone()
+
+
+@pytest.mark.parametrize('body',[
+    {},{'expectedRevision':0},{'expectedRevision':-1},{'expectedRevision':True},
+    {'expectedRevision':False},{'expectedRevision':1.0},{'expectedRevision':1.5},
+    {'expectedRevision':'1'},{'expectedRevision':None},{'expectedRevision':[]},
+    {'expectedRevision':{}},{'expectedRevision':1,'force':True},None,[],
+])
+def test_delete_project_strict_body_preserves_records(client,body):
+    c=client;p=new(c);queue(c,p,'inspect');before=deletion_state()
+    response=c.request('DELETE','/v1/projects/'+p['projectId'],json=body)
+    assert response.status_code==422 and response.json()['code']=='VALIDATION_ERROR'
+    assert deletion_state()==before
+
+
+@pytest.mark.parametrize('headers',[
+    {'X-Session-Token':''},{'X-Session-Token':'incorrect'},
+    {'Origin':'https://evil.invalid'},
+])
+def test_delete_project_security_preserves_records(client,headers):
+    c=client;p,asset=upload(c,new(c));before=deletion_state()
+    response=c.request('DELETE','/v1/projects/'+p['projectId'],json={'expectedRevision':p['revision']},headers=headers)
+    assert response.status_code==403
+    assert response.json()['code']==('ORIGIN_FORBIDDEN' if 'Origin' in headers else 'SESSION_REQUIRED')
+    assert deletion_state()==before
+
+
+def test_delete_project_revision_conflict_precedes_busy_check(client):
+    c=client;p=new(c);old=p['revision'];p,asset=upload(c,p);queue(c,p,'inspect')
+    before=deletion_state()
+    response=c.request('DELETE','/v1/projects/'+p['projectId'],json={'expectedRevision':old})
+    assert response.status_code==409 and response.json()['code']=='REVISION_CONFLICT'
+    assert response.json()['details']=={'expectedRevision':old,'savedRevision':p['revision']}
+    assert deletion_state()==before
+    response=c.request('DELETE','/v1/projects/missing',json={'expectedRevision':1})
+    assert response.status_code==404 and response.json()['code']=='PROJECT_NOT_FOUND'
+    assert deletion_state()==before
+
+
+def test_delete_project_rolls_back_all_dependent_deletes(client):
+    import sqlite3
+    c=client;p,asset=upload(c,new(c))
+    response=c.post('/v1/projects/'+p['projectId']+'/backup',json={'savedRevision':p['revision']})
+    run_job(response.json()['jobId']);before=deletion_state()
+    with s.connect() as db:
+        db.execute("CREATE TRIGGER reject_project_delete BEFORE DELETE ON projects BEGIN SELECT RAISE(ABORT, 'injected delete failure'); END")
+    with pytest.raises(sqlite3.IntegrityError,match='injected delete failure'):
+        c.request('DELETE','/v1/projects/'+p['projectId'],json={'expectedRevision':p['revision']})
+    assert deletion_state()==before
+
+
+def test_delete_project_during_idempotent_export_cannot_recreate_export(client,monkeypatch):
+    from services.api import main as api
+    c=client;p,_=approved(c)
+    p=edit(c,p,[{'type':'updateClip','clipId':p['clips'][0]['clipId'],'changes':{'review':'approved'}}])
+    pid=p['projectId'];url='/v1/projects/'+pid
+    body={'savedRevision':p['revision'],'clipRevisionIds':[p['clips'][0]['clipRevisionId']],'idempotencyKey':s.uid()}
+    response=c.post(url+'/exports',json=body);assert response.status_code==202
+    run_job(response.json()['jobId'])
+    enqueue=api.enqueue
+    def delete_after_enqueue(*args,**kwargs):
+        job=enqueue(*args,**kwargs)
+        api.delete_project(pid,api.DeleteProject(expectedRevision=p['revision']))
+        return job
+    monkeypatch.setattr(api,'enqueue',delete_after_enqueue)
+    response=c.post(url+'/exports',json=body)
+    assert response.status_code==404 and response.json()['code']=='PROJECT_NOT_FOUND'
+    with s.connect() as db:
+        assert not db.execute('SELECT 1 FROM exports WHERE project_id=?',(pid,)).fetchone()
+        assert not db.execute('SELECT 1 FROM jobs WHERE project_id=?',(pid,)).fetchone()
+
+
+def test_delete_project_serializes_with_new_job_submission(client):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+    c=client;p=new(c);url='/v1/projects/'+p['projectId'];barrier=Barrier(2)
+    def remove():
+        barrier.wait(timeout=5)
+        return c.request('DELETE',url,json={'expectedRevision':p['revision']})
+    def submit():
+        barrier.wait(timeout=5)
+        return c.post(url+'/jobs',json={'operation':'inspect','inputRevision':p['revision'],'idempotencyKey':s.uid()})
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        removing=pool.submit(remove);submitting=pool.submit(submit)
+        deleted=removing.result(timeout=10);queued=submitting.result(timeout=10)
+    if deleted.status_code==200:
+        assert queued.status_code==404 and queued.json()['code']=='PROJECT_NOT_FOUND'
+        with s.connect() as db:
+            assert not db.execute('SELECT 1 FROM jobs WHERE project_id=?',(p['projectId'],)).fetchone()
+    else:
+        assert deleted.status_code==409 and deleted.json()['code']=='PROJECT_BUSY'
+        assert queued.status_code==202
+        assert load(c,p)==p
 
 def test_conflict_and_empty_export(client):
     c=client;p=new(c);p2=edit(c,p,[{'type':'createClip','clip':{'name':'빈 동작'}}])

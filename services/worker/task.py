@@ -9,12 +9,16 @@ def asset_from_image(image,name,provenance):
     b=io.BytesIO(); image.save(b,format='PNG'); return s.register_asset(b.getvalue(),name,'derived',provenance)
 
 def backup(snapshot,out):
-    files={}; asset_records=[]
+    from services.api import videos
+    files={}; asset_records=[]; video_records=[]
     for a in snapshot['assets']:
         path=s.asset_path(a['assetId']); name='assets/'+a['sha256']; files[name]=path
         asset_records.append(dict(assetId=a['assetId'],file=name,sha256=a['sha256']))
+    for v in snapshot.get('videos',[]):
+        path=videos.path_for(v['videoId']);name='videos/'+v['sha256']+'.mp4';files[name]=path
+        video_records.append(dict(videoId=v['videoId'],file=name,sha256=v['sha256']))
     with zipfile.ZipFile(out/'project-backup.zip','w',zipfile.ZIP_DEFLATED) as z:
-        z.writestr('project.json',s.dumps({'schemaVersion':1,'snapshot':snapshot,'assets':asset_records}))
+        z.writestr('project.json',s.dumps({'schemaVersion':1,'snapshot':snapshot,'assets':asset_records,'videos':video_records}))
         for name,path in files.items(): z.write(path,name)
     return dict(files=['project-backup.zip'],summary='프로젝트 백업 완료')
 
@@ -41,7 +45,19 @@ def restore(request,out):
                 if not old or old['sha256']!=a['sha256']: raise s.AppError('BACKUP_ASSETS','백업 자료 목록이 일치하지 않습니다.')
                 meta=s.validate_image(data,old['originalFilename']); pending.append((old,data,meta))
             if {a['assetId'] for a,_,_ in pending}!={a['assetId'] for a in p['assets']}: raise s.AppError('BACKUP_ASSETS','필수 자료가 누락되었습니다.')
-            mapping={}
+            from services.api import videos
+            pending_videos=[];seen_videos=set()
+            for record in payload.get('videos',[]):
+                if record['videoId'] in seen_videos: raise s.AppError('BACKUP_DUPLICATE','중복 영상이 있는 백업입니다.')
+                seen_videos.add(record['videoId'])
+                old=next((v for v in p.get('videos',[]) if v['videoId']==record['videoId']),None)
+                data=z.read(record['file'])
+                if not old or old['sha256']!=record['sha256'] or s.digest(data)!=record['sha256']: raise s.AppError('BACKUP_HASH','백업 영상 해시가 일치하지 않습니다.')
+                pending_videos.append((old,data,videos.validate(data,old['originalFilename'])))
+            if seen_videos!={v['videoId'] for v in p.get('videos',[])}: raise s.AppError('BACKUP_VIDEOS','필수 영상이 누락되었습니다.')
+            mapping={};video_mapping={}
+            for old,data,meta in pending_videos:
+                video_mapping[old['videoId']]=videos.register(data,old['originalFilename'],old.get('provenance'),meta)
             for old,data,meta in pending:
                 new=s.register_asset(data,old['originalFilename'],old['role'],old['provenance'],meta); mapping[old['assetId']]=new
             # Portable snapshot contains only relative public URLs. Remap each opaque asset use.
@@ -49,29 +65,41 @@ def restore(request,out):
                 if isinstance(v,dict): return {k:remap(x) for k,x in v.items()}
                 if isinstance(v,list): return [remap(x) for x in v]
                 if isinstance(v,str) and v in mapping: return mapping[v]['assetId']
+                if isinstance(v,str) and v in video_mapping: return video_mapping[v]['videoId']
                 return v
-            p=remap(p); p['assets']=list(mapping.values()); p=s.remap_reference_ids(p)
+            p=remap(p);p['assets']=[remap(x) for x in mapping.values()];p['videos']=[remap(x) for x in video_mapping.values()];p=s.remap_reference_ids(p)
+            # DB provenance must match the remapped portable snapshot too.
+            with s.transaction() as c:
+                for a in p['assets']: c.execute('UPDATE assets SET metadata=? WHERE id=?',(s.dumps(a),a['assetId']))
+                for v in p['videos']: c.execute('UPDATE videos SET metadata=? WHERE id=?',(s.dumps(v),v['videoId']))
             p.update(projectId=s.uid(),name=p['name']+' (복원)',revision=1,journal=[],createdAt=s.now())
             return dict(restoredProject=p,files=[])
     except (zipfile.BadZipFile,KeyError,ValueError,TypeError) as e: raise s.AppError('BACKUP_INVALID','손상되었거나 지원하지 않는 백업입니다.') from e
 
 def execute(j,out):
+    with s.project_scope(j.get('projectId')):
+        return _execute(j,out)
+
+def _execute(j,out):
     from alignment.pipeline import extract_regions,suggest_anchor,cutout_image,build_bundle
     p=j['snapshot']; request=j['request']; op=j['operation']; params=request.get('params',{})
     out.mkdir(parents=True,exist_ok=True)
     if op=='backup': return backup(p,out)
     if op=='restore': return restore(request,out)
+    if op in ('generate_video','process_video'):
+        from services.worker.video_task import execute_video
+        return execute_video(j,out)
     if op=='generate':
         from adapters.spritegen.provider import generate
         rid=params.get('referenceRevisionId',p['activeReferenceRevisionId']); ref=next(r for r in p['references'] if r['referenceRevisionId']==rid)
         checkpoint=out.parent/'provider-completed.json'
         if j.get('reuseProviderAttemptId') and not checkpoint.exists():
-            prior=s.DATA/'jobs'/j['jobId']/j['reuseProviderAttemptId']/'provider-completed.json'
+            prior=s.job_directory(j['jobId'])/j['reuseProviderAttemptId']/'provider-completed.json'
             recovered=json.loads(prior.read_text())
             local=[]
             for i,name in enumerate(recovered['providerResult']['paths']):
-                source=Path(name).resolve()
-                if not source.is_relative_to(s.DATA) or not source.is_file(): raise s.AppError('CHECKPOINT_MISSING','확정 생성 원본이 없습니다.')
+                source=s.resolve_work_path(j['jobId'],name)
+                if not source.is_relative_to(s.job_directory(j['jobId']).resolve()) or not source.is_file(): raise s.AppError('CHECKPOINT_MISSING','확정 생성 원본이 없습니다.')
                 expected=recovered['providerResult']['receipt'].get('sha256')
                 if expected and s.digest(source.read_bytes())!=expected: raise s.AppError('CHECKPOINT_HASH','생성 원본의 해시가 다릅니다.')
                 target=out/f'recovered-{i}.png'; shutil.copyfile(source,target); local.append(str(target))
@@ -81,6 +109,7 @@ def execute(j,out):
             saved=json.loads(checkpoint.read_text())
             if saved['requestHash']!=j['requestHash']: raise s.AppError('CHECKPOINT_HASH','생성 체크포인트의 입력이 다릅니다.')
             result=saved['providerResult']
+            result['paths']=[str(s.resolve_work_path(j['jobId'],name)) for name in result['paths']]
         else:
             if params.get('scope')=='frame':
                 frame=next((f for f in p['frames'] if f['frameVersionId']==params.get('frameVersionId')),None)
@@ -152,14 +181,14 @@ def execute(j,out):
 def main():
     jid,attempt_id=sys.argv[1:3]; s.init(); j=s.get_job(jid)
     if j['attemptId']!=attempt_id: return
-    out=s.DATA/'jobs'/jid/attempt_id/'staging'; result_path=out.parent/'result.json'
+    out=s.job_directory(jid)/attempt_id/'staging'; result_path=out.parent/'result.json'
     try:
         if j.get('reuseResultAttemptId'):
-            previous=s.DATA/'jobs'/jid/j['reuseResultAttemptId']
+            previous=s.job_directory(jid)/j['reuseResultAttemptId']
             payload=json.loads((previous/'result.json').read_text())
             if not payload.get('ok'): raise s.AppError('CHECKPOINT_INVALID','완료 체크포인트가 없습니다.')
             source=previous/'staging'
-            if not source.exists(): source=s.DATA/'artifacts'/jid/j['reuseResultAttemptId']
+            if not source.exists(): source=s.artifact_directory(jid)/j['reuseResultAttemptId']
             shutil.copytree(source,out)
             result=payload['result']
             for name,expected in result.get('publicationHashes',{}).items():

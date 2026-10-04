@@ -39,7 +39,7 @@ from typing import Any
 from PIL import Image
 
 from sprite_gen._deps import np
-from sprite_gen.frames.cutout import cutout
+from sprite_gen.frames.cutout import cutout, extract_route
 from sprite_gen.frames.decontam import palette_from_stats
 from sprite_gen.frames.extract import is_border_key_candidate
 from sprite_gen.frames.extract import _SPILL_FULL_MIN_TINT, DEFAULT_UNMIX_REACH
@@ -236,6 +236,28 @@ def key_frames(
                        spill_require_hue=spill == "full", decontam=decontam, decontam_fit=DECONTAM_FIT,
                        decontam_palette=clip_palette)
         image = Image.open(dst).convert("RGBA")
+        # v2.18's edge-band rule, adapted here rather than overwriting this
+        # fork's cyan cutout/extract changes. Decontamination may recover a thin
+        # strand away from the perimeter, but must not invent new contact on
+        # the top/left/right band that the original matte left transparent.
+        if stats.get("decontam", {}).get("applied"):
+            stats["decontam"]["edge_band"] = EDGE_ROWS
+            if any(edge_contact(image).values()) and str(stats.get("route", "")).startswith("extract:"):
+                kind = stats["route"].split(":", 1)[1]
+                with Image.open(src) as original:
+                    matte, _ = extract_route(original.convert("RGBA"), kind,
+                                              spill_max_fraction=spill_max, spill_min_tint=spill_tint,
+                                              spill_require_hue=spill == "full", decontam="off",
+                                              background_key=tuple(stats["chroma_key_painted"]))
+                pixels = np.asarray(image).copy()
+                band = np.zeros(pixels.shape[:2], dtype=bool)
+                band[:EDGE_ROWS, :] = band[:, :EDGE_ROWS] = band[:, -EDGE_ROWS:] = True
+                invented = band & (np.asarray(matte)[..., 3] == 0) & (pixels[..., 3] > 0)
+                stats["decontam"]["edge_band_suppressed"] = int(invented.sum())
+                if invented.any():
+                    pixels[invented] = 0
+                    image = Image.fromarray(pixels, "RGBA")
+                    image.save(dst)
         hist = image.getchannel("A").histogram()
         w, h = image.size
         alpha_zero_pct = round(100 * hist[0] / (w * h), 2)
@@ -280,6 +302,7 @@ def key_frames(
             "palette_keyfree": decontam_first["palette_keyfree"],
             "key_material_share": decontam_first["key_material_share"],
             "material_spread": decontam_first["material_spread"],
+            "edge_band": EDGE_ROWS,
             "applied_frames": decontam_applied,
             "totals": decontam_totals,
         }

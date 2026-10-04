@@ -51,6 +51,7 @@ CORNER_MIN_BRIGHT = 225  # a corner pixel must be at least this bright (min chan
 KEY_TARGETS: dict[str, tuple[int, int, int]] = {
     "magenta": (255, 0, 255),
     "green": (0, 255, 0),
+    "cyan": (0, 255, 255),
 }
 # extract.remove_chroma_background params — the extract CLI defaults (SSoT: extract.py argparse).
 _EXTRACT_KEY_THRESHOLD = 96.0
@@ -342,7 +343,7 @@ def cutout(
 ) -> dict[str, Any]:
     """Cut a uniform-background imported image to a clean transparent RGBA PNG.
 
-    `key`: "auto" (detect from corners) | "white" (matte) | "magenta" | "green"
+    `key`: "auto" (detect from corners) | "white" (matte) | "magenta" | "green" | "cyan"
     (reuse the extract chroma engine). `spill_max_fraction` overrides the chroma
     engine's trapped-spill cluster cap and `spill_min_tint` its tint bar (None = the
     engine default for either). `decontam` is the engine's edge decontamination
@@ -352,8 +353,8 @@ def cutout(
     stats dict. Raises SystemExit if the key is unknown, the background cannot be
     located, or any transparent pixel keeps non-zero RGB (No Silent Fallback).
     """
-    if key not in ("auto", "white", "magenta", "green"):
-        raise SystemExit(f"cutout: unknown key {key!r}; expected one of auto|white|magenta|green")
+    if key not in ("auto", "white", *KEY_TARGETS):
+        raise SystemExit(f"cutout: unknown key {key!r}; expected one of auto|white|magenta|green|cyan")
     if decontam not in ("off", "auto", "palette"):
         raise SystemExit(f"cutout: unknown decontam {decontam!r}; expected off|auto|palette")
 
@@ -361,7 +362,7 @@ def cutout(
     width, height = image.size
 
     route = _detect_key_kind(_corner_average(image)) if key == "auto" else key
-    if route in ("magenta", "green"):
+    if route in KEY_TARGETS:
         result, route_stats = extract_route(image, route, spill_max_fraction=spill_max_fraction,
                                             spill_min_tint=spill_min_tint, spill_require_hue=spill_require_hue,
                                             decontam=decontam, decontam_fit=decontam_fit,
@@ -423,7 +424,7 @@ def add_arguments(p: Any) -> None:
     p.add_argument("--out", type=Path, help="output PNG (default: <input>_cutout.png)")
     p.add_argument(
         "--key",
-        choices=["auto", "white", "magenta", "green"],
+        choices=["auto", "white", "magenta", "green", "cyan"],
         default="auto",
         help="background type; auto detects from corners (white→matte, magenta/green→extract engine)",
     )

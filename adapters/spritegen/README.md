@@ -1,5 +1,9 @@
 # Provider adapter 통합
 
+영상 제작은 별도 `video_provider.py`와 `video_processing.py`를 사용한다. `video_provider`는 Grok 로그인·단일 POST·durable request ID·GET 재개를 담당하고, `video_processing`은 동작용 캔버스·프롬프트·추출·구간 선택·시간 보존을 담당한다. [영상 계약](../../packages/contracts/VIDEO.md), [앱 실측](../../docs/product/VIDEO_EDITOR_INTEGRATION_2026-10-04.md)을 참고한다. 아래 내용은 기존 Codex 이미지 어댑터 계약이다.
+
+영상 프롬프트는 Apache-2.0 공개 [sprite-gen v2.19.0 batch.py](https://github.com/aldegad/sprite-gen/blob/v2.19.0/sprite_gen/video/batch.py)의 방향·Lite 보행·장비 유지 지침을 반영했다. 기존 vendored engine의 LICENSE·NOTICE는 유지한다.
+
 `engine/sprite-gen/.venv/bin/python`으로 repository root에서 import한다.
 
 ```python

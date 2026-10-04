@@ -481,7 +481,7 @@ def test_drop_specks_erases_detached_slivers_only() -> None:
 
 def test_prompt_uses_state_and_view_and_optional_character() -> None:
     p = batch_mod.build_prompt("side", "walk", "The armored knight")
-    assert p.startswith("2D game sprite animation. The armored knight moves in place on a treadmill")
+    assert p.startswith("2D game sprite animation. The armored knight walks naturally in place, as if on a treadmill")
     assert "seen from the exact side" in p
     assert "The character" in batch_mod.build_prompt("back", "jump", None)
 

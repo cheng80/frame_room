@@ -609,7 +609,7 @@ def _test_reseal_artifacts(directory):
     _test_write_json(directory / "runtime.json", runtime)
     with zipfile.ZipFile(directory / "bundle.zip") as archive:
         entries = {name: archive.read(name) for name in archive.namelist()}
-    for name in ("atlas.png", "pngs.zip", "runtime.json", "aseprite.json", "qa.json"):
+    for name in ("runtime.json", *(item["name"] for item in runtime["files"])):
         entries[name] = (directory / name).read_bytes()
     _test_zip_replace(directory / "bundle.zip", entries)
 

@@ -30,7 +30,28 @@ body{-webkit-font-smoothing:antialiased}
 .project-browser-toolbar{display:flex;gap:20px;align-items:center;justify-content:space-between;margin-bottom:28px}
 .project-browser h1{font-size:24px;letter-spacing:-.5px;margin-bottom:5px}.project-browser-toolbar p{font-size:13px;color:var(--muted);margin:0}
 .project-list-heading,.project-file{display:grid!important;grid-template-columns:minmax(200px,1fr) 210px 100px;gap:20px;align-items:center;width:100%}
-.project-list-heading{font-size:11px;color:var(--muted);padding:0 14px 8px}.project-list-heading>span:last-child{text-align:end}
+@media(min-width:701px) and (max-width:900px){.project-list-heading,.project-file{grid-template-columns:minmax(0,1fr) 150px 70px;gap:10px}}
+.project-browser-actions{flex-wrap:wrap;justify-content:flex-end}.project-browser-actions>button,.project-browser-actions>.file-button{white-space:nowrap}
+.project-storage-toolbar{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:14px}.project-storage-toolbar>button{flex:none}
+.project-storage-note{font-size:12px;color:var(--muted);margin:0}
+.project-list-heading{font-size:11px;color:var(--muted);padding:0 14px 8px;width:calc(100% - 234px)}.project-list-heading>span:last-child{text-align:end}
+.project-row{display:flex;align-items:center;border-bottom:1px solid var(--border);background:var(--surface)}
+.project-row:first-child{border-top:1px solid var(--border)}
+.project-row .project-file{flex:1;min-width:0;border:0!important}
+.project-actions{flex:none;width:234px;display:flex;align-items:center;justify-content:flex-end;gap:4px;padding:0 10px}
+.studio-shell .project-reveal{flex:none;width:90px;white-space:nowrap;background:transparent}
+.studio-shell .project-reveal:hover{background:#263832;border-color:#637e71}
+.studio-shell .project-delete{flex:none;width:120px;white-space:nowrap;background:transparent;border-color:transparent}
+.studio-shell .project-delete:hover{background:#2b343c;border-color:#63717e}
+.editor-tool.project-delete-dialog{width:min(500px,calc(100vw - 24px));height:auto;max-height:calc(100dvh - 24px)}
+.project-delete-content{padding:20px;overflow:auto;font-size:13px;overflow-wrap:anywhere}
+.project-delete-content p{margin-bottom:16px}.project-delete-content p:not(:first-child){color:var(--muted)}
+.project-delete-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.project-folder-path{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;overflow-wrap:anywhere;user-select:text;color:var(--muted)}
+.project-file .project-folder-path{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}.project-file .project-folder-status{color:#b4cdbd}.project-file .project-folder-status.unavailable{color:var(--warning)}
+.project-file:disabled{opacity:1}.project-file:disabled .project-file-thumb{opacity:.6}
+.missing-project-list{list-style:none;padding:0;margin:0 0 18px;max-height:35dvh;overflow:auto}.missing-project-list li{padding:10px 0;border-bottom:1px solid var(--border)}.missing-project-list .project-folder-path{display:block;margin-top:5px;font-size:12px}
+.studio-shell .danger{background:#852f3d;border-color:#c26a79;color:#fff}.studio-shell .danger:hover{background:#a53a4c}
 .studio-shell .project-file{background:var(--surface);border-radius:0;border:0;border-bottom:1px solid var(--border);text-align:start;padding:12px 14px;min-height:80px}
 .studio-shell .project-file:hover{background:#23302d}
 .project-file:first-child{border-top:1px solid var(--border)}
@@ -51,11 +72,13 @@ body{-webkit-font-smoothing:antialiased}
 .tool-content-jobs,.tool-content-history,.tool-content-conflict,.tool-content-review,.tool-content-export{overflow:auto;scrollbar-gutter:stable}
 .tool-content-history .two-columns,.tool-content-review .two-columns,.tool-content-export .two-columns{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .tool-content-history .panel,.tool-content-export .panel{margin-bottom:12px}.tool-content-export .stage{min-height:180px;max-height:400px}.tool-content-export .list-card{padding:12px}.tool-content-export .deliverables{font-size:12px}
-.tool-content-create{overflow:auto}.editor-tool.tool-create{width:min(500px,calc(100vw - 24px));height:auto;max-height:calc(100dvh - 24px)}.new-project-form{padding:12px}.new-project-form>.primary{width:100%}
+.tool-content-create,.tool-content-openFolder{overflow:auto}.editor-tool.tool-create,.editor-tool.tool-openFolder{width:min(560px,calc(100vw - 24px));height:auto;max-height:calc(100dvh - 24px)}.new-project-form{padding:12px}.new-project-form>fieldset{border:0;padding:0;margin:0;min-width:0}.new-project-form>fieldset>.primary{width:100%}
+.project-folder-input{display:flex;align-items:flex-end;gap:8px;margin-bottom:10px}.project-folder-input>.field{flex:1;min-width:0;margin:0}.project-folder-input>button{flex:none;min-height:34px}
 .tool-content .conflict{margin:0}.tool-content-history pre{max-height:200px}
 @media(max-width:1050px){.document-title>span{display:none}.document-title h1{max-width:26vw}.utility-commands button span{display:none}.studio-header{gap:8px;padding-inline:10px}.studio-brand{font-size:14px!important}.tool-save-state{display:none}}
 @media(max-width:700px){.studio-header{min-height:48px;padding:6px 8px;gap:6px}.studio-brand span,.header-divider{display:none}.document-title h1{max-width:calc(100vw - 240px);font-size:12px}.document-save{display:none}.studio-header-actions button{min-width:32px;padding:5px}.studio-header-actions .service{display:none}.workspace-commands{padding:3px 6px;gap:5px}.workspace-commands button{font-size:11px;padding:5px 7px}.utility-commands{padding-inline-start:5px}.studio-status{padding-inline:7px;gap:7px}.studio-status .service{font-size:10px}.studio-notice{font-size:10px}.studio-status button{display:none}.editor-tool{width:calc(100vw - 12px);height:calc(100dvh - 16px);border-radius:6px}.tool-header{padding:9px 10px;align-items:flex-start}.tool-header p{display:none}.tool-header h2{font-size:14px;padding-top:5px}.tool-header-actions{gap:5px}.tool-stage-nav{padding:5px 7px;gap:3px}.tool-stage-nav button{font-size:11px;padding:5px 7px}.tool-content{padding:7px}.tool-footer{padding:6px 9px}.tool-footer>span{font-size:10px;max-width:55%}.tool-footer button{white-space:nowrap;padding:5px 7px}.project-browser{padding:18px 12px}.project-browser-toolbar{align-items:flex-start;gap:12px;flex-direction:column;margin-bottom:20px}.project-browser-toolbar p{font-size:12px}.project-list-heading,.project-file{grid-template-columns:minmax(0,1fr) 60px;gap:10px}.project-list-heading>span:nth-child(2),.project-file-date{display:none}.project-file-thumb{width:44px;height:44px}.project-file strong{font-size:12px}.project-file-identity{gap:9px}.tool-content-history .two-columns,.tool-content-review .two-columns,.tool-content-export .two-columns{grid-template-columns:minmax(0,1fr)}.standalone-workspace{padding:10px}.standalone-workspace .panel{padding:12px}.standalone-workspace .stage{max-height:calc(100dvh - 390px)}.shell-error{flex-wrap:wrap;font-size:11px}.shell-error>span{flex-basis:100%}}
 @media(max-height:550px){.studio-status{display:none}.editor-tool{height:calc(100dvh - 8px)}.tool-header{padding-block:6px}.tool-header p,.tool-footer>span{display:none}.tool-footer{padding-block:4px}}
+@media(max-width:700px){.project-actions{width:132px;flex-direction:column;align-items:flex-end;padding:8px 6px;gap:4px}.project-list-heading{width:calc(100% - 132px)}.project-storage-note{font-size:11px}.project-browser-actions{justify-content:flex-start}.project-storage-toolbar{align-items:flex-start;flex-direction:column;gap:8px}.project-folder-input{align-items:stretch;flex-direction:column}.project-folder-input>button{align-self:flex-start}}
 
 .workspace-commands .guide-link{white-space:nowrap;background:none;border-color:transparent;text-decoration:none}.guide-link{display:inline-flex;align-items:center;gap:6px}
 @media(max-width:1050px){.utility-commands .guide-link span{display:none}}

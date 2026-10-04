@@ -40,6 +40,111 @@
       "path": "sprite_gen/frames/extract.py",
       "upstreamSha256": "2e347dfce9f9dfd471ffcb1c841c69209b6d940a35f24555e67aea7cb71242cb",
       "forkSha256": "f11c14cd5f35d3f36041cb309e6b33964c4e722c57c809dd4ffa101000f052c6"
+    },
+    {
+      "path": "sprite_gen/frames/cutout.py",
+      "upstreamSha256": "7a3af893abecba52347ac0c301079e3aa61531001c6c16254238b2661fa37067",
+      "forkSha256": "c3f11578aba2f9256d5e08325f5fa4e45155de9ab0ae69af118fcaa4f7bac7c3"
+    },
+    {
+      "path": "sprite_gen/gen/video.py",
+      "upstreamSha256": "655e3abe34ff9adcac07d29a6ec167b89f1bc47f4d54bebf913d936e2f6fa8cb",
+      "forkSha256": "ce6cd6c249fe27332e7adab1486875ee2a43d50d0f8add9b9e6fbbdb6a2c1b09"
+    },
+    {
+      "path": "sprite_gen/video/loop.py",
+      "upstreamSha256": "5475953492d1cb8dee53364152498f232a952b51e006591aaf404b170a147980",
+      "forkSha256": "0d5767a365e2b765f320d44049709654a32621c27749abd068a3e89bf3f90c21"
+    },
+    {
+      "path": "sprite_gen/video/batch.py",
+      "upstreamSha256": "ed664fbb40ad655c5e031e74feb4f8d9a683993d4210d155d4dd82d56abc716a",
+      "forkSha256": "4d50df6c10c629479d7e263a92b0a3c2dce19123723cfaddac2d7c72f8adf069"
+    },
+    {
+      "path": "sprite_gen/video/frames.py",
+      "upstreamSha256": "6165b06ea709173bb811a3a09baaef86b6cca380da4c4a46dc2d0a0ddcc31109",
+      "forkSha256": "9ebd14259bef8df89ef7128ab78535b063f8891a97e8fb03d7749c8dfc759ef2"
+    },
+    {
+      "path": "sprite_gen/video/auto_motion.py",
+      "upstreamSha256": "8294e9b4ca734c8241e0eaf3ebc6b933bba26246c0d70ccc7f37e17cf7faabe7",
+      "forkSha256": "e3a397d33b31b974b2102a7520b1c8d69282ee7e91c9c00bfb7caab822ed3e3a"
+    },
+    {
+      "path": "sprite_gen/video/local_cycle.py",
+      "upstreamSha256": "24950d17a10b64060d3162002d5050d720878ce8e816209d7978cfca5d5783ce",
+      "forkSha256": "b6e9b8ad173aac8b387bf0849f5a1bdf539839f778ee27568bb77be61e8261d4"
+    },
+    {
+      "path": "sprite_gen/video/gait_fallback.py",
+      "upstreamSha256": null,
+      "forkSha256": "46ef2d12e54ea00354b9ca8ae049a7023f5b6194f675cf24e813bdf76f0d465b"
+    },
+    {
+      "path": "sprite_gen/video/repair.py",
+      "upstreamSha256": null,
+      "forkSha256": "554b25cb3dbd869a7202c82c450a594953c4dcc77d2d59aac39ea3c233671f09"
+    },
+    {
+      "path": "sprite_gen/video/rife.py",
+      "upstreamSha256": null,
+      "forkSha256": "ea2c9c7bd3b959102acf2ada066c6b4dd6cca96154bf2560b05478042bc9091a"
+    },
+    {
+      "path": "sprite_gen/video/rife_install.py",
+      "upstreamSha256": null,
+      "forkSha256": "4b9ceb06510b14f9ca17f99b22a7c4e768f82ad1b563c3b2c6bd456f649560b8"
+    },
+    {
+      "path": "sprite_gen/video/align.py",
+      "upstreamSha256": null,
+      "forkSha256": "1b631866db259731996d7c9abddf3778c8ef7f331453652eff1277c2c19f917f"
+    },
+    {
+      "path": "tests/video/test_cycle_align.py",
+      "upstreamSha256": null,
+      "forkSha256": "b2a1e6952879cb989c24c8ff7cb4216328f1206064f308bd7c57105bf26c2995"
+    },
+    {
+      "path": "tests/video/test_gait_fallback.py",
+      "upstreamSha256": null,
+      "forkSha256": "f68df7410effae5025295c9e004e2a103586a9b0c2a8de580ffebf00e641cd99"
+    },
+    {
+      "path": "tests/video/test_loop_repair.py",
+      "upstreamSha256": null,
+      "forkSha256": "89773fbfcad64b894dfc0fd75c4c5e1751c8598a896907cb722a3a9ecfcee4f6"
+    },
+    {
+      "path": "tests/video/test_rife.py",
+      "upstreamSha256": null,
+      "forkSha256": "f50a162c329d6e20e8749f9cabfa8f52466df26c9bf2fd2aa223959c85830a64"
+    },
+    {
+      "path": "tests/video/test_rife_install.py",
+      "upstreamSha256": null,
+      "forkSha256": "a7a8f8ca35a5726a1f73f2e363c714a697ed0c5386038bc359f44d4af108c9d2"
+    },
+    {
+      "path": "tests/video/test_strip_resample.py",
+      "upstreamSha256": null,
+      "forkSha256": "5e3ad5ab50f7bdb104f3382dafc89d9a0f110a86498e34d81c17b59f0e6e8bde"
+    },
+    {
+      "path": "tests/video/test_backport_edges.py",
+      "upstreamSha256": null,
+      "forkSha256": "15a6cc7421cfdad9ea2b3c4eae395f64a1f529990f26e5b5f064336132465158"
+    },
+    {
+      "path": "tests/video/test_batch_bases.py",
+      "upstreamSha256": "66fac8391b615cc05938b1e07ac509a5f4dd936f95bd827ced0577f266cbd71e",
+      "forkSha256": "6892b87e59432a0f27fa59afb048fc25377fcac1b8ab011d8aa05eacbdd1f7a7"
+    },
+    {
+      "path": "tests/video/test_video_pipeline.py",
+      "upstreamSha256": "0a77949a54dc6827548e236fa61eb5f105339149376135be8e46b038f5881ea2",
+      "forkSha256": "5a03747d106b9b64ae61b6af8e23f3c56e5940e9e12ab60a843c59c85f0192a6"
     }
   ],
   "environment": {
@@ -96,5 +201,159 @@
     "scope": "local provider/engine regressions; no external generation",
     "providerTestsPassed": 48,
     "upstreamGenerationTestsPassed": 60
+  },
+  "backports": [
+    {
+      "name": "public-video-quality-v2.19.0",
+      "tag": "v2.19.0",
+      "commit": "9e8cf1e238495b2b113e4acf1f73517e1fbe6e70",
+      "repository": "https://github.com/aldegad/sprite-gen",
+      "baseEngineUnchanged": "2.12.1",
+      "files": [
+        {
+          "path": "sprite_gen/gen/video.py",
+          "upstream219Sha256": "ce6cd6c249fe27332e7adab1486875ee2a43d50d0f8add9b9e6fbbdb6a2c1b09",
+          "forkSha256": "ce6cd6c249fe27332e7adab1486875ee2a43d50d0f8add9b9e6fbbdb6a2c1b09"
+        },
+        {
+          "path": "sprite_gen/video/loop.py",
+          "upstream219Sha256": "0d5767a365e2b765f320d44049709654a32621c27749abd068a3e89bf3f90c21",
+          "forkSha256": "0d5767a365e2b765f320d44049709654a32621c27749abd068a3e89bf3f90c21"
+        },
+        {
+          "path": "sprite_gen/video/batch.py",
+          "upstream219Sha256": "4d50df6c10c629479d7e263a92b0a3c2dce19123723cfaddac2d7c72f8adf069",
+          "forkSha256": "4d50df6c10c629479d7e263a92b0a3c2dce19123723cfaddac2d7c72f8adf069"
+        },
+        {
+          "path": "sprite_gen/video/frames.py",
+          "upstream219Sha256": "a0491919a32379f26141573f121fdc0429f0a40144d06915e34de02eb2302d27",
+          "forkSha256": "9ebd14259bef8df89ef7128ab78535b063f8891a97e8fb03d7749c8dfc759ef2"
+        },
+        {
+          "path": "sprite_gen/video/auto_motion.py",
+          "upstream219Sha256": "e3a397d33b31b974b2102a7520b1c8d69282ee7e91c9c00bfb7caab822ed3e3a",
+          "forkSha256": "e3a397d33b31b974b2102a7520b1c8d69282ee7e91c9c00bfb7caab822ed3e3a"
+        },
+        {
+          "path": "sprite_gen/video/local_cycle.py",
+          "upstream219Sha256": "b6e9b8ad173aac8b387bf0849f5a1bdf539839f778ee27568bb77be61e8261d4",
+          "forkSha256": "b6e9b8ad173aac8b387bf0849f5a1bdf539839f778ee27568bb77be61e8261d4"
+        },
+        {
+          "path": "sprite_gen/video/gait_fallback.py",
+          "upstream219Sha256": "46ef2d12e54ea00354b9ca8ae049a7023f5b6194f675cf24e813bdf76f0d465b",
+          "forkSha256": "46ef2d12e54ea00354b9ca8ae049a7023f5b6194f675cf24e813bdf76f0d465b"
+        },
+        {
+          "path": "sprite_gen/video/repair.py",
+          "upstream219Sha256": "554b25cb3dbd869a7202c82c450a594953c4dcc77d2d59aac39ea3c233671f09",
+          "forkSha256": "554b25cb3dbd869a7202c82c450a594953c4dcc77d2d59aac39ea3c233671f09"
+        },
+        {
+          "path": "sprite_gen/video/rife.py",
+          "upstream219Sha256": "f23fef4976e2cd67c52ac9e2e142d283f1390c4c656c9bcc61caa215639e7771",
+          "forkSha256": "ea2c9c7bd3b959102acf2ada066c6b4dd6cca96154bf2560b05478042bc9091a"
+        },
+        {
+          "path": "sprite_gen/video/rife_install.py",
+          "upstream219Sha256": "4b9ceb06510b14f9ca17f99b22a7c4e768f82ad1b563c3b2c6bd456f649560b8",
+          "forkSha256": "4b9ceb06510b14f9ca17f99b22a7c4e768f82ad1b563c3b2c6bd456f649560b8"
+        },
+        {
+          "path": "sprite_gen/video/align.py",
+          "upstream219Sha256": "1b631866db259731996d7c9abddf3778c8ef7f331453652eff1277c2c19f917f",
+          "forkSha256": "1b631866db259731996d7c9abddf3778c8ef7f331453652eff1277c2c19f917f"
+        },
+        {
+          "path": "tests/video/test_cycle_align.py",
+          "upstream219Sha256": "5cf4cec1026c3c7c99a875e9cb5282c046e6930f0f4be17e4a0ceadf51e4a77d",
+          "forkSha256": "b2a1e6952879cb989c24c8ff7cb4216328f1206064f308bd7c57105bf26c2995"
+        },
+        {
+          "path": "tests/video/test_gait_fallback.py",
+          "upstream219Sha256": "f68df7410effae5025295c9e004e2a103586a9b0c2a8de580ffebf00e641cd99",
+          "forkSha256": "f68df7410effae5025295c9e004e2a103586a9b0c2a8de580ffebf00e641cd99"
+        },
+        {
+          "path": "tests/video/test_loop_repair.py",
+          "upstream219Sha256": "db3fbd4d3d6fce5d16c18a5453e0364bbea1ad35e540f0366698738c5e03d4d1",
+          "forkSha256": "89773fbfcad64b894dfc0fd75c4c5e1751c8598a896907cb722a3a9ecfcee4f6"
+        },
+        {
+          "path": "tests/video/test_rife.py",
+          "upstream219Sha256": "fe4c835e268e59ad049614d12bc03e07f563e484b1540404db8317a2fb06fd7a",
+          "forkSha256": "f50a162c329d6e20e8749f9cabfa8f52466df26c9bf2fd2aa223959c85830a64"
+        },
+        {
+          "path": "tests/video/test_rife_install.py",
+          "upstream219Sha256": "43d081c889ff2e566030266be6133e37fa66aa1ec4ae9e357766e06032c927bd",
+          "forkSha256": "a7a8f8ca35a5726a1f73f2e363c714a697ed0c5386038bc359f44d4af108c9d2"
+        },
+        {
+          "path": "tests/video/test_strip_resample.py",
+          "upstream219Sha256": "5e3ad5ab50f7bdb104f3382dafc89d9a0f110a86498e34d81c17b59f0e6e8bde",
+          "forkSha256": "5e3ad5ab50f7bdb104f3382dafc89d9a0f110a86498e34d81c17b59f0e6e8bde"
+        },
+        {
+          "path": "tests/video/test_backport_edges.py",
+          "upstream219Sha256": null,
+          "forkSha256": "15a6cc7421cfdad9ea2b3c4eae395f64a1f529990f26e5b5f064336132465158"
+        },
+        {
+          "path": "tests/video/test_batch_bases.py",
+          "upstream219Sha256": null,
+          "forkSha256": "6892b87e59432a0f27fa59afb048fc25377fcac1b8ab011d8aa05eacbdd1f7a7"
+        },
+        {
+          "path": "tests/video/test_video_pipeline.py",
+          "upstream219Sha256": null,
+          "forkSha256": "5a03747d106b9b64ae61b6af8e23f3c56e5940e9e12ab60a843c59c85f0192a6"
+        }
+      ],
+      "adaptations": [
+        "Video-only edge-band guard retains fork cyan/extract changes.",
+        "RIFE installer and cycle-align are executable Python modules; no unrelated root CLI registry changes.",
+        "New installer tests use module entry point; two existing assertions updated for extended directions and walk prompt."
+      ],
+      "validation": {
+        "engineVideoAndVideoGenerationTestsPassed": 430,
+        "engineTestsSkippedWithoutDefaultRifePath": 1,
+        "realProjectRifeTestsPassed": 1,
+        "externalGenerationCalls": 0
+      }
+    }
+  ],
+  "localTools": {
+    "rife": {
+      "release": "20221029",
+      "model": "rife-v4.6",
+      "source": "https://github.com/nihui/rife-ncnn-vulkan/releases/download/20221029/rife-ncnn-vulkan-20221029-macos.zip",
+      "archiveSha256": "4a63a1f3c9c715773c57d2ee51df1b315ed20cd6c63103e45c483ecc4400b595",
+      "installRoot": ".data/tools/rife/rife-ncnn-vulkan-20221029-macos",
+      "files": {
+        "rife-ncnn-vulkan": "d11429c72f0cddfb170fd131ee9373dc5329a5729c4382c0acfd40092e5ed19a",
+        "rife-v4.6/flownet.param": "724569596bcd1e7b9fa50455c604777ebed99746d2ef40aa86e31b5725f1053c",
+        "rife-v4.6/flownet.bin": "f334ed2260149ce0188a6dcf049844e8b0cdd912e01cbcfb63553157d2508958",
+        "LICENSE": "a73beab18143600af0b10c6050a953ec233775ce31c2bf3373a794db535329fd"
+      },
+      "check": {
+        "passed": true,
+        "discCentreX": 47.82,
+        "actualCycleAlignment": {
+          "from": 24,
+          "to": 25,
+          "madeByRife": 24,
+          "durationMs": 1200
+        }
+      },
+      "defaultRepairMode": "off",
+      "scope": "project-local; no shared skill modified"
+    },
+    "img2webp": {
+      "version": "1.6.0",
+      "binary": "/opt/homebrew/bin/img2webp",
+      "purpose": "lossless-alpha engine WebP export regression verification"
+    }
   }
 }

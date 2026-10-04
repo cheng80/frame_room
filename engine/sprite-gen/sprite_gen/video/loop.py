@@ -29,6 +29,7 @@ import math
 import os
 import shutil
 import subprocess
+import sys
 from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
@@ -39,7 +40,9 @@ from PIL import Image
 from sprite_gen._deps import np
 from sprite_gen.spec.runio import atomic_write_text
 from sprite_gen.util.gif_utils import save_clean_gif
-from sprite_gen.video import motion_anchor, auto_motion, local_cycle
+from sprite_gen.video import motion_anchor, auto_motion, local_cycle, gait_fallback
+from sprite_gen.video import repair as repair_mod
+from sprite_gen.video import rife as rife_mod
 
 ANALYSIS_SIZE = 96  # thumbnail edge for the distance matrix
 STRIP_MAX_CELLS = 64  # upper bound on cells even when they are narrow
@@ -48,6 +51,8 @@ STRIP_MAX_HEIGHT = 520
 SEAM_RATIO_MAX = 2.0  # loop seam / mean adjacent distance inside the cycle
 SPECK_MIN_FRACTION = 0.01  # detached components smaller than this fraction of the body are keying specks
 PERIODICITY_MIN = 0.15  # the period must dip at least 15% below the profile mean (flat profile = no repeat)
+# Where the gait fallback writes the frames it scaled back (removed once the strip is built).
+FALLBACK_FRAMES_DIR = ".gait-fallback-frames"
 GIF_FPS_DEFAULT = 24.0  # GIF/WebP playback density = the source rate: every cycle frame is kept, a fast action never looks slow (12 made a jump read sluggish, 2026-09-09)
 GIF_FRAMES_MIN = 4
 ONE_SHOT_MIN_CONTRAST = 3.0  # one-shot: the excursion peak must stand this far above the rest-pose noise (in MADs)
@@ -78,6 +83,17 @@ ANCHOR_MODES = ("none", "feet", "body", "motion", "motion-auto")
 BODY_ANCHOR_BAND = 0.6  # --anchor body reads the wrap offset from the top 60 % of the first frame's box: head and torso, not the legs
 BODY_ANCHOR_SEARCH = 24  # px either side searched for the last frame's horizontal offset against the first
 FOOT_BAND = 0.08  # fraction of the frame's own height, measured up from its lowest opaque row
+# Jump-frame repair (docs/loop-repair.md section 2). auto: walk and run loops get a RIFE frame in
+# place of each frame that follows a jump, and a loop that needs one where no RIFE is installed is
+# cut as filmed with a warning (a walk that cut before RIFE existed still cuts); on: the same, but
+# no RIFE fails the loop — a caller that asked for the repair is never handed less; off: the loop
+# is cut as filmed, and says so.
+REPAIR_MODES = ("auto", "on", "off")
+FACINGS = ("right", "left")
+# Where `video-cycle-align` keeps the cut as filmed (sprite_gen/video/align.py). A new cut makes
+# the kept one stale, so writing the cycle removes it: an alignment after a re-cut (say, once RIFE
+# is installed and the jumps are repaired) reads the new cut, not the old one.
+CYCLE_SOURCE_DIR = "cycle.source"
 
 
 # A gait's period is a fact about the body, not about how long the clip runs: the
@@ -591,6 +607,61 @@ def first_frame_height(path: Path) -> int:
     return box[3] - box[1]
 
 
+def _support_bounds(n_src: int, n_out: int, support: float) -> tuple[np.ndarray, np.ndarray]:
+    """First and last source index Pillow's resample reads for each output index, for a filter
+    of `support` source pixels (`precompute_coeffs` in Pillow's Resample.c: the support widens
+    by the scale when shrinking)."""
+    scale = n_src / n_out
+    reach = support * max(1.0, scale)
+    centre = (np.arange(n_out) + 0.5) * scale
+    lo = np.clip(np.floor(centre - reach + 0.5).astype(int), 0, n_src - 1)
+    hi = np.clip(np.floor(centre + reach + 0.5).astype(int) - 1, 0, n_src - 1)
+    return lo, np.maximum(lo, hi)
+
+
+def _window_extrema(a: np.ndarray, rows: tuple[np.ndarray, np.ndarray], cols: tuple[np.ndarray, np.ndarray]) -> tuple[np.ndarray, np.ndarray]:
+    """Min and max of `a` over each output pixel's source window (separable, rows then columns)."""
+    def along(v: np.ndarray, lo: np.ndarray, hi: np.ndarray, axis: int) -> tuple[np.ndarray, np.ndarray]:
+        low = high = np.take(v, lo, axis=axis)
+        for d in range(1, int((hi - lo).max()) + 1):
+            step = np.take(v, np.minimum(lo + d, hi), axis=axis)
+            low, high = np.minimum(low, step), np.maximum(high, step)
+        return low, high
+
+    lo_c, hi_c = along(a, *cols, axis=1)
+    return along(lo_c, *rows, axis=0)[0], along(hi_c, *rows, axis=0)[1]
+
+
+def resize_cell(image: Image.Image, size: tuple[int, int]) -> Image.Image:
+    """Scale one RGBA cell with its coverage and its colour taken apart.
+
+    LANCZOS over premultiplied RGBA (Pillow's RGBa) rings: its negative lobes weigh the colours
+    across an edge against each other, and dividing by the low coverage at the edge throws the
+    result past every colour the source had there — a light rim around a dark outline, a key
+    tint where the ink was only a little green. So the two are resampled apart. Coverage keeps
+    LANCZOS's crisp edge, held to the range of the source coverage the colour mixes from (no
+    halo outside the silhouette, no hole inside it). Colour is a Hamming mix of premultiplied
+    colour, a filter with no negative lobe: every pixel's colour is a weighted mix of the
+    colours under it and never one they did not have. docs/video-pipeline.md "Cells"."""
+    if image.size == tuple(size):
+        return image.copy()
+    w, h = size
+    src = np.asarray(image.convert("RGBA"), dtype=np.float32)
+    alpha = src[..., 3]
+
+    def scaled(channel: np.ndarray, resample: Image.Resampling) -> np.ndarray:
+        return np.asarray(Image.fromarray(np.ascontiguousarray(channel)).resize(size, resample), dtype=np.float32)
+
+    mix_alpha = scaled(alpha, Image.Resampling.HAMMING)
+    mix = np.stack([scaled(src[..., c] * alpha, Image.Resampling.HAMMING) for c in range(3)], axis=-1)
+    low, high = _window_extrema(alpha, _support_bounds(image.height, h, 1.0), _support_bounds(image.width, w, 1.0))
+    cover = np.clip(scaled(alpha, Image.Resampling.LANCZOS), low, high)
+    cover = np.where(mix_alpha > 1e-3, np.round(cover), 0)
+    colour = np.where((cover > 0)[..., None], np.round(mix / np.maximum(mix_alpha, 1e-3)[..., None]), 0)
+    out = np.dstack([np.clip(colour, 0, 255), np.clip(cover, 0, 255)]).astype(np.uint8)
+    return Image.fromarray(out, "RGBA")
+
+
 def build_strip(frames: list[Image.Image], *, max_cells: int = STRIP_MAX_CELLS, max_height: int = STRIP_MAX_HEIGHT, max_width: int = STRIP_MAX_WIDTH, cycle_seconds: float, body_height: int | None = None, anchor: str = "none", kind: str = "periodic", standing_src: int | None = None) -> tuple[Image.Image, dict[str, Any]]:
     """Union-crop (no bottom pad so feet meet the floor), scale, bottom-align, tile horizontally.
 
@@ -650,9 +721,9 @@ def build_strip(frames: list[Image.Image], *, max_cells: int = STRIP_MAX_CELLS, 
             im = frames[i]
             cell = Image.new("RGBA", (round(cell_src_w), bottom - top), (0, 0, 0, 0))
             cell.alpha_composite(im.crop((0, top, im.width, bottom)), (round(lead - feet[i]), 0))
-            cells.append(cell.resize((w, h), Image.LANCZOS))
+            cells.append(resize_cell(cell, (w, h)))
     else:
-        cells = [im.crop((left, top, right, bottom)).resize((w, h), Image.LANCZOS) for im in chosen]
+        cells = [resize_cell(im.crop((left, top, right, bottom)), (w, h)) for im in chosen]
     strip = Image.new("RGBA", (w * len(cells), h), (0, 0, 0, 0))
     for k, im in enumerate(cells):
         strip.alpha_composite(im, (k * w, 0))
@@ -675,6 +746,7 @@ def build_strip(frames: list[Image.Image], *, max_cells: int = STRIP_MAX_CELLS, 
         "subsampled": L > cap,
         "cell_cap": cap,
         "top_margin_px": top,
+        "cell_height_cap": max_height,  # --strip-height: what a rebuild of these cells (video-cycle-align) scales against
         "body_height_target": body_height,
         "foot_anchor": anchor,  # "none" | "feet" — how the cells were aligned
         "drift_px": drift_px,  # source px of slow in-canvas drift removed across the cycle (0 when not measured)
@@ -768,6 +840,42 @@ def write_loop_report(target: Path, payload: dict[str, Any]) -> None:
     atomic_write_text(target, json.dumps(finite(payload), ensure_ascii=False, indent=2, allow_nan=False) + "\n")
 
 
+def _repair_jumps(frames: list[Image.Image], interpolate: rife_mod.Interpolate | None, *, facing: str,
+                  required: bool) -> tuple[list[Image.Image], dict[str, Any]]:
+    """`repair_mod.repair_jumps`, with RIFE located only once a frame is to be made: a loop
+    without a jump needs no binary. The report names the interpolator that made the frames.
+
+    A frame to make and no RIFE installed: `required` lets `RifeNotInstalled` through; otherwise
+    the loop comes back as filmed and the record says why (`applied: false`, `rife`, `install`)."""
+    made_by: list[dict[str, str]] = []
+
+    def lazy(a: Image.Image, b: Image.Image, t: float) -> Image.Image:
+        nonlocal interpolate
+        if interpolate is None:
+            located = rife_mod.Rife()
+            made_by.append(located.describe())
+            interpolate = located
+        return interpolate(a, b, t)
+
+    try:
+        repaired, record = repair_mod.repair_jumps(frames, lazy, facing=facing)
+    except rife_mod.RifeNotInstalled as exc:
+        if required:
+            raise
+        # RIFE is located before the first frame is made, so nothing was replaced yet.
+        worst = round(float(repair_mod.jump_scores(frames, facing=facing)["score"].max()), 4)
+        return frames, {"applied": False, "why": "RIFE not installed — cut as filmed", "rife": str(exc),
+                        "install": rife_mod.INSTALL_COMMAND, "ratio": repair_mod.JUMP_RATIO, "facing": facing,
+                        "score_max_before": worst, "score_max_after": worst, "replaced": []}
+    frames = repaired
+    record["applied"] = bool(record["replaced"])
+    if made_by:
+        record["interpolator"] = {"kind": "rife-ncnn-vulkan", **made_by[0]}
+    elif record["replaced"]:
+        record["interpolator"] = {"kind": "injected"}
+    return frames, record
+
+
 def run_loop(
     frames_dir: Path,
     out_dir: Path,
@@ -788,7 +896,16 @@ def run_loop(
     body_height: int | None = None,
     anchor: str | None = None,
     anchor_regions: list[motion_anchor.Box] | None = None,
+    repair: str = "auto",
+    facing: str = "right",
+    interpolate: rife_mod.Interpolate | None = None,
+    jolt_max: float | None = None,
+    head_step_max: float | None = None,
 ) -> dict[str, Any]:
+    if repair not in REPAIR_MODES:
+        raise SystemExit(f"video-loop: unknown --repair {repair!r}; expected one of {', '.join(REPAIR_MODES)}")
+    if facing not in FACINGS:
+        raise SystemExit(f"video-loop: unknown --facing {facing!r}; expected one of {', '.join(FACINGS)}")
     if anchor is None:
         # gaits drift a few pixels over a cycle and the wrap shows it; in-place states do not
         anchor = "body" if profile_for(state).gait else "none"
@@ -830,11 +947,33 @@ def run_loop(
             source_frames = [Image.open(f).convert("RGBA") for f in files]
             D, trajectory, analysis = auto_motion.analyse(source_frames, fps=fps)
             report_base["automatic_motion_analysis"] = analysis
-            cycle = local_cycle.detect(
-                D, trajectory, min_len=lo, max_len=hi, gait_floor=round(prof.min_seconds*fps),
-                periodicity_min=PERIODICITY_MIN, double_tolerance=GAIT_DOUBLE_TOL,
-                double_search=GAIT_DOUBLE_SEARCH,
-            )
+            detect = dict(gait_floor=round(prof.min_seconds*fps), periodicity_min=PERIODICITY_MIN,
+                          double_tolerance=GAIT_DOUBLE_TOL, double_search=GAIT_DOUBLE_SEARCH)
+            try:
+                cycle = local_cycle.detect(D, trajectory, min_len=lo, max_len=hi, **detect)
+            except ValueError as first:
+                # A front or back gait that walked toward the camera, or a slow one: one more
+                # search, recorded (`gait_fallback`), and only after the first found nothing.
+                drift = gait_fallback.scale_drift(source_frames)
+                fallback = {"reason": str(first), "scale_drift": {k: drift[k] for k in ("height_first_px", "height_last_px", "drift")},
+                            "scale_drift_min": gait_fallback.SCALE_DRIFT_MIN, "scale_undone": False}
+                if abs(drift["drift"]) >= gait_fallback.SCALE_DRIFT_MIN:
+                    source_frames = gait_fallback.undo_scale(source_frames, drift)
+                    files = gait_fallback.write_frames(source_frames, [f.name for f in files], out_dir.expanduser().resolve() / FALLBACK_FRAMES_DIR)
+                    D, trajectory, analysis = auto_motion.analyse(source_frames, fps=fps)
+                    report_base["automatic_motion_analysis"] = analysis
+                    fallback["scale_undone"] = True
+                # An explicit --max-len is the caller's ceiling and stays one.
+                hi_long = gait_fallback.long_window(lo, n, fps) if max_len is None else hi
+                fallback["window"] = [lo, hi_long]
+                report_base["gait_fallback"] = fallback
+                try:
+                    cycle = local_cycle.detect(D, trajectory, min_len=lo, max_len=hi_long,
+                                               max_fraction=gait_fallback.LONG_CYCLE_FRACTION if max_len is None else .5,
+                                               **detect)
+                except ValueError as second:
+                    raise ValueError(f"{second} (also with the gait fallback: window [{lo}, {hi_long}], "
+                                     f"scale drift {drift['drift']:+.1%}{', undone' if fallback['scale_undone'] else ''})") from first
         elif cycle_mode == "fixed":
             if start is None or length is None:
                 raise SystemExit("video-loop: --cycle fixed needs --start and --length")
@@ -864,6 +1003,7 @@ def run_loop(
                         "regenerate the clip, or pass --cycle one-shot for a single performed action"
                     )
     except (SystemExit, ValueError) as exc:
+        shutil.rmtree(out_dir.expanduser().resolve() / FALLBACK_FRAMES_DIR, ignore_errors=True)
         write_loop_report(target, {**report_base, "status": "failed", "error": str(exc),
                                   "cycle": getattr(exc, "diagnostics", cycle),
                                   "periodic_attempt": periodic_attempt})
@@ -907,16 +1047,64 @@ def run_loop(
             )
         except ValueError as exc:
             error = f"video-loop: {exc}"
+            shutil.rmtree(out_dir / FALLBACK_FRAMES_DIR, ignore_errors=True)
             write_loop_report(target, {**report_base, "status": "failed", "error": error, "cycle": cycle})
             raise SystemExit(error) from exc
         report_base["motion_anchor"] = motion
+    if repair != "off" and prof.gait:
+        report_base["jump_repair"] = None
+        try:
+            frames, report_base["jump_repair"] = _repair_jumps(frames, interpolate, facing=facing, required=repair == "on")
+        except (ValueError, rife_mod.RifeUnavailable) as exc:
+            fix = (f"install RIFE (`{rife_mod.INSTALL_COMMAND}`), or pass --repair auto to cut it as filmed with a warning"
+                   if isinstance(exc, rife_mod.RifeNotInstalled) else "fix RIFE, or pass --repair off to cut it as filmed")
+            error = f"video-loop: {exc}; the loop has a jump frame to repair — {fix} (docs/loop-repair.md)"
+            shutil.rmtree(out_dir / FALLBACK_FRAMES_DIR, ignore_errors=True)
+            write_loop_report(target, {**report_base, "status": "failed", "error": error, "cycle": cycle})
+            raise SystemExit(error) from exc
+        if report_base["jump_repair"]["replaced"]:
+            report_base["seam_measurement"] = "rendered-cells"
+        if "rife" in report_base["jump_repair"]:
+            print(f"video-loop: warning: a jump frame was not repaired ({report_base['jump_repair']['score_max_before']:.2f}x "
+                  f"the median step) — RIFE is not installed, so the loop is cut as filmed; run `{rife_mod.INSTALL_COMMAND}` "
+                  "and cut it again (docs/loop-repair.md)", file=sys.stderr)
+    else:
+        report_base["jump_repair"] = {"applied": False, "why": "--repair off" if repair == "off" else f"not a gait state ({state})"}
+    if prof.gait:
+        # The jolt is measured on the loop as it will play — after the repair — and reported on
+        # every walk and run (docs/loop-repair.md section 3). Beyond the reference bounds it is a
+        # warning line; it fails the loop only against a bound the caller passed (--jolt-max /
+        # --head-step-max), and never with --repair off, which cuts and reports as filmed. A loop
+        # whose repair could not run (no RIFE) is gated as filmed, and the failure says why.
+        jolt = repair_mod.measure_jolt(frames, facing=facing)
+        reference = {"jolt_max": repair_mod.JOLT_REFERENCE, "head_step_max": repair_mod.HEAD_STEP_REFERENCE}
+        warnings = repair_mod.jolt_verdict(jolt, **reference)
+        gated = repair != "off" and (jolt_max is not None or head_step_max is not None)
+        over = repair_mod.jolt_verdict(jolt, jolt_max=jolt_max, head_step_max=head_step_max) if gated else []
+        report_base["jolt"] = {**jolt, "reference": reference, "warnings": warnings,
+                               "gate": {"jolt_max": jolt_max, "head_step_max": head_step_max} if gated else None,
+                               "gated": gated, "over": over, "passed": not over,
+                               "measured": "after the jump repair" if report_base["jump_repair"].get("replaced") else "as filmed"}
+        if over:
+            error = (f"video-loop: loop jolts — {'; '.join(over)} ({cycle.get('kind', 'periodic')} length {L} frames from {i}"
+                     f"{', after repairing frames ' + str(report_base['jump_repair']['replaced']) if report_base['jump_repair'].get('replaced') else ''}); "
+                     "the motion does not play smoothly — regenerate the clip"
+                     f"{' (the jump repair did not run: RIFE is not installed — ' + rife_mod.INSTALL_COMMAND + ')' if 'rife' in report_base['jump_repair'] else ''}")
+            shutil.rmtree(out_dir / FALLBACK_FRAMES_DIR, ignore_errors=True)
+            write_loop_report(target, {**report_base, "status": "failed", "error": error, "cycle": cycle})
+            raise SystemExit(error)
+        for line in warnings:
+            print(f"video-loop: warning: {line} (reference bound; the loop is kept — docs/loop-repair.md)", file=sys.stderr)
     cycle_dir.mkdir(parents=True, exist_ok=True)
     for old in cycle_dir.glob("frame-*.png"):
         old.unlink()
+    shutil.rmtree(out_dir / CYCLE_SOURCE_DIR, ignore_errors=True)
     for k, im in enumerate(frames):
         im.save(cycle_dir / f"frame-{k:03d}.png")
     strip, strip_meta = build_strip(frames, max_height=strip_height, cycle_seconds=cycle_seconds, body_height=body_height, anchor="feet" if anchor == "feet" else "none", kind=str(cycle.get("kind") or "periodic"),
                                     standing_src=first_frame_height(files[0]) if body_height is not None else None)
+    # The scaled-back frames are read for the last time above; the cycle cells keep them.
+    shutil.rmtree(out_dir / FALLBACK_FRAMES_DIR, ignore_errors=True)
     if motion is not None:
         strip_meta["foot_anchor"] = anchor
         strip_meta["motion_anchor"] = motion
@@ -944,8 +1132,8 @@ def run_loop(
     seam_idx = [i + j for j in idx]
     resampled_adjacent = float(np.mean([D[seam_idx[k], seam_idx[k + 1]] for k in range(len(seam_idx) - 1)]))
     resampled_seam = float(D[seam_idx[-1], seam_idx[0]])
-    if anchor in ("motion", "motion-auto"):
-        # Gate the actual corrected/resampled strip cells, with the same limit.
+    if report_base["seam_measurement"] == "rendered-cells":
+        # Gate the actual corrected/repaired/resampled strip cells, with the same limit.
         flat = np.stack([_small_features(im) for im in pick])
         resampled_adjacent = float(np.abs(flat[1:] - flat[:-1]).mean())
         resampled_seam = float(np.abs(flat[-1] - flat[0]).mean())
@@ -1033,6 +1221,10 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--body-height", type=int, help="scale so the STANDING height (the subject in the clip's first frame, i.e. the base still's pose) is this many px — the same value across states gives the same character size; --strip-height stays the cap")
     parser.add_argument("--anchor", choices=ANCHOR_MODES, default=None, help="motion-auto: automatic stable regions, local repeat selection and XY ramp (walk/run); motion: fixed cut with explicit regions; body (default for walk/run): measure the last-to-first head-and-torso offset once and spread it as a ramp over the cycle; feet: remove in-canvas drift (a straight-line trend) so every cell stands on the mean foot line; none: leave placement as filmed (default for other states)")
     parser.add_argument("--anchor-region", type=motion_anchor.parse_region, action="append", help="motion anchor only: repeat twice with head then torso x0,y0,x1,y1 in the first selected frame; requires --cycle fixed and at least 6 frames")
+    parser.add_argument("--repair", choices=REPAIR_MODES, default="auto", help="auto (default): in a walk or run loop, a frame that follows a jump (a step 1.4x the median, whole body or the hair behind it) is replaced by RIFE's frame between its neighbours, at most 3 and never two side by side, recorded in the report (docs/loop-repair.md); where no RIFE is installed a loop that needs a frame is cut as filmed with a warning (`sprite-gen rife install` adds RIFE); on: the same repair, but no RIFE fails the loop; off: cut as filmed")
+    parser.add_argument("--jolt-max", type=float, default=None, help=f"walk/run: fail the repaired loop when its jolt index (how far each step strays from its neighbours' mean, over the median step) exceeds this. Default: no gate — the index is reported and a value over {repair_mod.JOLT_REFERENCE} is a warning line")
+    parser.add_argument("--head-step-max", type=float, default=None, help=f"walk/run: fail the repaired loop when the head's largest sideways move in one frame exceeds this %% of the body height. Default: no gate — reported, and over {repair_mod.HEAD_STEP_REFERENCE} is a warning line")
+    parser.add_argument("--facing", choices=FACINGS, default="right", help="which way the body faces in the frames (default right): the hair the jump search watches is behind it")
     parser.add_argument("--name", default="loop", help="basename for strip/gif/webp outputs")
     parser.add_argument("--report", type=Path)
 
@@ -1048,6 +1240,8 @@ def run(**kwargs: object) -> int:
         body_height=kwargs.get("body_height"),  # type: ignore[arg-type]
         anchor=kwargs.get("anchor"),  # None resolves by state inside run_loop
         anchor_regions=kwargs.get("anchor_region"),
+        repair=str(kwargs.get("repair") or "auto"), facing=str(kwargs.get("facing") or "right"),
+        jolt_max=kwargs.get("jolt_max"), head_step_max=kwargs.get("head_step_max"),  # type: ignore[arg-type]
     )
     summary = {k: payload[k] for k in ("state", "frames_total", "window", "cycle_seconds", "n_out", "delay_ms", "resampled_seam_ratio", "specks_dropped", "report")}
     summary["cycle"] = {k: payload["cycle"].get(k) for k in ("kind", "start", "length", "period_global", "ratio", "review_recommended", "half_period_guard")}
@@ -1055,6 +1249,11 @@ def run(**kwargs: object) -> int:
         summary["periodic_attempt"] = payload["periodic_attempt"]["why_rejected"]
     if payload.get("motion_anchor", {}).get("applied") is False:
         summary["motion_anchor"] = payload["motion_anchor"]
+    if payload.get("jolt"):
+        summary["jolt"] = {"index": payload["jolt"]["index"], "warnings": payload["jolt"]["warnings"],
+                           "head_x_step_max_pct": payload["jolt"]["head"].get("x", {}).get("step_max_pct")}
+    if payload.get("jump_repair", {}).get("replaced"):
+        summary["jump_repair"] = {k: payload["jump_repair"][k] for k in ("replaced", "score_max_before", "score_max_after")}
     summary["strip"] = {k: payload["strip"][k] for k in ("path", "frames", "w", "h", "body_h", "delay_ms")}
     print(json.dumps(summary, ensure_ascii=False, indent=2))
     return 0

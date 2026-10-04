@@ -22,6 +22,7 @@ from PIL import Image
 
 DEFAULT_OUTPUT = Path(__file__).resolve().parents[1] / "artifacts/acceptance/real-character/output"
 FILES = ("atlas.png", "pngs.zip", "runtime.json", "aseprite.json", "qa.json", "bundle.zip")
+ANIMATION_FILES = ("animations.zip", "animation-manifest.json")
 PIN = "b058341f7543f3adcbea227bd4e6b7587895b1bc"
 MAX_BYTES = 512 * 1024 * 1024
 MAX_ZIP_BYTES = 2 * 1024 * 1024 * 1024
@@ -170,7 +171,172 @@ def lineage(runtime):
         if generation:
             recorded = {assets[a].get("provenance", {}).get("generationVersionId") for a in chains[raw]}
             require(generation in recorded, "GENERATION_LINEAGE_MISMATCH", "원본 계보에서 generationVersionId를 확인할 수 없습니다.", frameVersionId=fid)
+        interpolated = source.get("interpolated")
+        require(interpolated is None or type(interpolated) is bool, "INTERPOLATION_LINEAGE_MISMATCH", "보간 여부는 boolean이어야 합니다.", frameVersionId=fid)
+        interpolation = source.get("interpolation")
+        if interpolated:
+            require(isinstance(interpolation, dict) and isinstance(interpolation.get("method"), str) and bool(interpolation["method"]),
+                    "INTERPOLATION_LINEAGE_MISMATCH", "보간 방식 기록이 없습니다.", frameVersionId=fid)
+            fraction = finite(interpolation.get("fraction"), f"{fid}.interpolation.fraction")
+            indices = interpolation.get("sourceFrameIndices")
+            require(0 < fraction < 1 and isinstance(indices, list) and len(indices) == 2
+                    and all(type(index) is int and index >= 0 for index in indices) and indices[0] != indices[1],
+                    "INTERPOLATION_LINEAGE_MISMATCH", "보간 비율/원본 프레임 연결이 잘못되었습니다.", frameVersionId=fid)
+        else:
+            require(interpolation is None, "INTERPOLATION_LINEAGE_MISMATCH", "원본 프레임에 보간 기록이 붙어 있습니다.", frameVersionId=fid)
     return assets, sources, edges, sorted(external_parents)
+
+
+def animation_timeline(data, format, metadata, cells, durations, loop, where):
+    """Independent decoder oracle. Do not import the writer or re-render cells."""
+    boundaries, elapsed = [], 0
+    for duration in durations:
+        elapsed += duration
+        boundaries.append(elapsed)
+    frame_durations, mappings, changed = [], [], [None] * len(cells)
+    cursor = source_index = 0
+    with Image.open(io.BytesIO(data)) as decoded:
+        require(decoded.format == format and decoded.size == cells[0].size,
+                "ANIMATION_MISMATCH", "애니메이션 형식/셀 크기가 다릅니다.", file=where)
+        expected_loop = (0 if loop else 1) if format == "WEBP" else (0 if loop else None)
+        require(decoded.info.get("loop") == expected_loop, "ANIMATION_TIMING_MISMATCH", "애니메이션 반복/단발 설정이 다릅니다.", file=where)
+        for i in range(decoded.n_frames):
+            decoded.seek(i); decoded.load()
+            duration = integer(decoded.info.get("duration"), 1, 2**31-1, f"{where}.{i}.duration")
+            actual = decoded.convert("RGBA")
+            pixels = np.asarray(actual)
+            if format == "GIF":
+                require(np.all((pixels[..., 3] == 0) | (pixels[..., 3] == 255))
+                        and len(np.unique(pixels[pixels[..., 3] != 0, :3], axis=0)) <= 255,
+                        "ANIMATION_MISMATCH", "GIF 색상/알파 제약이 다릅니다.", file=where)
+            end, covered = cursor + duration, []
+            j = source_index
+            while j < len(cells) and (boundaries[j-1] if j else 0) < end:
+                if boundaries[j] > cursor:
+                    covered.append(j)
+                    if format == "WEBP":
+                        same_rgba(actual, cells[j], f"{where}/{j}")
+                    else:
+                        original = np.asarray(cells[j])
+                        require(np.array_equal(pixels[..., 3] != 0, original[..., 3] > 128),
+                                "ANIMATION_MISMATCH", "GIF 알파 임계값 결과가 다릅니다.", file=where, occurrenceIndex=j)
+                        count = int(np.count_nonzero(np.any(pixels != original, axis=2)))
+                        require(changed[j] in (None, count), "ANIMATION_MISMATCH", "같은 슬롯의 GIF 픽셀이 재생 도중 달라집니다.", file=where)
+                        changed[j] = count
+                        if np.all((original[..., 3] == 0) | (original[..., 3] == 255)) and len(np.unique(original[original[..., 3] != 0, :3], axis=0)) <= 255:
+                            same_rgba(actual, cells[j], f"{where}/{j}")
+                if boundaries[j] <= end:
+                    source_index = j + 1
+                j += 1
+            require(bool(covered) and end <= elapsed, "ANIMATION_TIMING_MISMATCH", "애니메이션 프레임의 재생 구간이 다릅니다.", file=where)
+            cursor = end
+            frame_durations.append(duration); mappings.append(covered)
+    require(cursor == elapsed and source_index == len(cells), "ANIMATION_TIMING_MISMATCH", "애니메이션 전체 시간이 다릅니다.", file=where)
+    require(metadata.get("decodedFrameCount") == len(frame_durations) and metadata.get("decodedDurationsMs") == frame_durations
+            and metadata.get("decodedSourceIndices") == mappings and metadata.get("durationMs") == elapsed
+            and metadata.get("loop") is loop and metadata.get("playCount") == (0 if loop else 1)
+            and metadata.get("verified") is True, "ANIMATION_METADATA_MISMATCH", "애니메이션 디코딩 결과와 manifest가 다릅니다.", file=where)
+    if format == "GIF":
+        require(metadata.get("changedPixelsPerOccurrence") == changed and metadata.get("pixelLossDetected") is any(changed),
+                "ANIMATION_METADATA_MISMATCH", "GIF 색상 손실 기록이 다릅니다.", file=where)
+    else:
+        require(metadata.get("fullRGBAParity") is True and metadata.get("lossy") is False and metadata.get("timingLossy") is False,
+                "ANIMATION_METADATA_MISMATCH", "무손실 WebP 검증 기록이 다릅니다.", file=where)
+
+
+def animations(stack, data, runtime, clips, crops):
+    zipped = archive(stack, data["animations.zip"], "animations.zip")
+    metadata = parse_json(data["animation-manifest.json"])
+    require(member(zipped, "manifest.json") == data["animation-manifest.json"],
+            "ANIMATION_MANIFEST_MISMATCH", "애니메이션 ZIP의 manifest가 독립 파일과 다릅니다.")
+    for key in ("schemaVersion", "exportId", "projectRevision", "recipeHash"):
+        require(metadata.get(key) == runtime.get(key), "SNAPSHOT_MISMATCH", "애니메이션 출력의 snapshot이 다릅니다.", field=key)
+    summary = runtime["animationExports"]
+    require(metadata.get("version") == summary.get("version") == "canonical-animation-v1"
+            and metadata.get("source") == "canonical-bake-cells", "ANIMATION_METADATA_MISMATCH", "애니메이션 출력 버전/원본이 다릅니다.")
+    anim_clips = indexed(metadata.get("clips"), "id", "animations.clips")
+    require(list(anim_clips) == list(clips), "TIMELINE_MISMATCH", "애니메이션 동작 순서가 다릅니다.")
+    expected_files, expected_warnings, reports = {"manifest.json"}, [], []
+    for cid, clip in clips.items():
+        exported = anim_clips[cid]
+        for key in ("clipId", "clipRevisionId", "name", "loop", "endBehavior", "durationMs"):
+            require(exported.get(key) == clip.get(key), "ANIMATION_METADATA_MISMATCH", "애니메이션 동작 정보가 다릅니다.", clipId=cid, field=key)
+        slots = clip["occurrences"]
+        width = max(crops[slot["renderedFrameId"]].width for slot in slots)
+        height = max(crops[slot["renderedFrameId"]].height for slot in slots)
+        columns = math.ceil(math.sqrt(len(slots)))
+        require(exported.get("cell") == {"width": width, "height": height} and exported.get("frameCount") == len(slots),
+                "ANIMATION_METADATA_MISMATCH", "애니메이션 셀/프레임 수가 다릅니다.", clipId=cid)
+        exported_slots = exported.get("occurrences")
+        require(isinstance(exported_slots, list) and len(exported_slots) == len(slots), "TIMELINE_MISMATCH", "애니메이션 슬롯 수가 다릅니다.", clipId=cid)
+        cells = []
+        for i, slot in enumerate(slots):
+            cell = crops[slot["renderedFrameId"]]
+            padded = Image.new("RGBA", (width, height)); padded.paste(cell, (0, 0)); cells.append(padded)
+            expected = {**slot, "index": i, "sourceCell": {"width": cell.width, "height": cell.height},
+                        "stripRect": {"x": i * width, "y": 0, "width": width, "height": height},
+                        "gridRect": {"x": i % columns * width, "y": i // columns * height, "width": width, "height": height}}
+            require(exported_slots[i] == expected, "TIMELINE_MISMATCH", "애니메이션 슬롯의 순서/시간/앵커/rect가 다릅니다.", clipId=cid, occurrenceIndex=i)
+        durations = [slot["durationMs"] for slot in slots]
+        formats = exported.get("formats", {})
+        require(set(formats) == {"stripPng", "gridPng", "gif", "webp"}, "ANIMATION_METADATA_MISMATCH", "애니메이션 형식 목록이 다릅니다.", clipId=cid)
+        report = {"clipId": cid, "formatsChecked": [], "omittedFormats": []}
+        for kind, record in formats.items():
+            if record.get("status") == "omitted":
+                reason = record.get("reason", {})
+                code = reason.get("code")
+                valid = ((kind == "gif" and code == "GIF_TIMING_UNREPRESENTABLE" and any(d < 10 for d in durations))
+                         or (kind == "webp" and code == "WEBP_UNAVAILABLE")
+                         or (kind == "webp" and code == "WEBP_DIMENSION_LIMIT" and max(width, height) > 16383)
+                         or (kind in ("stripPng", "gridPng") and code == "SHEET_TOO_LARGE"
+                             and width * height * (len(slots) if kind == "stripPng" else columns * math.ceil(len(slots) / columns)) > MAX_PIXELS))
+                require(valid and isinstance(reason.get("message"), str) and bool(reason["message"]) and "file" not in record,
+                        "ANIMATION_METADATA_MISMATCH", "형식 제외 이유가 잘못되었습니다.", clipId=cid, format=kind)
+                expected_warnings.append({"clipId": cid, "format": kind, **reason})
+                report["omittedFormats"].append(kind)
+                continue
+            require(record.get("status") == "created", "ANIMATION_METADATA_MISMATCH", "형식 생성 상태가 잘못되었습니다.", clipId=cid, format=kind)
+            name = record.get("file")
+            require(isinstance(name, str) and name.startswith("clips/") and name not in expected_files,
+                    "INVALID_ZIP_MEMBER", "애니메이션 파일 경로가 없거나 중복됩니다.", file=name)
+            content = member(zipped, name)
+            require(hash_value(record.get("sha256"), name) == sha(content), "FILE_HASH_MISMATCH", "애니메이션 내부 파일 해시가 다릅니다.", file=name)
+            expected_files.add(name)
+            if kind in ("stripPng", "gridPng"):
+                cols = len(slots) if kind == "stripPng" else columns
+                rows = math.ceil(len(slots) / cols)
+                sheet = image(content, name)
+                require(sheet.size == (cols * width, rows * height) and record.get("columns") == cols and record.get("rows") == rows
+                        and record.get("width") == sheet.width and record.get("height") == sheet.height and record.get("fullRGBAParity") is True,
+                        "ANIMATION_METADATA_MISMATCH", "PNG 시트 크기/격자 기록이 다릅니다.", file=name)
+                for i in range(cols * rows):
+                    x, y = i % cols * width, i // cols * height
+                    wanted = cells[i] if i < len(cells) else Image.new("RGBA", (width, height))
+                    same_rgba(sheet.crop((x, y, x + width, y + height)), wanted, f"{name}/{i}")
+            else:
+                require(record.get("sourceDurationsMs") == durations, "ANIMATION_TIMING_MISMATCH", "애니메이션 원본 시간이 다릅니다.", file=name)
+                encoded_durations = durations
+                if kind == "gif":
+                    encoded_durations, previous, elapsed = [], 0, 0
+                    for duration in durations:
+                        elapsed += duration
+                        rounded = (elapsed + 5) // 10 * 10
+                        encoded_durations.append(rounded - previous); previous = rounded
+                    require(min(durations) >= 10 and record.get("encodedDurationsMs") == encoded_durations
+                            and record.get("timingLossy") is (durations != encoded_durations)
+                            and record.get("totalDurationErrorMs") == sum(encoded_durations) - sum(durations)
+                            and record.get("lossy") is True and record.get("maxOpaqueColors") == 255
+                            and record.get("alphaThreshold") == 128 and record.get("transparentWhen") == "alpha<=128",
+                            "ANIMATION_METADATA_MISMATCH", "GIF 시간/색상/알파 제약 기록이 다릅니다.", file=name)
+                animation_timeline(content, "GIF" if kind == "gif" else "WEBP", record, cells, encoded_durations, clip["loop"], name)
+            report["formatsChecked"].append(kind)
+        reports.append(report)
+    require(set(zipped.namelist()) == expected_files, "ZIP_MEMBER_MISMATCH", "애니메이션 ZIP 파일 목록이 다릅니다.")
+    # JSON objects are sorted when saved, so warning order is not format order.
+    order = lambda warning: (warning["clipId"], warning["format"])
+    require(sorted(metadata.get("warnings", []), key=order) == sorted(expected_warnings, key=order)
+            and summary.get("warnings") == metadata.get("warnings"), "ANIMATION_METADATA_MISMATCH", "형식 제외 경고 기록이 다릅니다.")
+    return reports
 
 
 def _verify(directory):
@@ -178,10 +344,14 @@ def _verify(directory):
     if missing:
         raise ArtifactValidationError("ARTIFACTS_MISSING", "검사할 최종 파일이 아직 없습니다.", {"missing": missing}, "BLOCKED")
     data = {}
-    for name in FILES:
+    def read_file(name):
         path = directory / name
+        if not path.is_file():
+            raise ArtifactValidationError("ARTIFACTS_MISSING", "검사할 최종 파일이 아직 없습니다.", {"missing": [name]}, "BLOCKED")
         require(not path.is_symlink() and path.stat().st_size <= MAX_BYTES, "INVALID_ARTIFACT", "일반 크기 제한 내 파일이 필요합니다.", file=name)
-        data[name] = path.read_bytes()
+        return path.read_bytes()
+    for name in FILES:
+        data[name] = read_file(name)
     runtime, qa, aseprite = (parse_json(data[name]) for name in ("runtime.json", "qa.json", "aseprite.json"))
     require(runtime.get("schemaVersion") == 1 and runtime.get("engineCommit") == PIN, "VERSION_MISMATCH", "schemaVersion/source pin이 다릅니다.")
     require(runtime.get("qaStatus") == qa.get("status") == "verified" and qa.get("errors") == [] and qa.get("fullRGBAParity") is True,
@@ -192,7 +362,20 @@ def _verify(directory):
     integer(runtime.get("projectRevision"), 1, 2**63-1, "projectRevision")
     require(isinstance(runtime.get("exportId"), str) and bool(runtime["exportId"]), "INVALID_SCHEMA", "exportId가 필요합니다.")
     hashes = indexed(runtime.get("files"), "name", "files")
-    for name in ("atlas.png", "pngs.zip", "aseprite.json", "qa.json"):
+    animation_output = ("animationExports" in runtime or bool(set(hashes) & set(ANIMATION_FILES))
+                        or any((directory / name).exists() for name in ANIMATION_FILES))
+    file_names = FILES
+    if animation_output:
+        summary = runtime.get("animationExports")
+        require(isinstance(summary, dict) and summary.get("archive") == "animations.zip"
+                and summary.get("manifest") == "animation-manifest.json",
+                "ANIMATION_METADATA_MISMATCH", "runtime의 애니메이션 출력 연결이 잘못되었습니다.")
+        for name in ANIMATION_FILES:
+            data[name] = read_file(name)
+        file_names = FILES[:-1] + ANIMATION_FILES + FILES[-1:]
+    expected_hashes = set(file_names) - {"runtime.json", "bundle.zip"}
+    require(set(hashes) == expected_hashes, "FILE_HASH_MISMATCH", "runtime의 파일 해시 목록이 다릅니다.")
+    for name in expected_hashes:
         require(name in hashes and hash_value(hashes[name].get("sha256"), name) == sha(data[name]),
                 "FILE_HASH_MISMATCH", "최종 파일 해시가 다릅니다.", file=name)
     atlas = image(data["atlas.png"], "atlas.png")
@@ -213,7 +396,7 @@ def _verify(directory):
         require(key not in qa_frames, "DUPLICATE_OR_MISSING_ID", "QA 슬롯이 중복됩니다.")
         qa_frames[key] = frame
     total = 0
-    clip_reports = []
+    clip_reports, animation_reports = [], []
     used_frames, used_sources = set(), set()
     expected_sequences = {"manifest.json"}
     with ExitStack() as stack:
@@ -224,7 +407,7 @@ def _verify(directory):
             require(sequence.get(key) == runtime.get(key), "SNAPSHOT_MISMATCH", "PNG sequence의 snapshot이 다릅니다.", field=key)
         seq_clips = indexed(sequence.get("clips"), "id", "pngs.manifest.clips")
         require(list(seq_clips) == list(clips), "TIMELINE_MISMATCH", "동작 순서가 다릅니다.")
-        for name in FILES[:-1]:
+        for name in file_names[:-1]:
             require(member(packed, name) == data[name], "BUNDLE_MISMATCH", "bundle 내부 파일이 독립 파일과 다릅니다.", file=name)
         crops = {}
         for fid, frame in frames.items():
@@ -299,15 +482,21 @@ def _verify(directory):
         require(len(ase_frames) == len(qa_frames) == total, "TIMELINE_MISMATCH", "QA/Aseprite 슬롯 수가 다릅니다.")
         require(used_frames == set(frames) and used_sources == set(sources), "LINEAGE_MISMATCH", "선택된 슬롯과 frame/lineage 목록이 다릅니다.")
         require(set(pngs.namelist()) == expected_sequences, "ZIP_MEMBER_MISMATCH", "PNG ZIP 파일 목록이 다릅니다.")
-        require(set(packed.namelist()) == set(FILES[:-1]) | {f["png"] for f in frames.values()}, "ZIP_MEMBER_MISMATCH", "bundle 파일 목록이 다릅니다.")
-    for name in FILES:
+        require(set(packed.namelist()) == set(file_names[:-1]) | {f["png"] for f in frames.values()}, "ZIP_MEMBER_MISMATCH", "bundle 파일 목록이 다릅니다.")
+        if animation_output:
+            animation_reports = animations(stack, data, runtime, clips, crops)
+            require(all(warning in qa.get("warnings", []) for warning in runtime["animationExports"]["warnings"]),
+                    "ANIMATION_METADATA_MISMATCH", "QA에 형식 제외 이유가 누락되었습니다.")
+    for name in file_names:
         require(sha((directory/name).read_bytes()) == sha(data[name]), "ARTIFACT_CHANGED", "검사 중 파일이 변경되었습니다.", file=name)
     return {"status":"PASS","exportId":runtime["exportId"],"projectRevision":runtime["projectRevision"],
         "recipeHash":runtime["recipeHash"],"engineCommit":runtime["engineCommit"],
         "occurrencesChecked":total,"renderedFramesChecked":len(frames),"fullRGBAParity":True,
         "clips":clip_reports,"frameSourcesChecked":len(sources),"sourceAssetsChecked":len(assets),
+        "interpolatedFrameSourcesChecked":sum(source.get("interpolated") is True for source in sources.values()),
+        "animationClips":animation_reports,
         "parentHashLinks":edges,"externalParentFrameVersionIds":external_parents,
-        "files":[{"name":name,"sha256":sha(data[name])} for name in FILES],
+        "files":[{"name":name,"sha256":sha(data[name])} for name in file_names],
         "limits":["원본 asset bytes는 출력 묶음에 없으므로 부모 ID/해시 기록의 연결만 검증합니다.",
                   "외부 parentFrameVersionId의 과거 프레임과 실제 생성/외형/브라우저 재생은 검증하지 않습니다."]}
 

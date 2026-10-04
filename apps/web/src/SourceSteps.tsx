@@ -3,6 +3,9 @@ import type { Studio } from './useStudio';
 import { assetProvenanceLabel } from './assetProvenance';
 import { Field, Input, Select, Num, Check, Empty, short } from './ui';
 import type { Rect } from './types';
+import { VideoStep } from './VideoStep';
+import { VideoBasePreset } from './VideoBasePreset';
+import { imageProviders } from './videoWorkflow';
 import './source-tools.css';
 /** The dialog owns its header; this grid fills only its remaining tool-content. */
 function SourceTool({ name, previewLabel = '미리보기', preview, settings, toolbar }: {
@@ -49,6 +52,7 @@ export function AssetsStep({ s, onNext }: {
     const [files, setFiles] = useState<File[]>([]);
     const limit = s.service?.limits?.maxUploadBytes || 32 * 1024 * 1024;
     const assetById = new Map(p.assets.map(a => [a.assetId, a]));
+    const videoById = new Map((p.videos ?? []).map(v => [v.videoId, v]));
     async function upload() {
         if (!files.length) {
             s.setError('가져올 PNG 또는 WebP를 선택해 주세요.');
@@ -77,7 +81,7 @@ export function AssetsStep({ s, onNext }: {
     </div>} preview={<SourcePane title={`등록된 자료 ${p.assets.length}개`}>
       <div className="source-tool-asset-grid">
         {p.assets.map(a => {
-                const source = assetProvenanceLabel(a, assetById);
+                const source = assetProvenanceLabel(a, assetById, videoById);
                 return <article className="source-tool-asset" key={a.assetId}>
             <div className="source-tool-thumb checker"><img src={a.url} alt={a.originalFilename} loading="lazy"/></div>
             <strong>{a.originalFilename}</strong>
@@ -173,12 +177,23 @@ export function ReferenceStep({ s }: {
     </>}
   </SourcePane>}/>);
 }
-export function GenerationStep({ s }: {
+export function GenerationStep({ s, onSelectClip }: { s: Studio; onSelectClip?: (clipId: string) => void }) {
+    const [mode, setMode] = useState<'image' | 'video'>('image');
+    return <div className="generation-tool">
+      <div className="generation-mode" role="group" aria-label="동작 생성 방식">
+        <button type="button" aria-pressed={mode === 'image'} onClick={() => setMode('image')}>이미지로 만들기</button>
+        <button type="button" aria-pressed={mode === 'video'} onClick={() => setMode('video')}>영상으로 만들기</button>
+      </div>
+      {mode === 'video' ? <VideoStep key={s.snapshot!.projectId} s={s} onSelectClip={onSelectClip}/> : <ImageGenerationStep key={s.snapshot!.projectId} s={s}/>}
+    </div>;
+}
+function ImageGenerationStep({ s }: {
     s: Studio;
 }) {
     const p = s.snapshot!;
     const settings = p.generationSettings;
-    const [providerId, setProvider] = useState(String(settings.providerId || s.providers[0]?.providerId || ''));
+    const providers = imageProviders(s.providers);
+    const [providerId, setProvider] = useState(String(providers.find(item => item.providerId === settings.providerId)?.providerId || providers[0]?.providerId || ''));
     const [model, setModel] = useState(String(settings.model || ''));
     const [prompt, setPrompt] = useState(String(settings.prompt || ''));
     const [frameCount, setCount] = useState(Number(settings.frameCount || 4));
@@ -187,7 +202,7 @@ export function GenerationStep({ s }: {
     const [background, setBackground] = useState(String(settings.background || 'green'));
     const [scope, setScope] = useState('states');
     const [frameVersionId, setFrame] = useState('');
-    const provider = s.providers.find(p => p.providerId === providerId);
+    const provider = providers.find(p => p.providerId === providerId);
     const models = provider?.models || [];
     const approved = p.references.some(r => r.referenceRevisionId === p.activeReferenceRevisionId && r.approval === 'approved');
     const available = provider?.available !== false && provider?.loginReady !== false && !!provider;
@@ -223,13 +238,14 @@ export function GenerationStep({ s }: {
     <button className="primary full" disabled={!approved || !available || !prompt.trim() || s.busy || !!s.commands.length || s.service?.worker !== 'ready' || scope === 'frame' && !frameVersionId} onClick={() => s.job('generate', [], params)}>새 후보 생성</button>
   </>}>
     <Field label="동작과 포즈 설명"><textarea className="source-tool-prompt" value={prompt} onChange={e => setPrompt(e.target.value)} placeholder="오른쪽을 바라보며 달리는 캐릭터. 승인 기준의 의상과 장비를 유지해 주세요."/></Field>
+    <VideoBasePreset onApply={text => { setPrompt(previous => [previous.trim(), text].filter(Boolean).join('\n\n')); setScope('states'); setCount(1); }}/>
     <Select label="생성 범위" value={scope} onChange={e => setScope(e.target.value)}><option value="states">새 동작 후보</option><option value="sheet">스프라이트 시트</option><option value="frame">한 프레임 재생성</option></Select>
     {scope === 'frame' ? <Select label="재생성할 프레임" value={frameVersionId} onChange={e => setFrame(e.target.value)}><option value="">후보 선택</option>{p.frames.map((f, i) => <option key={f.frameVersionId} value={f.frameVersionId}>후보 {i + 1} · {short(f.frameVersionId)}</option>)}</Select> : <Num label="요청 프레임 수" value={frameCount} onChange={setCount} min={1} max={provider?.capabilities?.frameCount?.max || 24}/>}
     <Select label="생성 배경" value={background} onChange={e => setBackground(e.target.value)}><option value="green">녹색 · 배경 제거용</option><option value="white">흰색</option><option value="magenta">마젠타</option><option value="transparent" disabled={!provider?.capabilities?.nativeAlphaRequest}>투명 배경 요청</option></Select>
     <p className="caption">{background === 'transparent' ? '투명 배경 요청 후에도 응답 알파를 검수합니다. 투명도를 보장하지 않습니다.' : '단색 배경은 배경 정리 도구에서 제거할 수 있습니다.'}</p>
     <details className="source-tool-details" open={!available}>
       <summary>생성 연결 · {available ? (provider?.label || provider?.name || providerId) : '연결 확인 필요'}</summary>
-      <Select label="제공자" value={providerId} onChange={e => { setProvider(e.target.value); setModel(''); }}><option value="">연결 선택</option>{s.providers.map(item => <option key={item.providerId} value={item.providerId}>{item.label || item.name || item.providerId}</option>)}</Select>
+      <Select label="제공자" value={providerId} onChange={e => { setProvider(e.target.value); setModel(''); }}><option value="">연결 선택</option>{providers.map(item => <option key={item.providerId} value={item.providerId}>{item.label || item.name || item.providerId}</option>)}</Select>
       {models.length ? <Select label="모델" value={model} onChange={e => setModel(e.target.value)}>{models.map(m => <option key={typeof m === 'string' ? m : m.id} value={typeof m === 'string' ? m : m.id}>{typeof m === 'string' ? m : m.name || m.id}</option>)}</Select> : <Input label="모델" value={model} onChange={e => setModel(e.target.value)}/>}
       <Select label="해상도" disabled={!provider?.capabilities?.resolution} value={resolution} onChange={e => setResolution(e.target.value)}>{(provider?.capabilities?.resolutions || ['1024x1024', '1536x1024', '1024x1536']).map((r: string) => <option key={r}>{r}</option>)}</Select>
       <Select label="품질" disabled={!provider?.capabilities?.quality} value={quality} onChange={e => setQuality(e.target.value)}>{(provider?.capabilities?.qualities || ['low', 'medium', 'high']).map((q: string) => <option key={q} value={q}>{({ low: '낮음', medium: '표준', high: '높음' } as Record<string, string>)[q] || q}</option>)}</Select>

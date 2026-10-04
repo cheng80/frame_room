@@ -71,6 +71,145 @@
         }
       }
     },
+    "/v1/project-folders/open": {
+      "post": {
+        "summary": "Open Project Folder",
+        "description": "프로젝트 폴더 또는 그 안의 project.json/project.sqlite3 경로를 검증하고 목록에 등록합니다. 생성 작업을 자동 실행하지 않습니다.",
+        "operationId": "open_project_folder_v1_project_folders_open_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectFolderPath"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/project-folders/pick": {
+      "post": {
+        "summary": "Pick Project Folder",
+        "description": "사용자가 호출할 때만 로컬 OS의 폴더 선택창을 엽니다. 취소하면 path는 null입니다.",
+        "operationId": "pick_project_folder_v1_project_folders_pick_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PickProjectFolder"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PickedProjectFolder"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "FOLDER_PICKER_UNSUPPORTED"
+          },
+          "503": {
+            "description": "FOLDER_PICKER_UNAVAILABLE"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/project-folders/missing": {
+      "get": {
+        "summary": "Missing Project Folders",
+        "operationId": "missing_project_folders_v1_project_folders_missing_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MissingProjectFolders"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/project-folders/cleanup": {
+      "post": {
+        "summary": "Cleanup Project Folders",
+        "description": "미리 확인한 ID·버전·경로와 폴더 부재를 다시 검증한 뒤 목록만 정리합니다. 물리 파일은 삭제하지 않습니다.",
+        "operationId": "cleanup_project_folders_v1_project_folders_cleanup_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CleanupProjectFolders"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CleanedProjectFolders"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/projects/{pid}": {
       "get": {
         "summary": "Project",
@@ -94,6 +233,125 @@
                 "schema": {}
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete Project",
+        "description": "프로젝트를 앱 목록에서 제거합니다. 프로젝트 폴더의 편집 상태·이력·원본·출력 파일을 보존하여 다시 열 수 있습니다. X-Session-Token과 로컬 Origin 보호를 적용합니다.",
+        "operationId": "delete_project_v1_projects__pid__delete",
+        "parameters": [
+          {
+            "name": "pid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Pid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteProject"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletedProject"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "SESSION_REQUIRED 또는 ORIGIN_FORBIDDEN"
+          },
+          "404": {
+            "description": "PROJECT_NOT_FOUND"
+          },
+          "409": {
+            "description": "REVISION_CONFLICT 또는 PROJECT_BUSY (queued/running/cancel_requested 작업 존재)"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/projects/{pid}/reveal": {
+      "post": {
+        "summary": "Reveal Project",
+        "description": "로컬 서버 OS의 Finder 또는 탐색기로 해당 프로젝트 폴더를 엽니다. 프로젝트 및 원본 자료는 변경하지 않습니다. 임의 경로는 받지 않습니다.",
+        "operationId": "reveal_project_v1_projects__pid__reveal_post",
+        "parameters": [
+          {
+            "name": "pid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Pid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevealProject"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevealedProject"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "SESSION_REQUIRED 또는 ORIGIN_FORBIDDEN"
+          },
+          "404": {
+            "description": "PROJECT_NOT_FOUND"
+          },
+          "501": {
+            "description": "FILE_MANAGER_UNSUPPORTED"
+          },
+          "503": {
+            "description": "FILE_MANAGER_UNAVAILABLE"
           },
           "422": {
             "description": "Validation Error",
@@ -214,6 +472,90 @@
             "schema": {
               "type": "string",
               "title": "Aid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/projects/{pid}/videos": {
+      "post": {
+        "summary": "Upload Video",
+        "operationId": "upload_video_v1_projects__pid__videos_post",
+        "parameters": [
+          {
+            "name": "pid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Pid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_video_v1_projects__pid__videos_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/videos/{vid}/content": {
+      "get": {
+        "summary": "Video Content",
+        "operationId": "video_content_v1_videos__vid__content_get",
+        "parameters": [
+          {
+            "name": "vid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Vid"
             }
           }
         ],
@@ -542,6 +884,54 @@
         ],
         "responses": {
           "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/projects/{pid}/video-batches": {
+      "post": {
+        "summary": "Video Batches Create",
+        "description": "All-or-nothing queueing; a lost response cannot multiply paid requests.",
+        "operationId": "video_batches_create_v1_projects__pid__video_batches_post",
+        "parameters": [
+          {
+            "name": "pid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Pid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VideoBatchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
             "description": "Successful Response",
             "content": {
               "application/json": {
@@ -1114,6 +1504,25 @@
         ],
         "title": "Body_upload_v1_projects__pid__assets_post"
       },
+      "Body_upload_video_v1_projects__pid__videos_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "title": "Expectedrevision"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file",
+          "expectedRevision"
+        ],
+        "title": "Body_upload_video_v1_projects__pid__videos_post"
+      },
       "Cancel": {
         "properties": {
           "expectedStatus": {
@@ -1150,6 +1559,74 @@
         ],
         "title": "Character"
       },
+      "CleanedProjectFolders": {
+        "properties": {
+          "removedProjectIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Removedprojectids"
+          },
+          "removedCount": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Removedcount"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "removedProjectIds",
+          "removedCount"
+        ],
+        "title": "CleanedProjectFolders"
+      },
+      "CleanupProjectFolder": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "maxLength": 4096,
+            "minLength": 1,
+            "title": "Path"
+          },
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Projectid"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Expectedrevision"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "path",
+          "projectId",
+          "expectedRevision"
+        ],
+        "title": "CleanupProjectFolder"
+      },
+      "CleanupProjectFolders": {
+        "properties": {
+          "projects": {
+            "items": {
+              "$ref": "#/components/schemas/CleanupProjectFolder"
+            },
+            "type": "array",
+            "title": "Projects"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "projects"
+        ],
+        "title": "CleanupProjectFolders"
+      },
       "CreateClip": {
         "properties": {
           "type": {
@@ -1170,6 +1647,35 @@
           "clip"
         ],
         "title": "CreateClip"
+      },
+      "DeleteProject": {
+        "properties": {
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Expectedrevision"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expectedRevision"
+        ],
+        "title": "DeleteProject"
+      },
+      "DeletedProject": {
+        "properties": {
+          "deletedProjectId": {
+            "type": "string",
+            "title": "Deletedprojectid"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "deletedProjectId"
+        ],
+        "title": "DeletedProject"
       },
       "Duplicate": {
         "properties": {
@@ -1377,6 +1883,8 @@
             "type": "string",
             "enum": [
               "generate",
+              "generate_video",
+              "process_video",
               "cutout",
               "extract",
               "align",
@@ -1419,6 +1927,53 @@
         ],
         "title": "JobRequest"
       },
+      "MissingProjectFolder": {
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "title": "Projectid"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Revision"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "projectId",
+          "name",
+          "path",
+          "revision"
+        ],
+        "title": "MissingProjectFolder"
+      },
+      "MissingProjectFolders": {
+        "properties": {
+          "projects": {
+            "items": {
+              "$ref": "#/components/schemas/MissingProjectFolder"
+            },
+            "type": "array",
+            "title": "Projects"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "projects"
+        ],
+        "title": "MissingProjectFolders"
+      },
       "NewProject": {
         "properties": {
           "name": {
@@ -1443,6 +1998,19 @@
               }
             ],
             "title": "Cell"
+          },
+          "parentDirectory": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4096,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parentdirectory"
           }
         },
         "additionalProperties": false,
@@ -1472,6 +2040,45 @@
           "outline"
         ],
         "title": "Outline"
+      },
+      "PickProjectFolder": {
+        "properties": {
+          "purpose": {
+            "type": "string",
+            "enum": [
+              "open",
+              "parent"
+            ],
+            "title": "Purpose"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "purpose"
+        ],
+        "title": "PickProjectFolder"
+      },
+      "PickedProjectFolder": {
+        "properties": {
+          "path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Path"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "path"
+        ],
+        "title": "PickedProjectFolder"
       },
       "Pixels": {
         "properties": {
@@ -1507,6 +2114,22 @@
           "pixelEdits"
         ],
         "title": "Pixels"
+      },
+      "ProjectFolderPath": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "maxLength": 4096,
+            "minLength": 1,
+            "title": "Path"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "path"
+        ],
+        "title": "ProjectFolderPath"
       },
       "RefBody": {
         "properties": {
@@ -1656,6 +2279,46 @@
           "idempotencyKey"
         ],
         "title": "Retry"
+      },
+      "RevealProject": {
+        "properties": {},
+        "additionalProperties": false,
+        "type": "object",
+        "title": "RevealProject"
+      },
+      "RevealedProject": {
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "title": "Projectid"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "fileManager": {
+            "type": "string",
+            "enum": [
+              "finder",
+              "explorer"
+            ],
+            "title": "Filemanager"
+          },
+          "storageLayout": {
+            "type": "string",
+            "const": "project-folder",
+            "title": "Storagelayout"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "projectId",
+          "path",
+          "fileManager",
+          "storageLayout"
+        ],
+        "title": "RevealedProject"
       },
       "Review": {
         "properties": {
@@ -1868,6 +2531,58 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "VideoBatchItem": {
+        "properties": {
+          "assetId": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Assetid"
+          },
+          "params": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Params",
+            "default": {}
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "assetId"
+        ],
+        "title": "VideoBatchItem"
+      },
+      "VideoBatchRequest": {
+        "properties": {
+          "inputRevision": {
+            "type": "integer",
+            "title": "Inputrevision"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/VideoBatchItem"
+            },
+            "type": "array",
+            "maxItems": 16,
+            "minItems": 1,
+            "title": "Items"
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Idempotencykey"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "inputRevision",
+          "items",
+          "idempotencyKey"
+        ],
+        "title": "VideoBatchRequest"
       }
     }
   }

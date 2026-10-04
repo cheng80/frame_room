@@ -22,6 +22,8 @@ import zipfile
 import numpy as np
 from PIL import Image
 
+from alignment.animation_exports import AnimationExportError, build_animation_exports
+
 ENGINE_COMMIT = "b058341f7543f3adcbea227bd4e6b7587895b1bc"
 ADAPTER_VERSION = "alignment-v1"
 ENGINE_ROOT = Path(__file__).resolve().parents[1] / "engine" / "sprite-gen"
@@ -653,7 +655,8 @@ def build_bundle(snapshot, clip_ids, asset_path, output_dir, export_id, strict=T
             "alphaNormalization": "alpha0-rgb-zero-v1", "outlineMode": "bake" if effective_outline.get("enabled") else "preview-only",
             "outline": effective_outline,
             "sourceAssets": [{"assetId": a["assetId"], "sha256": a.get("sha256"), "decodedHash": a.get("decodedHash"), "provenance": a.get("provenance", {})} for a in locked.get("assets", []) if a["assetId"] in source_ids],
-            "frameSources": [{k: f.get(k) for k in ("frameId", "frameVersionId", "parentFrameVersionId", "generationVersionId", "rawAssetId", "imageAssetId", "sourceRect", "sourceToFrameTransform")} for f in locked.get("frames", []) if f["frameVersionId"] in frame_ids],
+            "frameSources": [{k: f.get(k) for k in ("frameId", "frameVersionId", "parentFrameVersionId", "generationVersionId", "rawAssetId", "imageAssetId", "sourceRect", "sourceToFrameTransform", "sourceVideoId", "sourceFrameIndex", "sourceTimeMs", "interpolated", "interpolation", "sourceProcessing")} for f in locked.get("frames", []) if f["frameVersionId"] in frame_ids],
+            "sourceVideos": [{k: v.get(k) for k in ("videoId", "sha256", "originalFilename", "width", "height", "fps", "frameCount", "durationMs", "provenance")} for v in locked.get("videos", []) if any(f.get("sourceVideoId") == v["videoId"] and f["frameVersionId"] in frame_ids for f in locked.get("frames", []))],
             "atlas": {"file": "atlas.png", "width": atlas.width, "height": atlas.height, "sha256": _hash((staging / "atlas.png").read_bytes())},
             "frames": frames, "clips": runtime_clips}
         sequence = {"schemaVersion": 1, "exportId": export_id, "recipeHash": recipe_hash,
@@ -680,11 +683,24 @@ def build_bundle(snapshot, clip_ids, asset_path, output_dir, export_id, strict=T
             "format": "RGBA8888", "size": {"w": atlas.width, "h": atlas.height}, "scale": "1", "frameTags": tags,
             "runtime": "runtime.json", "note": "Aseprite-compatible JSON; loop, endBehavior and anchors are in runtime.json"}}
         _write_json(staging / "aseprite.json", aseprite)
+        try:
+            animation_manifest, animation_entries = build_animation_exports(runtime_clips, png_data,
+                export_id=export_id, recipe_hash=recipe_hash, project_revision=locked.get("revision"))
+        except AnimationExportError as exc:
+            raise PipelineError("ANIMATION_PARITY_FAILED", str(exc)) from exc
+        _write_json(staging / "animation-manifest.json", animation_manifest)
+        animation_entries.append(("manifest.json", (staging / "animation-manifest.json").read_bytes()))
+        _zip(staging / "animations.zip", animation_entries)
+        _verify_zip(staging / "animations.zip", animation_entries)
+        manifest["animationExports"] = {"version": animation_manifest["version"],
+            "archive": "animations.zip", "manifest": "animation-manifest.json",
+            "warnings": animation_manifest["warnings"]}
+        qa["warnings"].extend(animation_manifest["warnings"])
         _write_json(staging / "qa.json", qa)
         # runtime cannot contain its own digest (or the containing ZIP digest).
-        manifest["files"] = [{"name": name, "sha256": _hash((staging/name).read_bytes())} for name in ("atlas.png", "pngs.zip", "aseprite.json", "qa.json")]
+        manifest["files"] = [{"name": name, "sha256": _hash((staging/name).read_bytes())} for name in ("atlas.png", "pngs.zip", "aseprite.json", "qa.json", "animations.zip", "animation-manifest.json")]
         _write_json(staging / "runtime.json", manifest)
-        names = ["atlas.png", "pngs.zip", "runtime.json", "aseprite.json", "qa.json"]
+        names = ["atlas.png", "pngs.zip", "runtime.json", "aseprite.json", "qa.json", "animations.zip", "animation-manifest.json"]
         bundle_entries = [(name, (staging/name).read_bytes()) for name in names] + [(f["png"], png_data[f["id"]]) for f in frames]
         _zip(staging / "bundle.zip", bundle_entries)
         names.append("bundle.zip")

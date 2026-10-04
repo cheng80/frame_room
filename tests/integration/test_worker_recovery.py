@@ -16,6 +16,7 @@ import os
 from pathlib import Path
 import signal
 import socket
+import sqlite3
 import subprocess
 import sys
 import time
@@ -57,8 +58,8 @@ def _png():
     return buffer.getvalue()
 
 
-@pytest.fixture
-def sandbox(tmp_path, monkeypatch):
+@pytest.fixture(params=['default-project-directory', 'external-project-directory'])
+def sandbox(tmp_path, monkeypatch, request):
     """No global .data, real provider auth, API listener, or permanent helper file."""
     from services.api import store as s
     from services.api import main as api
@@ -67,8 +68,10 @@ def sandbox(tmp_path, monkeypatch):
     monkeypatch.setenv('PYTHONDONTWRITEBYTECODE', '1')
     monkeypatch.setattr(s, 'DATA', data)
     s.init()
-    project = s.create_project('복구 회귀', '합성 캐릭터')
-    with s.transaction() as c:
+    parent = tmp_path / 'user-owned projects' if request.param == 'external-project-directory' else None
+    if parent: parent.mkdir()
+    project = s.create_project('복구 회귀', '합성 캐릭터', parent_directory=str(parent) if parent else None)
+    with s.project_scope(project['projectId']), s.transaction() as c:
         original = s.register_asset(_png(), 'owned-fixture.png', 'identity', c=c)
         project['assets'].append(original)
         rid = s.uid()
@@ -153,8 +156,15 @@ def test_real_worker_backup_preserves_source_and_publishes_once(sandbox):
     with s.connect() as c:
         row = c.execute('SELECT * FROM artifacts WHERE id=?', (artifact['artifactId'],)).fetchone()
         events = [r[0] for r in c.execute('SELECT seq FROM events WHERE job_id=? ORDER BY seq', (j['jobId'],))]
-    assert hashlib.sha256((s.DATA / row['path']).read_bytes()).hexdigest() == artifact['sha256']
+    assert hashlib.sha256(s.resolve_work_path(j['jobId'], row['path']).read_bytes()).hexdigest() == artifact['sha256']
     assert original.read_bytes() == original_bytes
+    folder = s.project_folder(j['projectId'])
+    assert original.is_relative_to(folder / 'assets')
+    assert s.job_directory(j['jobId']) == folder / 'jobs' / j['jobId']
+    assert s.artifact_directory(j['jobId']) == folder / 'outputs' / j['jobId']
+    assert s.resolve_work_path(j['jobId'], row['path']).is_relative_to(folder / 'outputs')
+    assert not (s.DATA / 'jobs' / j['jobId']).exists()
+    assert not (s.DATA / 'artifacts' / j['jobId']).exists()
     assert events == list(range(1, done['eventSeq'] + 1))
     proc.terminate(); proc.wait(timeout=5)
     sandbox.start()
@@ -225,7 +235,7 @@ def test_restart_reconciles_completed_result_without_reexecuting(sandbox, operat
     marker = sandbox.data / 'test-publication-boundary.json'
     _wait_for(marker.exists, label=mode)
     boundary = json.loads(marker.read_text())
-    work = sandbox.data / 'jobs' / j['jobId'] / j['attemptId']
+    work = sandbox.s.job_directory(j['jobId']) / j['attemptId']
     assert json.loads((work / 'result.json').read_text())['ok'] is True
     assert Path(boundary['path']).is_dir()
     proc.kill(); proc.wait(timeout=3)
@@ -275,7 +285,7 @@ def test_provider_checkpoint_retry_never_calls_provider_again(sandbox, tamper):
     sandbox.start('post-provider-error')
     failed = sandbox.terminal(j)
     assert failed['status'] == 'failed' and failed['providerCheckpoint'] is True
-    previous = sandbox.data / 'jobs' / j['jobId'] / failed['attemptId']
+    previous = sandbox.s.job_directory(j['jobId']) / failed['attemptId']
     checkpoint_bytes = (previous / 'provider-completed.json').read_bytes()
     checkpoint = json.loads(checkpoint_bytes)
     old_image = Path(checkpoint['providerResult']['paths'][0])
@@ -297,7 +307,7 @@ def test_provider_checkpoint_retry_never_calls_provider_again(sandbox, tamper):
         assert sandbox.s.get_project(j['projectId'])['generations'] == []
         return
     assert done['status'] == 'needs_review', done
-    current = sandbox.data / 'jobs' / j['jobId'] / done['attemptId']
+    current = sandbox.s.job_directory(j['jobId']) / done['attemptId']
     reused = json.loads((current / 'provider-completed.json').read_text())
     assert reused['requestHash'] == checkpoint['requestHash']
     assert reused['providerResult']['receipt'] == checkpoint['providerResult']['receipt']
@@ -305,7 +315,7 @@ def test_provider_checkpoint_retry_never_calls_provider_again(sandbox, tamper):
     assert copied.parent == current / 'staging' and copied != old_image
     # Publication moved staging atomically; compare the published copy and the
     # untouched previous attempt, not a stale absolute staging path.
-    published = sandbox.data / 'artifacts' / j['jobId'] / done['attemptId'] / copied.name
+    published = sandbox.s.artifact_directory(j['jobId']) / done['attemptId'] / copied.name
     assert published.read_bytes() == old_image.read_bytes() == confirmed_bytes
     p = sandbox.s.get_project(j['projectId'])
     assert len(p['generations']) == 1 and len(p['assets']) == 2
@@ -321,12 +331,12 @@ def test_completed_result_retry_republishes_without_task_execution_or_provider_c
     sandbox.start(mode)
     failed = sandbox.terminal(j)
     assert failed['status'] == 'failed' and failed['errors'][0]['code'] == 'PUBLICATION_FAILED'
-    previous = sandbox.data / 'jobs' / j['jobId'] / failed['attemptId']
+    previous = sandbox.s.job_directory(j['jobId']) / failed['attemptId']
     payload_bytes = (previous / 'result.json').read_bytes()
     payload = json.loads(payload_bytes)
     assert payload['ok'] is True and payload['result']['receipt']['testOnly'] is True
     old_directory = previous / 'staging' if mode == 'fail-before-publish-once' else (
-        sandbox.data / 'artifacts' / j['jobId'] / failed['attemptId'])
+        sandbox.s.artifact_directory(j['jobId']) / failed['attemptId'])
     old_image = old_directory / 'fake-generated.png'
     raw = old_image.read_bytes()
     assert sandbox.s.get_project(j['projectId'])['generations'] == []
@@ -341,7 +351,7 @@ def test_completed_result_retry_republishes_without_task_execution_or_provider_c
     executions = (sandbox.data / 'test-task-executions.jsonl').read_text().splitlines()
     assert len(executions) == 1
     assert json.loads(executions[0])['attemptId'] == failed['attemptId']
-    published = sandbox.data / 'artifacts' / j['jobId'] / done['attemptId']
+    published = sandbox.s.artifact_directory(j['jobId']) / done['attemptId']
     assert (published / 'fake-generated.png').read_bytes() == old_image.read_bytes() == raw
     assert (previous / 'result.json').read_bytes() == payload_bytes
     p = sandbox.s.get_project(j['projectId'])
@@ -350,6 +360,163 @@ def test_completed_result_retry_republishes_without_task_execution_or_provider_c
     assert done['result']['receipt'] == payload['result']['receipt']
     repeated = _retry_via_http(sandbox, j, 'reuse-completed-result')
     assert repeated['attemptId'] == done['attemptId'] and _call_count(sandbox.data) == 1
+
+
+@pytest.mark.parametrize('stored_form', ['legacy-absolute', 'relative'])
+def test_generation_checkpoint_uses_project_copy_of_old_path(sandbox, monkeypatch, stored_form):
+    """The preserved legacy bytes are not an alternate live job directory."""
+    from services.worker.task import execute
+    from adapters.spritegen import provider
+    s = sandbox.s
+    j = s.get_job(sandbox.enqueue('generate')['jobId'])
+    out = s.job_directory(j['jobId']) / j['attemptId'] / 'staging'
+    relative = Path('jobs') / j['jobId'] / j['attemptId'] / 'staging' / 'confirmed.png'
+    legacy = s.DATA / relative
+    image = out / 'confirmed.png'
+    original = _png()
+    s.atomic_bytes(legacy, original)
+    s.atomic_bytes(image, original)
+    saved_path = str(legacy) if stored_form == 'legacy-absolute' else relative.as_posix()
+    result = {'paths': [saved_path], 'requestSnapshot': {'testOnly': True},
+              'providerId': 'codex', 'model': 'test-only',
+              'receipt': {'testOnly': True, 'sha256': s.digest(original)}}
+    checkpoint = out.parent / 'provider-completed.json'
+    s.atomic_bytes(checkpoint, s.dumps({'requestHash': j['requestHash'], 'providerResult': result}).encode())
+    unchanged = checkpoint.read_bytes()
+    monkeypatch.setattr(provider, 'generate', lambda *a, **k: pytest.fail('Checkpoint recovery must not generate'))
+    assert s.resolve_work_path(j['jobId'], saved_path) == image
+    recovered = execute(j, out)
+    assert s.asset_path(recovered['assets'][0]['assetId']).read_bytes() == original
+    assert s.asset_path(recovered['assets'][0]['assetId']).is_relative_to(s.project_folder(j['projectId']) / 'assets')
+    assert checkpoint.read_bytes() == unchanged and legacy.read_bytes() == image.read_bytes() == original
+
+
+
+def test_unpublished_completed_result_keeps_resource_records_in_project_folder(sandbox, monkeypatch):
+    """A failed publication must survive copying only the project folder."""
+    from services.worker.task import execute
+    from adapters.spritegen import provider
+    s = sandbox.s
+    j = s.get_job(sandbox.enqueue('generate')['jobId'])
+    out = s.job_directory(j['jobId']) / j['attemptId'] / 'staging'
+    def fake_generate(params, reference, asset_path, out_dir):
+        image = out_dir / 'synthetic-generated.png'
+        s.atomic_bytes(image, _png())
+        return {'paths': [str(image)], 'requestSnapshot': {'testOnly': True},
+                'providerId': 'codex', 'model': 'test-only',
+                'receipt': {'testOnly': True, 'sha256': s.digest(_png())}}
+    monkeypatch.setattr(provider, 'generate', fake_generate)
+    result = execute(j, out)
+    result['publicationHashes'] = {}
+    s.atomic_bytes(out.parent / 'result.json', s.dumps({'ok': True, 'result': result}).encode())
+    with s.transaction() as c:
+        current = s.get_job(j['jobId'], c)
+        current.update(status='failed', errors=[{'code': 'PUBLICATION_FAILED', 'message': 'Synthetic local failure'}])
+        s.write_job(c, current)
+    folder = s.project_folder(j['projectId'])
+    generated = result['assets'][0]
+    assert generated['assetId'] not in {a['assetId'] for a in s.get_project(j['projectId'])['assets']}
+    with sqlite3.connect((folder / 'project.sqlite3').as_uri() + '?mode=ro', uri=True) as portable:
+        record = portable.execute('SELECT path,metadata FROM assets WHERE id=?', (generated['assetId'],)).fetchone()
+    assert record is not None, 'Completed checkpoint resource metadata must be portable before publication'
+    assert (folder / record[0]).read_bytes() == _png()
+    assert json.loads(record[1]) == generated
+
+
+def test_generation_checkpoint_cannot_read_other_project(sandbox, monkeypatch):
+    from services.worker.task import execute
+    from adapters.spritegen import provider
+    s = sandbox.s
+    j = s.get_job(sandbox.enqueue('generate')['jobId'])
+    other = s.create_project('다른 프로젝트', '합성 캐릭터')
+    with s.project_scope(other['projectId']):
+        asset = s.register_asset(_png(), 'foreign.png')
+    foreign = s.asset_path(asset['assetId'])
+    out = s.job_directory(j['jobId']) / j['attemptId'] / 'staging'
+    result = {'paths': [str(foreign)], 'requestSnapshot': {}, 'providerId': 'codex',
+              'model': 'test-only', 'receipt': {'sha256': s.digest(foreign.read_bytes())}}
+    s.atomic_bytes(out.parent / 'provider-completed.json',
+                   s.dumps({'requestHash': j['requestHash'], 'providerResult': result}).encode())
+    monkeypatch.setattr(provider, 'generate', lambda *a, **k: pytest.fail('Invalid checkpoint must not generate'))
+    with pytest.raises(s.AppError): execute(j, out)
+    assert foreign.read_bytes() == _png()
+
+
+
+def _other_project_backup(sandbox):
+    s=sandbox.s
+    project=s.create_project('계속 처리할 프로젝트','합성 캐릭터')
+    return sandbox.api.enqueue(project['projectId'],'backup',{'savedRevision':project['revision']},s.uid(),project['revision'])
+
+
+def _assert_missing_folder_isolated(sandbox, affected, healthy, process, original_folder, moved_folder):
+    s=sandbox.s
+    assert sandbox.terminal(healthy)['status']=='succeeded'
+    for job in affected:
+        stopped=sandbox.job(job)
+        assert stopped['status']=='interrupted',stopped
+        assert stopped['errors'][0]['code'].startswith('PROJECT_FOLDER_')
+    assert process.poll() is None and not original_folder.exists()
+    with s.connect() as c:
+        assert c.execute('SELECT 1 FROM folder_sync WHERE project_id=?',(affected[0]['projectId'],)).fetchone()
+    moved_folder.rename(original_folder)
+    from services.api import project_folders
+    project_folders.flush([affected[0]['projectId']])
+    with sqlite3.connect(original_folder/'project.sqlite3') as portable:
+        for job in affected:
+            assert portable.execute('SELECT status FROM jobs WHERE id=?',(job['jobId'],)).fetchone()[0]=='interrupted'
+    with s.connect() as c:
+        assert not c.execute('SELECT 1 FROM folder_sync WHERE project_id=?',(affected[0]['projectId'],)).fetchone()
+    assert sandbox.terminal(_other_project_backup(sandbox))['status']=='succeeded'
+
+
+@pytest.mark.parametrize('initial_status',['queued','running','cancel_requested'])
+def test_missing_project_folder_does_not_stop_recovery_or_queue(sandbox, initial_status):
+    s=sandbox.s
+    first=sandbox.enqueue()
+    second=sandbox.enqueue('generate')
+    if initial_status!='queued':
+        with s.transaction() as c:
+            current=s.get_job(first['jobId'],c);current['status']=initial_status;s.write_job(c,current)
+    healthy=_other_project_backup(sandbox)
+    folder=s.project_folder(first['projectId']);moved=sandbox.tmp/'temporarily-unavailable'
+    folder.rename(moved)
+    proc=sandbox.start()
+    _assert_missing_folder_isolated(sandbox,[first,second],healthy,proc,folder,moved)
+    assert not sandbox.job(second).get('externalStarted')
+    assert _call_count(sandbox.data)==0
+
+
+def test_missing_folder_during_execution_reaps_child_and_preserves_retry_guard(sandbox):
+    s=sandbox.s
+    first=sandbox.enqueue('generate')
+    second=sandbox.enqueue()
+    healthy=_other_project_backup(sandbox)
+    proc=sandbox.start('stubborn-provider')
+    entered=_wait_entered(sandbox)
+    _wait_for(lambda:sandbox.job(first).get('childPid'),label='recorded child')
+    folder=s.project_folder(first['projectId']);moved=sandbox.tmp/'unavailable-during-execution'
+    folder.rename(moved)
+    _assert_missing_folder_isolated(sandbox,[first,second],healthy,proc,folder,moved)
+    _wait_for(lambda:not _running(entered['pid']) and not _running(entered['descendantPid']),label='missing-folder children reaped')
+    assert sandbox.job(first)['externalStarted'] is True
+    with pytest.raises(s.AppError) as error:
+        sandbox.api.retry(first['jobId'],sandbox.api.Retry(idempotencyKey='no-paid-replay'))
+    assert error.value.code=='PROVIDER_RETRY_BLOCKED'
+    assert _call_count(sandbox.data)==1  # Synthetic provider only; no network.
+
+
+@pytest.mark.parametrize('boundary',['claim','spawn','publish'])
+def test_folder_loss_during_worker_flush_does_not_terminate_loop(sandbox,boundary):
+    s=sandbox.s
+    first=sandbox.enqueue();second=sandbox.enqueue()
+    healthy=_other_project_backup(sandbox)
+    folder=s.project_folder(first['projectId']);moved=sandbox.data/'test-offline-project'
+    proc=sandbox.start('lose-folder-'+boundary)
+    _assert_missing_folder_isolated(sandbox,[first,second],healthy,proc,folder,moved)
+    child=sandbox.job(first).get('childPid')
+    if child: _wait_for(lambda:not _running(child),label='child reaped after failed flush')
+    assert _call_count(sandbox.data)==0
 
 
 def test_asset_registration_rejects_symlink_escape_before_write(sandbox):
@@ -421,6 +588,29 @@ def _harness_worker():
         return original_popen(argv, *args, **kwargs)
     worker.subprocess.Popen = spawn
 
+    if mode in ('lose-folder-claim','lose-folder-spawn'):
+        original_write_job=worker.s.write_job
+        moved_once=False
+        def lose_folder(c,j):
+            nonlocal moved_once
+            original_write_job(c,j)
+            at_boundary=j['status']=='running' and (bool(j.get('childPid')) if mode=='lose-folder-spawn' else not j.get('childPid'))
+            if at_boundary and not moved_once:
+                moved_once=True
+                worker.s.project_folder(j['projectId'],c).rename(worker.s.DATA/'test-offline-project')
+        worker.s.write_job=lose_folder
+
+    if mode == 'lose-folder-publish':
+        original_publish=worker.publish
+        moved_once=False
+        def lose_folder_before_publish(j,payload):
+            nonlocal moved_once
+            if not moved_once:
+                moved_once=True
+                worker.s.project_folder(j['projectId']).rename(worker.s.DATA/'test-offline-project')
+            return original_publish(j,payload)
+        worker.publish=lose_folder_before_publish
+
     if mode == 'fail-before-publish-once':
         original_publish = worker.publish
         failed_once = False
@@ -444,7 +634,7 @@ def _harness_worker():
 
     if mode == 'hold-before-publish':
         def hold(j, payload):
-            path = worker.s.DATA / 'jobs' / j['jobId'] / j['attemptId'] / 'staging'
+            path = worker.s.job_directory(j['jobId']) / j['attemptId'] / 'staging'
             worker.s.atomic_bytes(worker.s.DATA / 'test-publication-boundary.json', json.dumps({'path': str(path)}).encode())
             while True:
                 time.sleep(.1)
