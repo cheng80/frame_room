@@ -1,34 +1,47 @@
 # 캐릭터 스프라이트 에디터 제품 문서
 
-2026-10-03 KST · v1.0 · **조사와 제품 설계 완료, 앱 구현 전**
+2026-10-05 KST · **로컬 앱 구현, 영상 제작 보완·프로젝트 폴더 관리 반영**
 
-사용자가 요청한 `sprite-gen` 포크 기반 웹앱의 제작 기준이다. 기존 조사와 대화의 요구를 통합했다. 기술 구성은 React+Vite+TypeScript, FastAPI, SQLite, 독립 Python worker다. 엔진은 검증된2.12.1 commit을 고정하고 프로젝트 안에서 수정한다.
+다른 환경에서 이어서 작업할 때는 **[HANDOFF.md](HANDOFF.md)**부터 읽는다. 특정 커밋을 최신으로 고정하지 않으며 `git status`와 `git log`로 실제 상태를 확인한다. Git에 포함되지 않는 프로젝트 데이터·인증·선택 도구의 이전 방법도 핸드오프에 있다.
+
+## 현재 상태와 실행 계약
 
 | 문서 | 내용 |
 | --- | --- |
-| [PRD.md](PRD.md) | R01–R12 요구, 두 제작 여정, 범위·완료 기준 |
-| [UX_DESIGN.md](UX_DESIGN.md) | 화면·편집 흐름, 빈/실패/저장/검수 상태 |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | 스택·포크·실행기·저장·출력 구조 |
-| [DATA_API_SPEC.md](DATA_API_SPEC.md) | 데이터와 API 정본, geometry·timing·job·output 계약 |
-| [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) | 구현 단계·소유권·검증·실행 진입점 |
-| [ACCEPTANCE_TESTS.md](ACCEPTANCE_TESTS.md) | 요구별 수용 시험·fixture·실행 상태 |
-| [DECISIONS.md](DECISIONS.md) | 사실/결정/미확인과 초기 명세의 정정 |
-| [HANDOFF.md](HANDOFF.md) | 새 구현 세션이 바로 읽고 제작을 시작할 지시문 |
+| [HANDOFF.md](HANDOFF.md) | 새 환경 실행·프로젝트 이전·코드 탐색·비용/원본 보존·남은 제한 |
+| [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) | 날짜별 실제 실행 결과와 자동/수동 검증 범위 |
+| [프로젝트 폴더 적용](PROJECT_FOLDERS_2026-10-05.md) | 프로젝트 SQLite·목록 제거·없는 폴더 정리·실제 복사 검증 |
+| [웹 보완 적용](WEB_QUALITY_COMPLETION_2026-10-04.md) | 영상 마무리·방향/묶음·RIFE·주기·애니메이션 출력 |
+| [색상 회귀](VIDEO_COLOR_REGRESSION_2026-10-04.md) | 손/칼의 색 변화와 검수 GIF·에디터 PNG 처리 차이 |
+| [영상 에디터 통합](VIDEO_EDITOR_INTEGRATION_2026-10-04.md) | Grok 로그인 생성·기존 MP4 처리·접수/재개 |
+| [실제 Grok 생성](GROK_LOGIN_VIDEO_PROBE_2026-10-04.md) | 생성 원본·출처·실제 성공 범위 |
+| [실행 계약](../../packages/contracts/IMPLEMENTATION.md) | 현재 데이터·편집·작업·출력 계약 |
+| [영상 계약](../../packages/contracts/VIDEO.md) | 생성/처리/묶음과 마무리·출력 확장 |
+| [프로젝트 폴더 계약](../../packages/contracts/PROJECT_FOLDERS.md) | 저장 구조·동기화·이전·등록 정리 |
+| [OpenAPI](../../packages/contracts/openapi.json) | 실행 앱의 API schema |
+| [웹 사용/검증 안내](../../apps/web/README.md) | 화면 기능, ego-browser 실행 규칙 |
 
-새 구현 세션은 HANDOFF부터 읽는다. 구현 요구는 PRD, wire/API 상세는 DATA_API_SPEC이 정본이다. 연구 제안과 충돌하면 이 제품 문서의 결정과 근거를 따른다. 계약을 바꾸면 관련 UI·테스트·결정 문서를 함께 갱신한다.
+기술 구성은 React/Vite/TypeScript, FastAPI, SQLite, 독립 Python worker다. 전용 엔진은 v2.12.1 기반에 공개 v2.19 영상 보완을 선별 반영한다. 코드·계약·회귀 시험으로 현재 동작을 확인하고 아래 초기 설계와 구분한다. 계약을 바꾸면 UI·시험·사용 설명서도 함께 갱신한다.
 
-## 핵심 결정
+## 초기 설계와 조사 기록
 
-- 큐레이션 이전의 기준 이미지·생성 설정·생성·알파·추출을 UI화하여 전체 흐름을 연결한다.
-- 포즈별 높이 정규화 대신 원시 crop·공통 scale·수동 앵커를 사용한다.
-- 원본 불변, 안정 frame/occurrence ID, 가변 duration, save revision, 작업 복구를 구현한다.
-- 확정 미리보기와 PNG·아틀라스는 같은 bake에서 만든다.
-- PXF, 영상·다방향 자동화·원격 협업·공개 배포는 첫 구현 범위에서 제외한다.
+아래 문서는 2026-10-03의 요구·판단·검증 계획을 보존한 것이다. 당시의 ‘영상 제외’, ‘구현 전’, NOT_RUN 또는 이 문서보다 오래된 시험 수를 현재 상태로 해석하지 않는다.
 
-## 근거와 현재 검증 상태
+| 문서 | 내용 |
+| --- | --- |
+| [PRD.md](PRD.md) | R01–R12 요구와 제작 여정·수용 경계 |
+| [UX_DESIGN.md](UX_DESIGN.md) | 초기 화면·편집 흐름·실패/저장/검수 상태 |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | 초기 스택·포크·실행기·저장·출력 설계 |
+| [DATA_API_SPEC.md](DATA_API_SPEC.md) | 초기 geometry·timing·job·output 계약; 이후 변경은 실행 계약 참고 |
+| [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) | M0–M5 구현 계획과 소유권·검증 계획 |
+| [ACCEPTANCE_TESTS.md](ACCEPTANCE_TESTS.md) | 34개 제품 수용 기준과 시나리오 |
+| [DECISIONS.md](DECISIONS.md) | 초기 명세 정정과 근거 |
+| [사용자 합의](../planning/USER_DECISIONS.md) | 후속 요구·결정 |
+| [웹 역기획](SPRITEGEN_WEB_REVERSE_DESIGN_2026-10-04.md) | 공개 관찰과 미확인 서버 내부의 구분 |
+| [구현 방향](AI_SPRITE_EDITOR_IMPLEMENTATION_2026-10-04.md) | 공개 데이터로 가능한 재구현 범위 |
+| [걷기 실험](WALK_EXPERIMENT_2026-10-04.md) | 정렬 후 판정·후보 실험 기록 |
+| [PXF 비교](PXF_COMPARISON_2026-10-04.md) | 별도 프로젝트와의 범위 비교 |
 
-[mydot 후속 조사](../../research/hero-inc/2026-10-03-implementation-design/README.md), [엔진 감사](../../research/hero-inc/2026-10-03-implementation-design/engine-audit.md), [이미지 검증](../../research/hero-inc/2026-10-03-implementation-design/validation.md), [사용자 합의](../planning/USER_DECISIONS.md)를 통합했다.
+연구의 19개 관찰 검사, 앱 자동 회귀 수, 34개 수용 기준은 다른 집계다. 실제 provider 생성, 모의 응답, 합성 시험 자료도 구분한다. 불필요한 검수 파일·로그는 사용자 요청으로 정리했으므로 과거 문서에 적힌 로컬 증거가 남아 있다고 가정하지 않는다.
 
-연구19개 관찰은 위험 재현을 포함하며 앱 수용 시험 통과가 아니다. 제품 테스트는 아직 NOT_RUN이다. 프레임 높이·알파·출력의 일부 engine 경로는 확인했지만 실제 provider 생성, 새 UI 완주, worker 복구 등은 구현 세션에서 검증해야 한다.
-
-진행 상태와 새 구현 채팅 ID는 [workflow-state.json](../planning/workflow-state.json)에 기록한다. 문서 자체의 링크/JSON/요구 검사 결과는 [document-validation.json](document-validation.json)에 저장한다.
+[workflow-state.json](../planning/workflow-state.json)은 날짜가 있는 진행 스냅샷이다. 예전 채팅 ID·자동화 상태는 이력이며 새 환경의 권한이나 실행 상태를 뜻하지 않는다. [document-validation.json](document-validation.json)은 초기 문서 검사 기록이다.

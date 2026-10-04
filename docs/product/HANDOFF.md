@@ -1,75 +1,148 @@
-# 새 구현 세션 핸드오프
+# 작업 재개 핸드오프
 
-2026-10-03 KST · 사용자가 새 세션 생성 및 실제 제작 시작을 요청함
+기록 기준: **2026-10-05 KST**. 프레임룸은 구현·실행 가능한 로컬 스프라이트 에디터다. 영상 제작 보완, 프로젝트 폴더/SQLite 관리, 불필요한 검수 자료 정리를 마쳤다. 다른 경로나 기기에서 작업을 이어갈 때 이 문서부터 읽는다.
 
-## 목적과 작업 위치
+## 1. 먼저 실제 Git 상태 확인
 
-`/Users/cheng80/Desktop/Current_works/copy_spritegen`에서 **게임 캐릭터 스프라이트 에디터**를 실제 구현한다. `sprite-gen`을 프로젝트 내부에 포크하고 React+Vite UI, FastAPI, SQLite, 독립 Python worker를 연결한다. 큐레이션 이전의 기준 자료·생성 설정·생성·배경 제거·추출을 포함하여 끝까지 UI에서 작업할 수 있어야 한다.
-
-이 문서는 구현 시작 지시다. 계획만 다시 제시하거나 문서를 반복 조사하는 데서 끝내지 말고 승인된 로컬 구현·실행·검증·발견한 문제 수정을 진행한다. 최종 제품 요구는 PRD R01–R12 전체다. 연구 결과가 앱 구현 완료를 의미하지 않는다.
-
-## 먼저 읽을 파일
-
-모든 상대 경로의 기준은 위 작업 루트다.
-
-1. `docs/product/README.md`, `PRD.md` — 전체 요구와 완료 경계.
-2. `UX_DESIGN.md`, `ARCHITECTURE.md` — 실제 화면과 구성.
-3. `DATA_API_SPEC.md` — 최신 데이터·API·정렬·timing 정본.
-4. `IMPLEMENTATION_PLAN.md`, `ACCEPTANCE_TESTS.md`, `DECISIONS.md` — 단계·검증·이유.
-5. `research/hero-inc/2026-10-03-implementation-design/README.md`, `baseline.json`, `engine-audit.md`, `validation.md` — 코드 감사와 실험 증거.
-6. 필요할 때 같은 연구 폴더의 `cli-api-matrix.md`, `data-contract.md`, `sources.md`, `tests/validate_local_engine.py`를 읽는다. 연구 제안과 최종 제품 문서가 다르면 최신 제품 결정이 기준이다.
-
-2–4항의 파일도 모두 `docs/product/` 아래에 있다. 이전 대화의 사용자 합의는 `docs/planning/USER_DECISIONS.md`에 보존했다.
-
-## 현재 완료된 것
-
-- 공개 제작 노트·Threads·YouTube 조사 및 원문 맥락 대조.
-- 엔진 설치본2.12.1의360개 릴리스 파일과 공개 commit `b058341f7543f3adcbea227bd4e6b7587895b1bc` 일치 확인.
-- 실제 공개 정렬 이미지를 이용한 import→curation→compose→출력 실험, 합성 무기/발 반례 등19개 관찰 검사. 위험 재현도 포함하며 제품 테스트19개 통과가 아니다.
-- PRD·화면·기술·데이터/API·구현·수용·결정 문서 작성.
-
-## 아직 하지 않은 것
-
-앱 구현, 프로젝트 전용 포크 생성, 실제 provider 이미지 생성, 제품 브라우저 완주, 실제 raw 체크무늬 제거 품질 검증, 취소/강제종료 복구, 제품 outline, 독립 앱 뷰어 검증은 미완료다. 원격 저장소·공개 배포도 생성하지 않았다. 과거 연구 폴더에 있는 HTML 비교물/테스트 스크립트는 앱이 아니다.
-
-## 구현 핵심과 금지되는 오해
-
-- UI는 프로젝트→참조 승인→동작/프롬프트/provider 설정→생성/가져오기→알파/추출→공통 배율/발→후보/순서/시간→검수→출력으로 연결한다. CLI 또는 JSON 직접 편집이 필수인 단계가 남으면 완주 실패다.
-- **pre-fit 원본 crop을 확보한다.** `slice-sheet`는 실제 웅크림320→471px를 재현했으므로 애니메이션 기본 경로에서 사용하지 않는다. 기존 `extract` fit도 그대로 믿지 않는다.
-- bbox 체고와 몸 landmark를 구분한다. 자동 발은 후보이며 수동/공중 앵커와 반올림 잔차를 기록한다. 단일 프레임 숨은 확대/축소를 금지한다.
-- 원본 assets는 불변이다. engine working base나 curation 편집은 사본/파생 revision에서 처리한다.
-- occurrence로 `[A,B,A,C]`를 표현한다. 빈 timeline은 빈 상태이며 출력 차단. 단순 selected 중복이나 `selected:[]` 기본값에 맡기지 않는다.
-- 가변 duration은 최종 MVP 필수다. 지원하지 않는 request 필드를 넣는 것으로 완료 처리하지 말고 composer/preview/export 계약을 함께 구현한다.
-- **최종 preview·atlas·개별 PNG는 같은 고정 bake**에서 만든다. save ACK 이전 export 금지, clipping gate, 원자적 결과 묶음, source revisions/hash를 검사한다.
-- 실제 provider capabilities와 성공 증거를 남긴다. `login-ready`와 mock 결과는 실제 생성 완료가 아니다. 기존 허용된 계정/구독 경로로 필요한 검증을 진행하며 임의 유료 API fallback을 쓰지 않는다. 인증/사용량 실패 호출은 반복하지 않는다.
-- provider와 생성 동시성1을 명시하고 engine의 Codex timeout 내부 재시도도 통제한다. 외부 job ledger가 있어도 내부 호출이 재전송되면 중복 방지 계약은 실패다.
-
-## 첫 구현과 계속할 작업
-
-현재 파일/Git 상태부터 확인하고 사용자 변경을 보존한다. M0 환경/소스 pin을 만든 뒤 M1의 프로젝트 저장·실제 업로드·재열기를 먼저 end-to-end로 구현한다. M2 공통 정렬과 M3 편집/출력을 연결하고, M4/M5 생성 앞단·worker·실제 생성까지 계속한다. 첫 화면이나 기존 PNG 가져오기 경로만으로 전체 제작 완료를 선언하지 않는다.
-
-독립 하위 작업은 병렬 위임해도 된다. `IMPLEMENTATION_PLAN.md`의 쓰기 범위를 나누고 계약/루트 설정은 주 세션이 통합한다. 완료되는 코드를 실제 리뷰·실행한다. 타 사용자 채팅에 임의로 메시지를 보내지 않는다.
-
-## 검증·실행 계약
-
-`scripts/setup.sh`, `scripts/dev.sh`, `scripts/start.sh`, package build/test scripts는 **만들어야 할 진입점**이며 현재 존재하거나 성공했다고 가정하지 않는다. 구현 후 실제 명령으로 README를 갱신한다. Python/엔진은 프로젝트 전용 venv를 사용한다. UI는 실제 브라우저에서 기존 PNG 여정과 실제 생성 여정을 각각 확인한다.
-
-연구 가설을 다시 확인할 필요가 있을 때만 아래 기존 스크립트를 새 out-dir에 실행한다. 이것은 제품 수용 테스트의 대체가 아니다.
+**특정 커밋을 ‘최신’으로 고정하지 않는다.** 아래 명령의 현재 결과로 변경·브랜치·이력을 확인한다. 이 문서의 날짜와 테스트 수는 기록 당시의 관찰이며 이후 변경보다 우선하지 않는다.
 
 ```sh
-PYTHONDONTWRITEBYTECODE=1 /Users/cheng80/.codex/skills/sprite-gen/.venv/bin/python \
-  research/hero-inc/2026-10-03-implementation-design/tests/validate_local_engine.py \
-  --out-dir research/hero-inc/2026-10-03-implementation-design/artifacts/handoff-recheck
+git status --short --branch
+git log -8 --oneline --decorate
+git diff --stat
+git diff --cached --stat
+git remote -v
+git worktree list
+# 원격과 비교할 때
+git fetch origin
+git rev-list --left-right --count HEAD...@{upstream}
 ```
 
-공용 경로로 앱을 실행하지 않는다. 위 읽기 전용 연구 재현 외 제품 테스트와 실행은 새 engine 사본을 사용한다. 기존 결과가 있으면 덮지 말고 별도 output을 쓴다.
+upstream이 없는 브랜치에서는 마지막 명령에 비교할 원격 브랜치를 직접 지정한다. 미반영 사용자 변경을 먼저 보존한다. 이 문서를 맞추려고 reset/clean/강제 push하지 않는다. 새 작업의 커밋·push·PR·merge·배포는 그때 사용자가 요청한 범위에서 한다.
 
-제품 수용 테스트는 처음 모두 NOT_RUN이다. 실제 실행한 테스트만 결과·명령·artifact를 기록해 PASS/FAIL로 바꾼다. mock/실제 provider/실제 소재/합성 소재를 구분한다. 처음부터 다시 연구할 필요는 없지만 핵심 회귀는 포크 코드에서 실행한다.
+저장소: `https://github.com/cheng80/copy_spritegen.git`. 기록 당시 작업 브랜치는 `main`이다. 원래 경로는 `/Users/cheng80/Desktop/Current_works/copy_spritegen`이지만 실행에 같은 절대 경로가 필요하지 않다. 이하 명령은 **복제한 저장소 루트** 기준이다.
 
-## 작업 경계와 최종 보고
+## 2. 새 환경에서 실행
 
-공용 `/Users/cheng80/.codex/skills/sprite-gen`, 별도 `/Users/cheng80/Desktop/Current_works/effect_editer`와 PXF 프로젝트, 기존 연구 증거는 수정하지 않는다. 공개 거너 fixture는 로컬 연구용이며 제품 기본 에셋은 자체/사용 허가 소재로 구성한다. 코드 라이선스·고지를 보존한다. 명시 요청 없는 commit/push/PR/merge/공개 배포를 수행하지 않는다.
+필수: Git, Node.js/npm, uv. 영상에는 PATH에서 실행 가능한 `ffmpeg`와 `ffprobe`도 필요하다. `setup.sh`는 Python 3.12 venv와 잠금 의존성·웹·설명서를 설치/빌드하지만 ffmpeg, Codex/Grok CLI, 계정 로그인, RIFE는 설치하지 않는다. `doctor.py` 성공만으로 이 외부 도구가 준비됐다고 판단하지 않는다.
 
-일상적인 설계와 되돌릴 수 있는 로컬 작업은 자율 진행한다. 실제 계정 접근·중요 입력이 없을 때만 해결에 필요한 구체 정보를 보고하고 가능한 독립 구현을 계속한다. 같은 승인을 반복 요청하지 않는다.
+```sh
+scripts/setup.sh
+command -v ffmpeg
+command -v ffprobe
+SPRITE_OPEN_BROWSER=0 scripts/start.sh
+# 브라우저에서 http://127.0.0.1:8765 열기
+```
 
-최종 보고는 한국어로 실행 URL/실행법, 구현된 흐름, 실제 출력 파일, 테스트 결과, 실제 provider 성공 여부와 남은 제한을 먼저 제시한다. 로컬 앱이 실행되지 않거나 필수 경로가 미완성인데 전체 완료라고 말하지 않는다.
+macOS에서는 `프레임룸 실행.command`도 사용할 수 있다. 실제 전체 실행 검증은 macOS에서 했다. Windows/Linux의 전체 설치·런처 동작은 검증하지 않았으며, 특히 Windows 네이티브 실행은 bash/fcntl 기반 런처의 추가 대응이 필요하다.
+
+- 개발: `scripts/dev.sh` → `http://127.0.0.1:5173`, API/worker는 8765. `start.sh`와 중복 실행하지 않는다.
+- Python은 `engine/sprite-gen/.venv/bin/python`을 쓴다. 다른 기기의 venv나 `node_modules`를 복사하지 말고 설치한다. 공용 sprite-gen 스킬에 의존하거나 그 파일을 수정하지 않는다.
+- 기본 데이터는 `.data/`. 바꾸려면 시작 전에 `SPRITE_DATA_DIR`을 설정한다. `.env` 자동 로드는 하지 않으므로 필요한 환경변수는 명시적으로 export한다.
+- 기존 데이터 편집·MP4 재처리는 생성 로그인이 필요 없다. 새 이미지 생성은 Codex CLI 로그인과 실제 계정 사용 가능 여부가 필요하다. 새 영상은 Grok Build CLI의 `grok login`을 사용한다. 기기마다 직접 로그인하며 인증 파일을 Git이나 프로젝트 폴더로 옮기지 않는다.
+- 로그인 준비와 실제 생성 성공/잔여량은 다르다. Grok 영상 adapter는 **Grok 로그인만 사용**하고 API 키로 전환하지 않는다. 인증/사용량 실패를 반복 호출하지 않는다.
+
+RIFE는 선택 기능이며 기본 보정은 꺼져 있다. 필요할 때만 해당 기기용 실행 파일/모델을 설치한다.
+
+```sh
+engine/sprite-gen/.venv/bin/python -m sprite_gen.video.rife_install install --dir "$PWD/.data/tools/rife"
+```
+
+adapter는 저장소의 `.data/tools/rife`를 우선 탐색한다(`SPRITE_DATA_DIR`과 별개). 이 파일은 Git에 없다. RIFE 설치·보간은 AI 영상 생성 호출과 별개다.
+
+## 3. 프로젝트 데이터 옮기기
+
+**Git clone만으로 사용자 프로젝트·실제 생성 원본은 복원되지 않는다.** 저장·진행 작업 완료와 ‘폴더 저장 보류’ 해제를 확인한 뒤 다음 폴더 전체를 별도로 복사한다.
+
+```text
+<프로젝트 이름>--<projectId>/
+  project.json
+  project.sqlite3
+  assets/
+  videos/
+  jobs/
+  outputs/
+```
+
+기본 위치는 `.data/projects/`, 사용자가 지정한 외부 부모 폴더도 가능하다. 새 앱에서 **프로젝트 폴더 열기**로 등록하면 동일 ID·현재 상태·저장 이력·원본·영상·작업·출력이 복원된다. 경로는 폴더 기준 상대 경로이며 원본 파일을 실제 복사한다.
+
+- 공용 `.data/app.sqlite3`는 등록/실행 인덱스·캐시다. 정상 저장된 프로젝트를 옮길 때 함께 복사할 필요가 없다. **저장 보류 중에는 공용 DB에만 새 변경이 있을 수 있으므로 이동·삭제하지 말고 보류부터 해결한다.**
+- **목록에서 제거**는 등록과 해당 브라우저 초안을 지우며 프로젝트 폴더를 삭제하지 않는다. 미저장 초안은 먼저 저장한다.
+- **없는 폴더 정리**는 사라진 루트 폴더의 공용 SQLite 기록만 정리한다. 실행 전 경로/버전/작업을 다시 확인하며 실제 파일을 지우지 않는다. 분리된 외장 디스크와 이동한 폴더도 확인 대상이다.
+- 같은 ID의 두 폴더를 한 앱에 동시에 등록할 수 없다. 별도 작업용 사본은 **새 프로젝트로 복제**하거나 ZIP 백업을 복원해 새 ID를 만든다.
+- ZIP 백업은 현재 편집 상태의 새 ID 복원용이다. 모든 이력·출력을 보관하려면 전체 프로젝트 폴더를 사용한다.
+- 폴더 열기로 과거 대기/실행 생성 작업을 자동 재전송하지 않는다. 여러 앱에서 같은 폴더를 동시에 편집하는 기능은 지원하지 않는다.
+
+기록 당시 등록 프로젝트는 5개였다. 이 목록도 현재 앱/폴더에서 재확인한다.
+
+| 프로젝트 | ID | 당시 저장 버전 |
+| --- | --- | --- |
+| 하늘 해적 · GPT 실제 제작 | `f29b69ab-8f8d-4dd2-ba87-37671121ff96` | 37 |
+| 검증 전용 · 제작 이력·승인·다음 작업 | `c69183dc-1408-4d29-a16a-905720c0238b` | 3 |
+| 판타지 검사 · 픽셀 64×128 | `1ae8af0c-d313-453f-a834-c8bfabbc6ec7` | 38 |
+| 보행 후보 검수 · Idle 기준 정렬 · 2026-10-04 | `2b5a85d7-89b5-4211-a19b-0be18dd71aa2` | 25 |
+| Grok 영상 · 실제 보행 검수 | `9717eb79-f63f-40ab-adda-149697e2c8db` | 26 |
+
+## 4. 구현 상태와 중요한 결정
+
+React/Vite/TypeScript + FastAPI + SQLite + 독립 Python worker. 기존 이미지 가져오기/생성 → 배경 제거/원시 crop → 공통 배율·발/공중 앵커 → 반복 occurrence·가변 시간·픽셀 편집 → 수동 검수 → 확정 bake/출력을 연결했다. 원본·저장 이력·출처를 보존하고 저장 충돌/중단 작업을 처리한다.
+
+이번까지 반영한 영상 기능:
+
+- Grok Pro/Lite 영상 생성, MP4 가져오기·기존 영상 재처리. 기본 3초·480p, 2–6초·480p/720p. 5방향·8동작·좌우 설정과 방향별 기준 그림 프롬프트 준비, 명시적 최대 16건 묶음 접수.
+- 원본 MP4/추출/배경 제거/축소/마무리 PNG의 출처 분리, 자동·전체·수동 구간, 공통 셀/배율/앵커, 참조 그림 기반 색 번짐 보정.
+- `gif` 기본 마무리는 사용자가 좋다고 본 GIF와 같은 색/알파 처리를 **실제 PNG 후보에 저장**한다. `rgba`는 색상/알파 분리 축소로 반투명을 유지한다.
+- 선택적 RIFE 보간과 보간 계보, 기존 동작과 주기/시간/프레임 수 맞춤. 자동 추가 이미지 생성은 하지 않는다.
+- 동일 bake에서 atlas/PNG/runtime/Aseprite 호환 JSON/QA와 GIF·WebP·가로/격자 PNG를 출력한다. `animations.zip`, `animation-manifest.json`, `bundle.zip`에 반영된다. GIF는 10ms·255색·이진 알파 제한이 있다.
+- 외부 접수 ID를 먼저 저장하며 중단 시 기존 요청 조회부터 재개한다. 접수 불명 POST는 재전송하지 않는다. 완료 MP4를 보존해 후처리 실패에 새 생성 비용이 들지 않게 한다.
+
+프로젝트 폴더 저장은 공용 DB의 durable outbox → 원본 복사/프로젝트 SQLite 반영 → 성공 응답 순서다. 실패 시 `storage.syncPending`과 보류 기록을 유지한다. 폴더 이동 후에도 보류 반영을 재개하며 경로 탈출·손상·ID 충돌을 거부한다. 실행 중 폴더가 사라지면 해당 프로젝트의 작업만 중단한다.
+
+엔진은 v2.12.1 기반에 공개 v2.19 영상 보완을 선별 반영한 **프로젝트 전용 포크**다. 전체 upstream 교체나 비공개 spritegen 웹 내부 구현의 완전 복제를 뜻하지 않는다. 정확한 원본/패치 의존성은 `engine/engine-lock.json`, `engine/PATCHES.md`를 확인한다. 의존성 pin은 재현성 정보이며 이 저장소의 ‘최신 커밋’ 표기가 아니다.
+
+## 5. 걷기 색상 회귀를 다시 볼 때
+
+원본 영상의 작은 색 변화에 축소·반투명 경계·GIF 팔레트 처리 차이가 겹쳤다. 검수 GIF의 마무리 단계를 에디터 PNG에 반영하고 참조 기반 색 번짐 처리를 연결했다. 기본 마무리를 임의로 생략하거나 프레임별 높이를 따로 맞추지 않는다.
+
+- 실제 보행 프로젝트: `9717eb79-f63f-40ab-adda-149697e2c8db`, 최종 28프레임 동작: `3ffd6b67-9dff-4b25-828f-e8becb9f13c9`.
+- 원본 영상 ID: `b8dfdede-a127-473a-9bf2-85c92987cda7`. MP4 SHA-256: `65754461cb508c0582224a82097c91493c52f93b10db0e69f5b74cc8819acf93`.
+- 셀 64×128, 전체 1167ms. 검수 GIF와 앵커 배치 차이(오른쪽 1px/아래 2px)를 보정해 비교했을 때 28프레임 색/알파 차이 0이었다.
+- 별도 기준 GIF: `.data/experiments/grok-walk-probe-20261004/walk-preview-3x.gif`. 이 기준 파일도 필요하면 별도로 옮긴다. Git에는 없다.
+- 기존 수동 검수 미승인을 보존했다. `needs_review`/`QA_NOT_VERIFIED`를 시험 실패로 오인하거나 자동 승인으로 숨기지 않는다.
+
+상세: [색상 회귀](VIDEO_COLOR_REGRESSION_2026-10-04.md), [웹 보완 적용](WEB_QUALITY_COMPLETION_2026-10-04.md).
+
+## 6. 검증과 정리 상태
+
+자동 검증 명령과 인계 직전 재실행 결과는 [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md)의 **2026-10-05 인계 검증**을 확인한다. 단위·통합 테스트 수를 제품 수용 기준 전체 통과나 실제 생성 품질 승인으로 대체하지 않는다.
+
+이미 실행한 실제 검증:
+
+- 5개 프로젝트 전환 후 저장 이력 91개·작업 33개·이벤트 153개·출력 기록 87개·export 3개 보존. 원본/영상/출력 480개 파일 해시 확인.
+- 보행 프로젝트 **폴더만 복사**해 새 공용 인덱스에서 열고 v26/이력 26개/이전 출력 56개 확인. 사본 편집·28프레임 bake 결과는 기존 448×512 atlas와 전체 RGBA 일치. 원본 v26 유지.
+- ego TaskSpace 1의 새 탭에서 지정 부모 폴더 생성·목록 제거·재열기·이동·없는 등록 정리·이동 폴더 재열기 확인. OS 선택창은 모의 테스트, 실제 화면에서는 경로 직접 입력 사용.
+- 실제 GPT 이미지 생성과 Grok 로그인 영상 생성은 이전에 성공했다. 이번 인계 검증에서는 새 유료 생성 요청을 하지 않았다.
+
+사용자 요청으로 불필요한 검수 파일/로그 **4,385개, 435,014,185바이트(약 435MB)**를 정리했다. 임시 DB/복제본/중간 비교 이미지/캡처/로그/캐시와 프로젝트 폴더로 복사된 이전 공용 중복 리소스를 제거했다. 등록 프로젝트 5개의 데이터, 원본 유료 생성 결과, 채택한 기준 GIF, 소스/테스트/설명서 자료, RIFE는 보존했다. 소스 567개·프로젝트 파일 1,180개의 정리 전후 해시가 같고 SQLite 기록도 보존됐다.
+
+**과거 보고서의 로컬 증거 경로는 현재 존재를 보장하지 않는다.** 특히 `artifacts/`, `output/`, `diagnostics/`, `.data/experiments/project-folders-20261005/`와 그 안의 전환 전 DB 백업·복제본·보고서/캡처는 정리됐다. 기록된 시험 결과는 역사적 요약이며 증거 파일을 새 기기에서 열 수 있다는 뜻이 아니다. 다시 검증할 때는 별도 임시 경로를 쓰고 사용자 원본을 덮어쓰지 않는다.
+
+## 7. 코드·계약 탐색과 다음 작업
+
+| 영역 | 진입점 |
+| --- | --- |
+| 앱/프로젝트 관리 | `apps/web/src/App.tsx`, `apps/web/src/useStudio.ts`, `services/api/main.py`, `services/api/store.py` |
+| 폴더·정리·복구 | `services/api/project_folders.py`, `services/api/desktop.py`, `services/worker/main.py` |
+| 영상 UI·요청 | `apps/web/src/VideoStep.tsx`, `VideoBatchPlan.tsx`, `VideoBasePreset.tsx`, `services/api/videos.py` |
+| 영상 생성·처리 | `services/worker/video_task.py`, `adapters/spritegen/`의 `video_provider.py`, `video_processing.py`, `video_normalization.py`, `video_finish.py` |
+| bake·검증·애니메이션 출력 | `alignment/pipeline.py`, `alignment/verify_artifacts.py`, `alignment/animation_exports.py` |
+| 실행 계약 | `packages/contracts/IMPLEMENTATION.md`, `VIDEO.md`, `PROJECT_FOLDERS.md`, `openapi.json` |
+| 시험 | `tests/integration/`, `apps/web/tests/`, `engine/sprite-gen/tests/video/` |
+
+현재 계약·코드·회귀 시험, 이 핸드오프/구현 현황, 날짜가 있는 과거 설계·조사를 구분해 읽는다. 초기 PRD/계획에 ‘영상 제외’, ‘구현 전’, NOT_RUN이라고 적힌 것은 당시 범위다. 계약 변경 시 코드·테스트·설명서도 함께 갱신한다.
+
+다음 세션은 Git 확인 → 설치/로그인 필요 여부 확인 → 프로젝트 폴더 열기 → 연결/저장 상태 확인부터 시작한다. 이미 끝난 M0–M5 구현을 처음부터 다시 계획하지 않는다. 새 생성 전에 기존 원본 재처리로 문제를 재현하고 비용을 아낀다. 원 서비스 크레딧은 마지막 사용자 고지 기준 500이었으며 현재 잔여량은 확인되지 않았다. 조사 목적 호출은 필수 데이터에만 제한한다. `scripts/walk_experiment/`의 일부 재현 스크립트는 Git에 없는 실험 원본이 필요하므로 clone만으로 실행된다고 가정하지 않는다.
+
+남은 제한: OS 네이티브 폴더 선택창과 다른 OS 전체 실행은 실기 검증하지 않았다. 34개 수용 기준의 모든 하위 시나리오, 화면리더/대비/키보드 조합, 복잡한 배경의 수동 복원 품질은 전체 완료로 선언하지 않는다. 생성 결과의 외형·장비·색상·동작 일관성과 수동 미술 검수는 계속 필요하다. Codex의 해상도/품질 지정·외부 취소/결과 조회는 미지원이다. 로그인/과금 서비스, 원격 협업, 공개 배포, PXF/effect_editer 통합은 구현 범위 밖이다.
+
+브라우저 검증은 `apps/web/README.md`에 따라 **ego-browser의 사용 허가된 기존 TaskSpace**를 재사용한다. 기록 당시 허가된 공간은 TaskSpace 1이었지만 다른 환경에서 같은 숫자를 자동 선택하지 않는다. Chrome/별도 Chromium을 설치·실행하지 않고 사용자 작업 창을 가로채지 않는다.

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "status": "handoff_complete",
+  "status": "maintenance_handoff_documented",
   "requestedAtLocalDate": "2026-10-03",
   "timezone": "Asia/Seoul",
   "workspace": "/Users/cheng80/Desktop/Current_works/copy_spritegen",
@@ -32,7 +32,24 @@
     "realCharacterProjectId": "f29b69ab-8f8d-4dd2-ba87-37671121ff96",
     "realCharacterExportId": "a6e757df-aca6-494c-ad44-25fe21d6c3cb",
     "browser": "ego",
-    "pythonTestsPassed": 159,
-    "webTestsPassed": 19
-  }
+    "pythonTestsPassed": 511,
+    "webTestsPassed": 244,
+    "engineTestsPassed": 1752,
+    "engineTestsSkipped": 1,
+    "realRifeTestsPassed": 1,
+    "walkContractTestsPassed": 10,
+    "validationDate": "2026-10-05",
+    "projectStorage": "self-contained-project-folders",
+    "videoStatus": "implemented_grok_login_and_local_processing",
+    "cleanupReport": "docs/product/HANDOFF.md#6-검증과-정리-상태"
+  },
+  "handoff": "docs/product/HANDOFF.md",
+  "handoffRecordedAtLocalDate": "2026-10-05",
+  "currentStateInstructions": [
+    "git status --short --branch",
+    "git log -8 --oneline --decorate",
+    "git diff --stat",
+    "git diff --cached --stat"
+  ],
+  "historyNote": "기존 채팅·프로젝트·자동화 식별자와 시각은 과거 조정 이력이다. 현재 Git 상태는 위 명령으로, 실행 상태는 현재 환경에서 확인한다."
 }

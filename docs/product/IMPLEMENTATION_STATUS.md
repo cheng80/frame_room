@@ -1,5 +1,42 @@
 # 구현·검증 현황
 
+## 2026-10-05 인계 검증
+
+영상 제작 보완과 프로젝트 폴더/SQLite 관리를 반영한 상태에서 아래 검증을 재실행했다. 실행·이전·작업 재개는 [HANDOFF.md](HANDOFF.md)를 따른다. 현재 브랜치/변경/커밋은 `git status`와 `git log`로 확인하며 이 문서에 특정 커밋을 최신으로 고정하지 않는다.
+
+| 검증 | 실제 결과 |
+| --- | --- |
+| Python 앱 통합 | **511 PASS**, Starlette 테스트 클라이언트 deprecation 경고 1건 |
+| 웹 단위 | **244 PASS** |
+| TypeScript·Vite | production build 성공, 설명서 HTML/ZIP 생성 성공 |
+| 엔진 영상·생성·cyan cutout | **1,752 PASS / 1 SKIP**, Pillow deprecation 경고 28건 |
+| 실제 RIFE 실행 파일 | 프로젝트 설치 경로를 명시한 별도 보간 시험 **1 PASS** |
+| 보행 실험 계약/선택 | **10 PASS**, 생성 호출 없음 |
+| 엔진 무결성 | doctor의 원본/승인 패치 360파일과 lock의 패치 25개 해시 검사 통과 |
+| 실행 계약·기존 데이터 | OpenAPI와 실행 schema 일치, API/worker ready, 5개 프로젝트 연결·버전 보존, 저장 보류/진행 작업 0, SQLite quick_check 정상 |
+
+엔진 일괄 실행의 1 SKIP은 기본 탐색 경로에 없는 RIFE 실기 시험이다. 프로젝트 `.data/tools/rife`의 실행 파일을 명시한 후 같은 시험이 통과했다. 최초 저장소 루트에서 엔진/실험 시험을 함께 수집했을 때 `tests.video` import 충돌이 발생했으며, 아래처럼 엔진 디렉터리에서 별도 실행해 해결했다. 의존성 경고는 남아 있다.
+
+```sh
+# 저장소 루트; 임시 결과는 저장소 밖에서 관리
+PYTHONDONTWRITEBYTECODE=1 engine/sprite-gen/.venv/bin/python -m pytest tests/integration -q -p no:cacheprovider
+npm --prefix apps/web test
+npm --prefix apps/web run build
+PYTHONDONTWRITEBYTECODE=1 engine/sprite-gen/.venv/bin/python scripts/package-guide.py
+PYTHONDONTWRITEBYTECODE=1 engine/sprite-gen/.venv/bin/python scripts/doctor.py
+PYTHONDONTWRITEBYTECODE=1 engine/sprite-gen/.venv/bin/python -m pytest scripts/walk_experiment/test_jev_contract.py scripts/walk_experiment/test_selection.py -q -p no:cacheprovider
+# 엔진 시험은 별도 프로세스/디렉터리에서 실행
+(cd engine/sprite-gen && PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest tests/video tests/gen tests/frames/test_cutout_cyan.py -q -p no:cacheprovider)
+# macOS에 설치된 선택 도구의 실제 시험; 다른 기기는 실제 설치 경로로 변경
+(cd engine/sprite-gen && SPRITE_GEN_RIFE="$PWD/../../.data/tools/rife/rife-ncnn-vulkan-20221029-macos/rife-ncnn-vulkan" PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest tests/video/test_rife.py::test_real_rife_makes_the_frame_between_in_colour_and_alpha -q -p no:cacheprovider)
+```
+
+이번 인계에서 새 AI 생성·유료 API 호출은 하지 않았다. 브라우저 전체 여정도 새로 반복하지 않았으며, 직전 구현 단계의 실제 ego 검증은 [프로젝트 폴더 결과](PROJECT_FOLDERS_2026-10-05.md)와 [웹 보완 결과](WEB_QUALITY_COMPLETION_2026-10-04.md)에 구분해 기록했다. 실제 프로젝트 폴더의 독립 복사/재열기/동일 bake를 확인했지만 다른 OS의 설치·네이티브 폴더 선택창까지 검증한 것은 아니다.
+
+사용자 요청으로 임시 DB·검수 캡처·로그·중복 리소스 약 435MB를 정리하고 5개 프로젝트의 원본·이력과 기준 GIF를 보존했다. **아래 과거 기록의 `artifacts/`, `output/` 등 로컬 증거 경로는 현재 없을 수 있다.** 보존·삭제 범위는 핸드오프를 확인한다. 자동 회귀 통과는 모든 수용 시나리오나 수동 미술 검수 승인과 다르다.
+
+## 2026-10-03 구현 당시 기록
+
 2026-10-03 KST. 로컬 앱과 실제 GPT 생성 제작 예시를 구현·실행했다. 아래 실행 결과는 제품 수용 TEST-01–34 전체 PASS 선언과 다르다.
 
 ## 실행 결과
@@ -40,7 +77,7 @@
 
 API/SQLite revision·원본 보존·백업·복원, 단일 worker·durable checkpoint·강제 종료 복구, 결과 불명 외부 호출 자동 재시도 차단, raw crop·공통 배율·수동/공중 anchor·편집·가변 timing·outline·확정 bake·전체 RGBA parity·독립 뷰어를 구현했다. generation→cutout→crop 계보와 부분 재생성 대상 참조를 보존한다.
 
-실행 API schema는 `packages/contracts/openapi.json`, 구체 계약은 `packages/contracts/IMPLEMENTATION.md`. Codex 품질/해상도 지정·외부 취소/조회는 미지원이며 유료 fallback은 활성화하지 않는다. 공용 스킬·연구 자료·다른 프로젝트는 보존했고 commit/push/PR/merge/배포는 하지 않았다.
+실행 API schema는 `packages/contracts/openapi.json`, 구체 계약은 `packages/contracts/IMPLEMENTATION.md`. Codex 품질/해상도 지정·외부 취소/조회는 미지원이며 유료 fallback은 활성화하지 않는다. 이 기록 시점에는 공용 스킬·연구 자료·다른 프로젝트를 보존했고 commit/push/PR/merge/배포는 하지 않았다. 현재 Git 상태는 직접 확인한다.
 
 
 ## 2026-10-03 후속: 제작 이력·승인·다음 작업
