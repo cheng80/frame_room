@@ -14,6 +14,7 @@ from pathlib import Path
 
 import pytest
 
+from sprite_gen import cli
 from sprite_gen.video import rife, rife_install
 
 PLATFORM = rife.platform_release() or "ubuntu"
@@ -99,8 +100,7 @@ def test_the_download_is_checked_like_a_given_zip(pinned, monkeypatch, tmp_path)
 
 
 def test_another_dir_names_the_variable_that_points_the_engine_at_it(pinned, tmp_path, capsys):
-    # Selective backport: retain the 2.12.1 root CLI; use the executable module.
-    rc = rife_install.main(["install", "--zip", str(pinned), "--dir", str(tmp_path / "elsewhere"), "--no-check"])
+    rc = cli.main(["rife", "install", "--zip", str(pinned), "--dir", str(tmp_path / "elsewhere"), "--no-check"])
     out, err = capsys.readouterr()
     assert rc == 0 and json.loads(out)["installed"] == "now"
     assert f"SPRITE_GEN_RIFE={tmp_path / 'elsewhere' / TOP / BINARY}" in err

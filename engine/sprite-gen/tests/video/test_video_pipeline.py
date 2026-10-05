@@ -82,7 +82,7 @@ def test_attack_canvas_reserves_overhead_room_and_reports_placement(tmp_path: Pa
     assert image.crop((x, y, x + 120, y + 160)).tobytes() == Image.open(still).tobytes()
     assert image.crop((0, 0, image.width, y)).getextrema() == ((0, 0), (255, 255), (0, 0))
     assert json.loads(report.read_text()) == rep
-    assert rep["why"] == "weapon swings rise overhead and extend in front; a long weapon drawn back reaches behind"
+    assert rep["why"] == canvas_mod.STATE_CANVAS["attack"].why
     # Explicit zeros still give the pre-headroom, pre-trail wide layout.
     zero, zero_rep = canvas_mod.pad_canvas(Image.open(still), canvas_mod.profile_for("attack"), headroom=0, trail=0)
     assert zero.size == (284, 160) and zero_rep["offset"] == [0, 0]
@@ -236,7 +236,7 @@ def test_profiles_scale_windows_with_clip_length() -> None:
 @pytest.mark.skipif(not HAS_IMG2WEBP, reason="img2webp not installed")
 def test_run_loop_emits_strip_gif_webp_and_verifies(tmp_path: Path) -> None:
     files = _gait_frames(tmp_path, period=12, n=96)
-    rep = loop_mod.run_loop(tmp_path / "keyed", tmp_path / "out", fps=24.0, state="walk", min_len=None, max_len=None, n_out=8, seam_max=2.0, name="walker", report_path=None)
+    rep = loop_mod.run_loop(tmp_path / "keyed", tmp_path / "out", fps=24.0, state="walk", min_len=None, max_len=None, n_out=8, seam_max=2.0, name="walker", report_path=None, repair="off")
     # 12 frames at 24 fps is half a second — below the walk gait floor (0.6 s), so the
     # half-period guard doubles it to the two-step 24 and records that it did
     assert rep["cycle"]["period_global"] == 24
@@ -262,7 +262,7 @@ def test_run_loop_seam_gate_fails_loud_on_noise(tmp_path: Path, monkeypatch) -> 
         arr[..., 3][mask] = 255
         Image.fromarray(arr, "RGBA").save(d / f"frame-{t:04d}.png")
     with pytest.raises(SystemExit, match="seam ratio|no periodic cycle"):
-        loop_mod.run_loop(d, tmp_path / "out", fps=24.0, state="walk", min_len=None, max_len=None, n_out=6, seam_max=2.0, name="noise", report_path=None)
+        loop_mod.run_loop(d, tmp_path / "out", fps=24.0, state="walk", min_len=None, max_len=None, n_out=6, seam_max=2.0, name="noise", report_path=None, repair="off")
     assert not (tmp_path / "out" / "noise.gif").exists()
 
 
@@ -313,7 +313,7 @@ def test_run_loop_auto_fails_over_to_one_shot_only_for_action_states(tmp_path: P
     _one_shot_frames(tmp_path)
     # walk must not repeat once: the gate stays a hard failure
     with pytest.raises(SystemExit, match="no periodic cycle"):
-        loop_mod.run_loop(tmp_path / "keyed", tmp_path / "walk", fps=24.0, state="walk", min_len=None, max_len=None, n_out=8, seam_max=2.0, name="w", report_path=None)
+        loop_mod.run_loop(tmp_path / "keyed", tmp_path / "walk", fps=24.0, state="walk", min_len=None, max_len=None, n_out=8, seam_max=2.0, name="w", report_path=None, repair="off")
     # jump may happen once: recorded failover, periodic attempt kept in the report
     rep = loop_mod.run_loop(tmp_path / "keyed", tmp_path / "jump", fps=24.0, state="jump", min_len=None, max_len=None, n_out=8, seam_max=2.0, name="j", report_path=None)
     assert rep["cycle"]["kind"] == "one-shot" and rep["cycle_mode"] == "auto"
@@ -349,9 +349,9 @@ def test_gif_frame_count_follows_cycle_length_at_a_fixed_playback_rate(tmp_path:
     assert rep["n_out"] == 30 and 80 <= rep["delay_ms"] <= 90
     (tmp_path / "short").mkdir()
     _gait_frames(tmp_path / "short", period=26, n=100, stamp=True)  # 1.08 s
-    rep2 = loop_mod.run_loop(tmp_path / "short" / "keyed", tmp_path / "short-out", fps=24.0, state="walk", min_len=None, max_len=None, n_out=None, seam_max=2.0, name="w", report_path=None, gif_fps=12.0)
+    rep2 = loop_mod.run_loop(tmp_path / "short" / "keyed", tmp_path / "short-out", fps=24.0, state="walk", min_len=None, max_len=None, n_out=None, seam_max=2.0, name="w", report_path=None, gif_fps=12.0, repair="off")
     assert 12 <= rep2["n_out"] <= 14 and abs(rep2["delay_ms"] - rep["delay_ms"]) <= 15  # ~1.1 s at 12 fps; the period may resolve to 24-26
-    explicit = loop_mod.run_loop(tmp_path / "short" / "keyed", tmp_path / "short-out2", fps=24.0, state="walk", min_len=None, max_len=None, n_out=8, seam_max=2.0, name="w8", report_path=None)
+    explicit = loop_mod.run_loop(tmp_path / "short" / "keyed", tmp_path / "short-out2", fps=24.0, state="walk", min_len=None, max_len=None, n_out=8, seam_max=2.0, name="w8", report_path=None, repair="off")
     assert explicit["n_out"] == 8
     assert rep["n_out"] <= rep["cycle"]["length"] and rep2["n_out"] <= rep2["cycle"]["length"]
 
@@ -382,7 +382,7 @@ def test_fixed_cycle_cuts_exactly_and_skips_detection(tmp_path: Path) -> None:
 @pytest.mark.skipif(not HAS_IMG2WEBP, reason="img2webp not installed")
 def test_strip_height_caps_the_output_size(tmp_path: Path) -> None:
     files = _gait_frames(tmp_path, period=12, n=60, size=(160, 400))
-    rep = loop_mod.run_loop(tmp_path / "keyed", tmp_path / "h", fps=24.0, state="walk", min_len=None, max_len=None, n_out=None, seam_max=2.0, name="h", report_path=None, strip_height=100)
+    rep = loop_mod.run_loop(tmp_path / "keyed", tmp_path / "h", fps=24.0, state="walk", min_len=None, max_len=None, n_out=None, seam_max=2.0, name="h", report_path=None, strip_height=100, repair="off")
     assert rep["strip"]["h"] <= 100
     assert Image.open(rep["gif"]["file"] if Path(rep["gif"]["file"]).is_absolute() else tmp_path / "h" / rep["gif"]["file"]).height <= 100
 
@@ -421,14 +421,14 @@ def test_body_height_measures_the_clips_first_frame_not_a_raised_weapon(tmp_path
             im.putpixel((36, y), (120, 120, 120, 255))
         im.save(path)
     rep = loop_mod.run_loop(tmp_path / "keyed", tmp_path / "out", fps=24.0, state="walk", min_len=None, max_len=None,
-                            n_out=8, seam_max=9.0, name="w", report_path=None, body_height=48)
+                            n_out=8, seam_max=9.0, name="w", report_path=None, body_height=48, repair="off")
     meta = json.loads((tmp_path / "out" / "w.strip.json").read_text())
     assert meta["body_ref"] == "first-frame"
     assert (meta["body_src_h"], meta["scale"], meta["body_h"]) == (48, 1.0, 48)  # the raised frames are 56 tall
     assert rep["strip"]["body_h"] == 48
     # without a target nothing changes: the tallest grounded frame, never scaled up
     loop_mod.run_loop(tmp_path / "keyed", tmp_path / "plain", fps=24.0, state="walk", min_len=None, max_len=None,
-                      n_out=8, seam_max=9.0, name="w", report_path=None)
+                      n_out=8, seam_max=9.0, name="w", report_path=None, repair="off")
     plain = json.loads((tmp_path / "plain" / "w.strip.json").read_text())
     assert plain["body_ref"] == "tallest-grounded" and plain["body_src_h"] == 56
 
@@ -486,10 +486,132 @@ def test_prompt_uses_state_and_view_and_optional_character() -> None:
     assert "The character" in batch_mod.build_prompt("back", "jump", None)
 
 
+def test_every_gait_walks_or_runs_naturally_in_place() -> None:
+    """Since 2.16.0 every walk and run, from any view, says only that it moves naturally, which way it
+    faces and that it stays in place: spelling the steps out made takes march, and "on a treadmill"
+    said as a place, or "an even left-right rhythm", are gone from every view."""
+    for state, direction, opening in (
+        ("walk", "front", "walks naturally in place, facing the viewer"),
+        ("walk", "back", "walks naturally in place, facing away from the viewer"),
+        ("walk", "side", "walks naturally in place"),
+        ("run", "front", "runs naturally in place, facing the viewer"),
+        ("run", "back", "runs naturally in place, facing away from the viewer"),
+        ("run", "side", "runs naturally in place"),
+    ):
+        sentence = batch_mod.VIEW_MOTION_TEXT.get((state, direction)) or batch_mod.MOTION_TEXT[state]
+        p = batch_mod.build_prompt(direction, state, None)
+        assert p == batch_mod.COMMON_TEXT.format(motion=sentence, view=batch_mod.VIEW_TEXT[direction].format(facing="right"))
+        assert sentence.startswith(opening) and sentence.count(".") == 1
+        assert ", as if on a treadmill" in p
+        for gone in ("left-right", "on a treadmill:", "lifts and lands", "never turns to the side"):
+            assert gone not in p
+    assert batch_mod.MOTION_TEXT["idle"] in batch_mod.build_prompt("back", "idle", None)
+    named = batch_mod.build_prompt("back", "walk", "The armored knight")
+    assert named.startswith("2D game sprite animation. The armored knight walks naturally in place, facing away from the viewer")
+
+
+def test_a_callers_gait_is_held_in_place_and_facing_the_images_way() -> None:
+    """A request interpreter's own walk or run (a sneak, a march) is followed by the engine's in-place
+    and facing sentence for the view; any other state's paragraph is not."""
+    sneak = "The knight sneaks along on tiptoe, setting each foot down slowly."
+    for direction in ("front", "back", "side"):
+        for state in ("walk", "run"):
+            p = batch_mod.build_prompt(direction, state, "The knight", "left", motion=sneak)
+            hold = batch_mod.GAIT_HOLD_TEXT[direction].format(facing="left")
+            assert p.startswith(f"2D game sprite animation. {sneak} {hold} The knight is {batch_mod.VIEW_TEXT[direction].format(facing='left')}.")
+            assert batch_mod.MOTION_TEXT[state] not in p
+    assert "keeps facing left the whole time" in batch_mod.GAIT_HOLD_TEXT["side"].format(facing="left")
+    jump = batch_mod.build_prompt("front", "jump", None, motion="The knight hops twice.")
+    assert all(text.split(",")[0] not in jump for text in batch_mod.GAIT_HOLD_TEXT.values())
+
+
+def test_pinned_picks_the_return_sentence_for_any_state() -> None:
+    """A walk or run pinned to end on its first frame asks for the return, not an even repeat; left
+    unsaid, only the states pinned by default do."""
+    walk = batch_mod.build_prompt("front", "walk", None, pinned=True)
+    assert "The last frame returns to the exact pose of the first frame" in walk and "evenly paced" not in walk
+    assert "evenly paced" in batch_mod.build_prompt("front", "walk", None)
+    assert batch_mod.build_prompt("side", "idle", None) == batch_mod.build_prompt("side", "idle", None, pinned=True)
+    assert "evenly paced" in batch_mod.build_prompt("side", "idle", None, pinned=False)
+    # An attack keeps its action template whichever way it is pinned.
+    assert batch_mod.build_prompt("side", "attack", None, pinned=False) == batch_mod.build_prompt("side", "attack", None)
+
+
+def test_a_diagonal_walk_is_pinned_and_named_as_an_isometric_heading() -> None:
+    """The two three-quarter views (2.17.0): a walk or run says where it heads on the screen, as an
+    isometric game reads, keeps the image's angle, and is filmed pinned to its first frame with the
+    return sentence. Any other state in a diagonal is the state's own sentence at that view."""
+    for direction, heading in (("front_diagonal", "heading diagonally toward the viewer and to the right"),
+                               ("back_diagonal", "heading diagonally away from the viewer toward the upper right")):
+        for state in ("walk", "run"):
+            sentence = batch_mod.VIEW_MOTION_TEXT[(state, direction)].format(facing="right")
+            p = batch_mod.build_prompt(direction, state, None)
+            assert p == batch_mod.PINNED_LOOP_TEXT.format(motion=sentence, view=batch_mod.VIEW_TEXT[direction])
+            assert heading in sentence and "never turns into a side view" in sentence
+            assert batch_mod.pins_last_frame(state, direction)
+        assert "turned exactly as in the image" in batch_mod.VIEW_TEXT[direction]
+        idle = batch_mod.build_prompt(direction, "idle", None)
+        assert batch_mod.MOTION_TEXT["idle"] in idle and batch_mod.VIEW_TEXT[direction] in idle
+        assert not batch_mod.pins_last_frame("jump", direction)
+    for direction in ("front", "back", "side"):
+        assert not batch_mod.pins_last_frame("walk", direction)
+    assert batch_mod.pins_last_frame("attack", "side") and batch_mod.pins_last_frame("idle", "front")
+
+
+@pytest.mark.parametrize("direction", ["front_diagonal", "back_diagonal"])
+@pytest.mark.parametrize("state", ["walk", "run"])
+def test_a_diagonal_facing_left_heads_left(direction, state) -> None:
+    """Regression: a diagonal drawn facing left was filmed with a walk heading "to the right" — the gait
+    sentence ignored `facing`. Facing left, it heads down or up and to the left, and says right nowhere."""
+    left = batch_mod.build_prompt(direction, state, None, facing="left")
+    assert "and to the left" in left and "to the right" not in left and "upper right" not in left
+    assert left == batch_mod.build_prompt(direction, state, None, facing="right").replace("right", "left")
+
+
+def test_a_diagonal_still_is_told_how_far_to_turn() -> None:
+    """A still at a diagonal is often redrawn from a front or side picture, so its view sentence says the
+    turn (45 degrees), that the head turns with the body and where the feet point, instead of pointing
+    at the image's own angle. A side still draws with the clip's view sentence."""
+    front = batch_mod.still_view_text("front_diagonal")
+    back = batch_mod.still_view_text("back_diagonal")
+    assert "about 45 degrees to the right" in front and "feet pointing toward the lower right" in front
+    assert "away from the viewer toward the upper right" in back and "not looking back over the" in back
+    assert "turned exactly as in the image" not in front + back
+    assert batch_mod.still_view_text("side", "left") == batch_mod.VIEW_TEXT["side"].format(facing="left")
+
+
+def test_a_front_or_back_still_does_not_follow_the_pictures_angle() -> None:
+    """A front or back still redrawn from a side picture kept the picture's turn in the head and chest with
+    the clip's one line, so its view sentence says where the head, chest and feet point and not to follow
+    the reference's angle. The clip keeps its own line: it starts from a still already drawn at that view."""
+    front = batch_mod.still_view_text("front")
+    back = batch_mod.still_view_text("back", "left")
+    assert front.startswith("seen from the front:") and back.startswith("seen from directly behind:")
+    assert "toes of both feet pointing straight at the viewer" in front
+    assert "face centred between both ears" in front
+    assert "heels of both feet facing straight at the viewer" in back
+    assert "face completely hidden" in back and "not turned toward either side or looking back over the shoulder" in back
+    for sentence in (front, back):
+        assert "even when a reference picture shows the character from another angle" in sentence
+        assert "{" not in sentence
+    assert batch_mod.VIEW_TEXT["front"] == "seen from the front, facing the viewer directly"
+    assert batch_mod.VIEW_TEXT["back"] == "seen from directly behind, facing away from the viewer"
+    clip = batch_mod.build_prompt("front", "idle", "a knight")
+    assert batch_mod.VIEW_TEXT["front"] in clip and front not in clip
+
+
+def test_a_callers_diagonal_gait_keeps_the_angle() -> None:
+    sneak = "The knight sneaks along on tiptoe, setting each foot down slowly."
+    for direction, angle in (("front_diagonal", "three-quarter front"), ("back_diagonal", "three-quarter back")):
+        p = batch_mod.build_prompt(direction, "walk", "The knight", motion=sneak)
+        assert f"keeps the exact {angle} angle of the image the whole time" in p
+        assert "The last frame returns to the exact pose of the first frame" in p
+
+
 def test_motion_templates_do_not_assume_a_body_plan() -> None:
     # the templates were first written for a biped; a quadruped or a legless blob must not
     # be prompted into a contradiction (2026-09-09 generalization run)
-    for state, text in batch_mod.MOTION_TEXT.items():
+    for state, text in [*batch_mod.MOTION_TEXT.items(), *batch_mod.VIEW_MOTION_TEXT.items()]:
         for word in (
             "bipedal",
             "knees",

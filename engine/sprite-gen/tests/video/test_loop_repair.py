@@ -162,13 +162,13 @@ def test_a_jump_without_rife_is_cut_as_filmed_with_a_warning(tmp_path, monkeypat
     assert rep["status"] == "passed"
     jr = rep["jump_repair"]
     assert jr["applied"] is False and jr["replaced"] == [] and jr["why"] == "RIFE not installed — cut as filmed"
-    assert jr["install"] == "python -m sprite_gen.video.rife_install install" and "rife-ncnn-vulkan not found" in jr["rife"]
+    assert jr["install"] == "sprite-gen rife install" and "rife-ncnn-vulkan not found" in jr["rife"]
     assert jr["score_max_before"] >= repair.JUMP_RATIO and jr["score_max_after"] == jr["score_max_before"]
     assert rep["seam_measurement"] == "source-frames" and rep["jolt"]["measured"] == "as filmed"
     on_disk = np.asarray(Image.open(tmp_path / "out" / "cycle" / "frame-010.png"))
     assert np.array_equal(on_disk, np.asarray(reopened[10]))  # the jump frame stays as filmed
     warning = [l for l in capsys.readouterr().err.splitlines() if "jump frame was not repaired" in l]
-    assert len(warning) == 1 and "python -m sprite_gen.video.rife_install install" in warning[0]
+    assert len(warning) == 1 and "sprite-gen rife install" in warning[0]
     assert json.loads((tmp_path / "w.json").read_text())["jump_repair"]["applied"] is False
 
 
@@ -183,7 +183,7 @@ def test_a_smooth_walk_without_rife_has_nothing_to_warn_about(tmp_path, monkeypa
 def test_repair_on_without_rife_is_refused_with_the_install_line(tmp_path, monkeypatch):
     _no_rife(monkeypatch, tmp_path)
     filmed, _ = _loop({10: 12})
-    with pytest.raises(SystemExit, match=r"python -m sprite_gen.video.rife_install install.*--repair auto"):
+    with pytest.raises(SystemExit, match=r"sprite-gen rife install.*--repair auto"):
         _run(tmp_path, _keyed(tmp_path, filmed), repair="on")
     report = json.loads((tmp_path / "w.json").read_text())
     assert report["status"] == "failed" and "rife-ncnn-vulkan not found" in report["error"]

@@ -212,7 +212,7 @@ def test_no_periodic_match_keeps_extraction_and_manual_recovers(tmp_path, monkey
     assert (Path(error.details["artifactDir"]) / "failure.report.json").is_file()
     assert error.details["metrics"]
     monkeypatch.setattr(vp, "_run_extraction", lambda *a: pytest.fail("must reuse keyed frames after selection refusal"))
-    manual = vp.process_clip(clip, work, {"loopMode": "manual", "startFrame": 0, "endFrame": 32})
+    manual = vp.process_clip(clip, work, {"loopMode": "manual", "startFrame": 0, "endFrame": 32, "maxFrames": 32})
     assert len(manual["frames"]) == 32
     assert sum(f["durationMs"] for f in manual["frames"]) == 1333
     assert manual["preview"]["encodedFrameCount"] < 32  # Identical frames merged, durations retained.
@@ -362,7 +362,7 @@ def test_spill_cache_tracks_reference_content_and_prepared_evidence(tmp_path, mo
     assert second["extraction"]["spill"]["referenceSourceSha256"] == sha(reference)
     markers = list(work.glob("extractions/*/complete.json"))
     assert len(markers) == 2
-    assert all(json.loads(path.read_text())["options"]["version"] == "video-processing-v3" for path in markers)
+    assert all(json.loads(path.read_text())["options"]["version"] == vp.VERSION for path in markers)
     prepared = Path(second["extraction"]["spill"]["reference"])
     prepared.write_bytes(b"invalid prepared reference evidence")
     third = vp.process_clip(clip, work, params)
@@ -598,7 +598,7 @@ def test_matched_cycle_resamples_with_unique_output_identity_and_provenance(tmp_
             return {'binary': 'synthetic-test-double', 'model': 'synthetic-test-double'}
     monkeypatch.setattr(vp, 'rife_interpolator', SyntheticInterpolator)
     result = vp.process_clip(clip, tmp_path / 'work', {'loopMode': 'manual', 'startFrame': 0, 'endFrame': 16,
-                             'targetFrameCount': 32, 'targetDurationMs': 1200})
+                             'targetFrameCount': 32, 'targetDurationMs': 1200, 'between': 'on'})
     frames = result['frames']
     assert len(frames) == 32 and len(calls) == 16
     assert [f['outputFrameIndex'] for f in frames] == list(range(32))

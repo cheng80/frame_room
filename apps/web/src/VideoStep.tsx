@@ -10,7 +10,7 @@ import {
   approvedVideoReference, defaultVideoAssetId, defaultVideoProcessing, isVideoJob,
   validateVideoUpload, VIDEO_DIRECTIONS, VIDEO_MODELS, VIDEO_STATES, videoGenerationRequest,
   videoProcessingRequest, videoProvenanceLabel, type VideoGenerationSettings, type VideoProcessingSettings,
-  videoBeforeFinishSnapshot, videoClipColorLabel, videoRangeBoundary,
+  videoBeforeFinishSnapshot, videoClipColorLabel, videoRangeBoundary, videoRangeSource, videoHasExactTimes,
   videoMatchClips,
 } from './videoWorkflow';
 import './video-tools.css';
@@ -25,7 +25,7 @@ export function VideoStep({s, onSelectClip}: {s: Studio; onSelectClip?: (clipId:
   const [mode, setMode] = useState<'generate' | 'process'>('generate');
   const [generation, setGeneration] = useState<VideoGenerationSettings>(() => ({
     assetId: defaultVideoAssetId(p), model: VIDEO_MODELS[0].id, durationSeconds: '3', resolution: '480p',
-    direction: 'side', facing: 'right', motionPrompt: '',
+    direction: 'side', facing: 'right', motionPrompt: '', bodyPlan: '', equipment: '',
   }));
   const [processing, setProcessing] = useState(defaultVideoProcessing);
   const [videoId, setVideoId] = useState('');
@@ -55,6 +55,7 @@ export function VideoStep({s, onSelectClip}: {s: Studio; onSelectClip?: (clipId:
   const locked = s.busy || !!s.commands.length || !!s.conflict;
   const disabled = locked || active || s.service?.worker !== 'ready';
   const videoJobs = s.jobs.filter(isVideoJob);
+  const rangeVideo = video ? videoRangeSource(video, videoJobs) : undefined;
   const resultClipIds = new Set(videoJobs.filter(job => mode === 'generate' || job.result?.videoId === video?.videoId).map(job => job.result?.clipId));
   const clips = p.clips.filter(clip => resultClipIds.has(clip.clipId) || !!clip.sourceVideoId && (mode === 'generate' || clip.sourceVideoId === video?.videoId));
   const selectedClip = clips.find(clip => clip.clipId === clipId) ?? clips.at(-1);
@@ -69,16 +70,16 @@ export function VideoStep({s, onSelectClip}: {s: Studio; onSelectClip?: (clipId:
 
   function changeMode(next: 'generate' | 'process') {
     setMode(next); setError('');
-    if (next === 'generate' && processing.loopMode === 'manual') setProcessingField('loopMode', 'auto');
+    if (next === 'generate') setProcessing(previous => ({...previous, loopMode: previous.loopMode === 'manual' ? 'auto' : previous.loopMode, startIndex: ''}));
   }
   function chooseVideo(value: string) {
     setVideoId(value); setClipId(''); setOccurrenceId(''); setBeforeFinishClipId(''); setError('');
     setSpillReference({videoId: value, assetId: ''});
-    setProcessing(previous => ({...previous, startFrame: '0', endFrame: ''}));
+    setProcessing(previous => ({...previous, startFrame: '0', endFrame: '', direction: '', facing: ''}));
   }
   function markRange(boundary: 'start' | 'end') {
-    if (!video || !originalPlayer.current) return;
-    const frame = videoRangeBoundary(video, originalPlayer.current.currentTime, boundary);
+    if (!rangeVideo || !originalPlayer.current) return;
+    const frame = videoRangeBoundary(rangeVideo, originalPlayer.current.currentTime, boundary);
     if (frame === null) return;
     setProcessing(previous => ({...previous, loopMode: 'manual', [boundary === 'start' ? 'startFrame' : 'endFrame']: frame}));
     setError('');
@@ -111,7 +112,7 @@ export function VideoStep({s, onSelectClip}: {s: Studio; onSelectClip?: (clipId:
     setError('');
     try {
       if (processing.repairMode === 'on' && !rifeAvailable) throw new Error(`RIFE 필수 보정을 사용할 수 없습니다. ${rifeReason}`);
-      if (processing.matchClipId && !rifeAvailable) throw new Error(`주기 맞춤에 필요한 RIFE 보간을 사용할 수 없습니다. ${rifeReason}`);
+      if (processing.matchClipId && processing.between !== 'off' && !rifeAvailable) throw new Error(`주기 맞춤에 필요한 RIFE 보간을 사용할 수 없습니다. 주기 보간을 끄면 가까운 원본을 사용할 수 있습니다. ${rifeReason}`);
       const request = mode === 'generate'
         ? videoGenerationRequest(p, generation, processing)
         : videoProcessingRequest(p, video?.videoId ?? '', {...processing, spillReferenceAssetId});
@@ -162,7 +163,7 @@ export function VideoStep({s, onSelectClip}: {s: Studio; onSelectClip?: (clipId:
                 <button type="button" onClick={() => markRange('end')}>현재 위치 다음까지</button>
               </div>
               {processing.loopMode === 'manual' ? <p className="caption" role="status">선택 구간 [{processing.startFrame}, {processing.endFrame || video.frameCount}) · 설정에서 프레임 번호를 조정할 수 있습니다.</p> : null}
-              <p className="caption">영상 위치는 평균 fps로 환산합니다. 추출 범위는 프레임 번호로 확인하세요.</p>
+              <p className="caption">{rangeVideo && videoHasExactTimes(rangeVideo) ? '저장된 원본 프레임 시각으로 구간을 지정합니다.' : '영상 위치는 평균 fps로 환산한 예상값입니다. 가변 프레임 영상은 차이가 날 수 있으니 추출 범위를 확인하세요.'}</p>
             </> : <Empty title="등록된 영상이 없습니다"><p>MP4를 가져오거나 기준 이미지로 영상을 생성하세요.</p></Empty>}
           </>}
           {selectedClip ? <section className="video-result" aria-label="등록된 동작 결과">
@@ -222,13 +223,36 @@ export function VideoStep({s, onSelectClip}: {s: Studio; onSelectClip?: (clipId:
                 <Select label="캐릭터 방향" value={generation.facing} onChange={e => setGenerationField('facing', e.target.value)}><option value="right">오른쪽</option><option value="left">왼쪽</option></Select>
               </div>
             </> : null}
+            {mode === 'process' ? <div className="source-tool-numbers">
+              <Select label="원본 보기 방향" value={processing.direction ?? ''} onChange={e => setProcessingField('direction', e.target.value)}>
+                <option value="">저장된 설정 사용 · 없으면 측면</option>
+                {VIDEO_DIRECTIONS.map(direction => <option key={direction.id} value={direction.id}>{direction.label}</option>)}
+              </Select>
+              <Select label="원본 캐릭터 방향" value={processing.facing ?? ''} onChange={e => setProcessingField('facing', e.target.value)}>
+                <option value="">저장된 설정 사용 · 없으면 오른쪽</option><option value="right">오른쪽</option><option value="left">왼쪽</option>
+              </Select>
+            </div> : null}
             <Select label="동작 상태" value={processing.state} onChange={e => setProcessingField('state', e.target.value)}>{VIDEO_STATES.map(state => <option key={state.id} value={state.id}>{state.label}</option>)}</Select>
             {mode === 'generate' ? <>
+              <details className="source-tool-details">
+                <summary>신체 구조·장비 지정 · 선택</summary>
+                <Input label="신체 구조" value={generation.bodyPlan} onChange={e => setGenerationField('bodyPlan', e.target.value)} placeholder="예: quadruped"/>
+                <p className="caption">비우면 두 발 캐릭터로 처리합니다. biped: 두 발 · quadruped: 네 발 · legless: 다리 없음. 여러 대상은 the rider=biped; the horse=quadruped처럼 구분하세요.</p>
+                <Input label="장비와 손" value={generation.equipment} onChange={e => setGenerationField('equipment', e.target.value)} placeholder="예: sword:right; shield:left"/>
+                <p className="caption">캐릭터 자신의 오른손은 right, 왼손은 left입니다. 장비 이름과 손을 콜론으로, 여러 장비는 세미콜론으로 구분하세요.</p>
+              </details>
               <Field label="추가 동작 지시 · 선택"><textarea maxLength={2000} value={generation.motionPrompt} onChange={e => setGenerationField('motionPrompt', e.target.value)} placeholder="예: 제자리에서 걷기. 검과 의상 유지."/></Field>
               {!available ? <p className="warning">{provider?.reason || provider?.disabledReason || 'Grok 영상 연결을 확인해 주세요. 기존 영상 처리는 계속 사용할 수 있습니다.'}</p> : null}
               <button type="button" disabled={s.busy} onClick={s.connect}>Grok 연결 다시 확인</button>
             </> : null}
             <h3>프레임 추출 설정</h3>
+            <p className="video-frame-default"><strong>게임용 걷기 · 한 주기 기본 8장</strong><br/>왼발·오른발이 한 번씩 돌아오는 구간을 추출하고 원래 주기 시간을 유지합니다.</p>
+            <div className="source-tool-segments video-frame-presets" role="group" aria-label="게임용 프레임 수">
+              <button type="button" aria-pressed={processing.maxFrames === '8'} onClick={() => setProcessingField('maxFrames', '8')}>8장 · 기본</button>
+              <button type="button" aria-pressed={processing.maxFrames === '12'} onClick={() => setProcessingField('maxFrames', '12')}>12장</button>
+            </div>
+            {numericField('maxFrames', '최대 후보 수', 4, 64)}
+            <p className="caption">4~64장 직접 입력도 가능합니다. 주기 맞춤을 선택하면 대상 동작의 프레임 수와 시간을 따릅니다.</p>
             <Select label="색상 마무리" value={processing.finishMode} onChange={e => setProcessingField('finishMode', e.target.value as VideoProcessingSettings['finishMode'])}>
               <option value="gif">검수 GIF와 같은 색상</option><option value="rgba">반투명 원본 유지</option>
             </Select>
@@ -240,7 +264,7 @@ export function VideoStep({s, onSelectClip}: {s: Studio; onSelectClip?: (clipId:
             </Select>
             <p className="caption">걷기·달리기 반복 구간의 급격한 움직임만 보정합니다. 자동 모드는 RIFE를 사용할 수 없으면 원본 프레임을 유지하고 사유를 기록합니다. 보간 프레임은 출처에 표시됩니다.</p>
             {!rifeAvailable ? <p className="warning">RIFE 필수 보정을 사용할 수 없습니다. {rifeReason}</p> : <p className="caption">로컬 RIFE 준비됨 · 보정에 새 영상 생성은 필요하지 않습니다.</p>}
-            <Select label="추출 구간" value={processing.loopMode} onChange={e => setProcessing(previous => ({...previous, loopMode: e.target.value, matchClipId: e.target.value === 'full' ? '' : previous.matchClipId}))}>
+            <Select label="추출 구간" value={processing.loopMode} onChange={e => setProcessing(previous => ({...previous, loopMode: e.target.value, ...(e.target.value === 'full' ? {matchClipId: '', startIndex: '', startFoot: 'auto'} : {})}))}>
               <option value="auto">자동 · 반복 구간 찾기</option><option value="full">전체 영상</option>
               {mode === 'process' ? <option value="manual">수동 · 프레임 범위</option> : null}
             </Select>
@@ -254,10 +278,28 @@ export function VideoStep({s, onSelectClip}: {s: Studio; onSelectClip?: (clipId:
             <Select label="주기를 맞출 동작" value={processing.matchClipId} disabled={processing.loopMode === 'full'} onChange={e => setProcessingField('matchClipId', e.target.value)}>
               <option value="">맞추지 않음 · 원래 주기 유지</option>
               {missingMatchClip ? <option value={processing.matchClipId} disabled>맞출 동작 없음 · 다시 선택</option> : null}
-              {matchClips.map(clip => <option key={clip.clipId} value={clip.clipId} disabled={!rifeAvailable}>{clip.name} · {clip.occurrences.length}프레임 · {clip.occurrences.reduce((sum, occurrence) => sum + occurrence.durationMs, 0)}ms</option>)}
+              {matchClips.map(clip => <option key={clip.clipId} value={clip.clipId} disabled={!rifeAvailable && processing.between !== 'off'}>{clip.name} · {clip.occurrences.length}프레임 · {clip.occurrences.reduce((sum, occurrence) => sum + occurrence.durationMs, 0)}ms</option>)}
             </Select>
             <p className="caption">선택한 동작과 프레임 수·재생 시간을 맞춥니다. 중간 프레임은 로컬 보간할 수 있습니다. 추가 영상 생성은 없습니다.</p>
             {processing.loopMode === 'full' ? <p className="caption">전체 영상에서는 주기 맞춤을 사용하지 않습니다.</p> : null}
+            <details className="source-tool-details">
+              <summary>주기 보간·시작 자세</summary>
+              <Select label="주기 보간" value={processing.between} onChange={e => setProcessingField('between', e.target.value as VideoProcessingSettings['between'])}>
+                <option value="auto">자동 · 손상된 보간 대신 원본 사용</option>
+                <option value="on">켜기 · 보간 결과 유지</option>
+                <option value="off">끄기 · 가까운 원본 사용</option>
+              </Select>
+              <p className="caption">주기 길이를 맞출 때 필요한 중간 프레임에 적용합니다. 자동은 번짐·윤곽 손상이 감지된 보간을 원본으로 대체합니다. 동작 흔들림 보정과 별도 설정입니다.</p>
+              {processing.between === 'on' ? <p className="warning">손상이 감지된 보간도 유지합니다. 처리 후 진단과 프레임을 확인하세요.</p> : null}
+              <Select label="시작 발" value={processing.startFoot} disabled={processing.loopMode === 'full' || !!processing.startIndex.trim()} onChange={e => setProcessingField('startFoot', e.target.value as VideoProcessingSettings['startFoot'])}>
+                <option value="auto">자동 · 기본 추출은 시작 유지</option><option value="left">캐릭터의 왼발</option><option value="right">캐릭터의 오른발</option>
+              </Select>
+              {mode === 'process' ? <>
+                <Input label="수동 시작 위치 · 선택" type="number" min={0} max={63} step={1} value={processing.startIndex} disabled={processing.loopMode === 'full'} onChange={e => setProcessingField('startIndex', e.target.value)} placeholder="자동"/>
+                <p className="caption">추출 결과의 프레임 번호를 0부터 지정합니다. 8장 결과라면 0~7입니다. 수동 위치가 시작 발보다 우선합니다.</p>
+              </> : <p className="caption">수동 시작 위치는 영상 생성 후 기존 영상 처리에서 지정할 수 있습니다.</p>}
+              <p className="caption">자동은 기본 추출의 시작을 유지하고, 주기 맞춤에서는 발 디딤을 판정합니다.</p>
+            </details>
             <Select label="제거할 배경색" value={processing.key} onChange={e => setProcessingField('key', e.target.value)}><option value="auto">자동 감지</option><option value="green">녹색</option><option value="magenta">마젠타</option><option value="cyan">시안</option><option value="white">흰색</option></Select>
             {mode === 'process' ? <>
               <Select label="색 번짐 판정 기준" value={spillReferenceAssetId} onChange={e => {setSpillReference({videoId: video?.videoId ?? '', assetId: e.target.value}); setError('');}}>
@@ -269,7 +311,6 @@ export function VideoStep({s, onSelectClip}: {s: Studio; onSelectClip?: (clipId:
                 : !spillReferenceAssetId && !hasVideoReference ? <p className="caption">기준이 없으면 칼·손 안쪽에 배경색이 남을 수 있습니다. 영상 제작에 쓴 원본 그림을 선택해 주세요.</p> : null}
             </> : null}
             <div className="source-tool-numbers">
-              {numericField('maxFrames', '최대 후보 수', 4, 64)}
               {numericField('bodyHeight', '공통 몸 높이 (px)', 16, 512)}
               {numericField('cellWidth', '셀 너비 (px)', 32, 1024)}
               {numericField('cellHeight', '셀 높이 (px)', 32, 1024)}

@@ -13,6 +13,13 @@ accidental single-frame seam cannot outrank a coherent repeat. Idle motion is
 tiny and not strictly periodic: its window is opened to
 most of the clip, where the seam is lowest.
 
+The deepest repeat can hold two cycles (a clip drawn on twos whose cycle is an odd number of
+frames repeats better two cycles on than one), but nothing here cuts shorter than it on the
+pixels' word: a gait's half step with the legs drawn alike is the same picture as a true cycle
+half a drawing late. The half and the third of the period are screened and recorded
+(`cycle.fundamental`, sprite_gen/video/period.py); `video-cycle-align` stops a set on a loop the
+screen suspects, and only a count given to it (`--cycles`) takes one cycle out of that loop.
+
 Everything downstream is measured, never assumed: the seam ratio (wrap distance
 over the mean adjacent-frame distance inside the cycle) gates the run, the GIF and
 WebP are re-opened and verified (frame count, loop flag, transparent corners,
@@ -40,7 +47,11 @@ from PIL import Image
 from sprite_gen._deps import np
 from sprite_gen.spec.runio import atomic_write_text
 from sprite_gen.util.gif_utils import save_clean_gif
+from sprite_gen.util.resample import resize_cell
 from sprite_gen.video import motion_anchor, auto_motion, local_cycle, gait_fallback
+from sprite_gen.video import held as held_mod
+from sprite_gen.video import legs as legs_mod
+from sprite_gen.video import period as period_mod
 from sprite_gen.video import repair as repair_mod
 from sprite_gen.video import rife as rife_mod
 
@@ -82,18 +93,22 @@ GAIT_NEAR_EXACT_STEP_FRACTION = 0.10  # no ambiguity extension when repeat error
 ANCHOR_MODES = ("none", "feet", "body", "motion", "motion-auto")
 BODY_ANCHOR_BAND = 0.6  # --anchor body reads the wrap offset from the top 60 % of the first frame's box: head and torso, not the legs
 BODY_ANCHOR_SEARCH = 24  # px either side searched for the last frame's horizontal offset against the first
-FOOT_BAND = 0.08  # fraction of the frame's own height, measured up from its lowest opaque row
+FOOT_BAND = legs_mod.FOOT_BAND  # fraction of the frame's own height, measured up from its lowest opaque row
 # Jump-frame repair (docs/loop-repair.md section 2). auto: walk and run loops get a RIFE frame in
 # place of each frame that follows a jump, and a loop that needs one where no RIFE is installed is
 # cut as filmed with a warning (a walk that cut before RIFE existed still cuts); on: the same, but
 # no RIFE fails the loop — a caller that asked for the repair is never handed less; off: the loop
 # is cut as filmed, and says so.
 REPAIR_MODES = ("auto", "on", "off")
+SIZE_HOLD_MODES = ("auto", "off")
 FACINGS = ("right", "left")
 # Where `video-cycle-align` keeps the cut as filmed (sprite_gen/video/align.py). A new cut makes
 # the kept one stale, so writing the cycle removes it: an alignment after a re-cut (say, once RIFE
 # is installed and the jumps are repaired) reads the new cut, not the old one.
 CYCLE_SOURCE_DIR = "cycle.source"
+# The strip as it was before `video-follow` moved a region of it; a later follow-through reads
+# from it, and a new cut or alignment removes it (docs/video-pipeline.md section 6).
+FOLLOW_SOURCE = "follow.source.png"
 
 
 # A gait's period is a fact about the body, not about how long the clip runs: the
@@ -176,6 +191,15 @@ def frame_masses(files: list[Path]) -> np.ndarray:
     return np.array([float(np.abs(_load_small(f)).mean()) for f in files], dtype=np.float32)
 
 
+def leg_signals(frames: list[Image.Image]) -> dict[str, list[float]] | None:
+    """The legs' per-frame signals for the two-cycle screen's record (`legs.strike_signals`), or
+    None where a frame has no solid body to read them from."""
+    try:
+        return legs_mod.strike_signals(frames)
+    except ValueError:
+        return None
+
+
 def distance_matrix(files: list[Path]) -> np.ndarray:
     flat = np.stack([_load_small(f) for f in files])
     n = len(files)
@@ -205,7 +229,8 @@ def _repeat_context(D: np.ndarray, start: int, length: int, step: float) -> dict
     }
 
 
-def detect_cycle(D: np.ndarray, *, min_len: int, max_len: int, gait_floor: int | None = None) -> dict[str, Any]:
+def detect_cycle(D: np.ndarray, *, min_len: int, max_len: int, gait_floor: int | None = None,
+                 signals: dict[str, list[float]] | None = None) -> dict[str, Any]:
     """Global period, then a wrap-compatible start with coherent gait context.
 
     `gait_floor` (frames) turns on the half-period guard: a period below it is one step
@@ -213,7 +238,10 @@ def detect_cycle(D: np.ndarray, *, min_len: int, max_len: int, gait_floor: int |
     (see GAIT_DOUBLE_TOL). Above the floor, ambiguous non-exact harmonics may also
     retain two phase occurrences; the report flags that decision for visual review.
     Gait starts balance the wrap step with observed repetition around the cut;
-    other states keep their wrap-only ranking."""
+    other states keep their wrap-only ranking. The period taken is then screened for
+    two or three cycles (`fundamental`, `period.screen`; `signals` are the frames'
+    `legs.strike_signals`, for the record): what is found is recorded, nothing is
+    cut shorter."""
     n = D.shape[0]
     max_len = min(max_len, n - 2)
     if min_len < 2 or max_len < min_len:
@@ -288,6 +316,12 @@ def detect_cycle(D: np.ndarray, *, min_len: int, max_len: int, gait_floor: int |
                 period = L2
                 review_recommended = True
     periodicity = (profile_mean - prof[period]) / profile_mean if profile_mean > 0 else 0.0
+    # A half or a third of the period that returns to a pose on the motion's path may be the
+    # cycle, or one step of it with the legs alike: recorded, never taken (sprite_gen/video/period.py).
+    fundamental = period_mod.screen(
+        period, D=D, prof=prof, minima=period_mod.local_minima(prof), mean=profile_mean,
+        lowest=max(min_len, gait_floor or 0), periodicity_min=PERIODICITY_MIN, signals=signals, gait=gait_floor is not None,
+        floor_why="the gait floor" if gait_floor is not None and gait_floor >= min_len else "the window")
     # Score the last displayed frame -> first frame transition against an ordinary
     # playback step. Minimising distance alone rewards a repeated pose (a stall).
     # Log distance penalises steps that are too short or too long symmetrically.
@@ -323,6 +357,7 @@ def detect_cycle(D: np.ndarray, *, min_len: int, max_len: int, gait_floor: int |
     best["profile_sample_pairs"] = len(range(0, n - period, 2))
     best["period_global"] = period
     best["half_period_guard"] = guard
+    best["fundamental"] = fundamental
     best["review_recommended"] = review_recommended
     best["periodicity"] = round(periodicity, 4)  # how far below the profile mean the period dips (0 = flat = no period)
     best["profile_minima"] = [[L, round(prof[L], 5)] for L in sorted(cands, key=lambda L: prof[L])[:6]]
@@ -607,61 +642,6 @@ def first_frame_height(path: Path) -> int:
     return box[3] - box[1]
 
 
-def _support_bounds(n_src: int, n_out: int, support: float) -> tuple[np.ndarray, np.ndarray]:
-    """First and last source index Pillow's resample reads for each output index, for a filter
-    of `support` source pixels (`precompute_coeffs` in Pillow's Resample.c: the support widens
-    by the scale when shrinking)."""
-    scale = n_src / n_out
-    reach = support * max(1.0, scale)
-    centre = (np.arange(n_out) + 0.5) * scale
-    lo = np.clip(np.floor(centre - reach + 0.5).astype(int), 0, n_src - 1)
-    hi = np.clip(np.floor(centre + reach + 0.5).astype(int) - 1, 0, n_src - 1)
-    return lo, np.maximum(lo, hi)
-
-
-def _window_extrema(a: np.ndarray, rows: tuple[np.ndarray, np.ndarray], cols: tuple[np.ndarray, np.ndarray]) -> tuple[np.ndarray, np.ndarray]:
-    """Min and max of `a` over each output pixel's source window (separable, rows then columns)."""
-    def along(v: np.ndarray, lo: np.ndarray, hi: np.ndarray, axis: int) -> tuple[np.ndarray, np.ndarray]:
-        low = high = np.take(v, lo, axis=axis)
-        for d in range(1, int((hi - lo).max()) + 1):
-            step = np.take(v, np.minimum(lo + d, hi), axis=axis)
-            low, high = np.minimum(low, step), np.maximum(high, step)
-        return low, high
-
-    lo_c, hi_c = along(a, *cols, axis=1)
-    return along(lo_c, *rows, axis=0)[0], along(hi_c, *rows, axis=0)[1]
-
-
-def resize_cell(image: Image.Image, size: tuple[int, int]) -> Image.Image:
-    """Scale one RGBA cell with its coverage and its colour taken apart.
-
-    LANCZOS over premultiplied RGBA (Pillow's RGBa) rings: its negative lobes weigh the colours
-    across an edge against each other, and dividing by the low coverage at the edge throws the
-    result past every colour the source had there — a light rim around a dark outline, a key
-    tint where the ink was only a little green. So the two are resampled apart. Coverage keeps
-    LANCZOS's crisp edge, held to the range of the source coverage the colour mixes from (no
-    halo outside the silhouette, no hole inside it). Colour is a Hamming mix of premultiplied
-    colour, a filter with no negative lobe: every pixel's colour is a weighted mix of the
-    colours under it and never one they did not have. docs/video-pipeline.md "Cells"."""
-    if image.size == tuple(size):
-        return image.copy()
-    w, h = size
-    src = np.asarray(image.convert("RGBA"), dtype=np.float32)
-    alpha = src[..., 3]
-
-    def scaled(channel: np.ndarray, resample: Image.Resampling) -> np.ndarray:
-        return np.asarray(Image.fromarray(np.ascontiguousarray(channel)).resize(size, resample), dtype=np.float32)
-
-    mix_alpha = scaled(alpha, Image.Resampling.HAMMING)
-    mix = np.stack([scaled(src[..., c] * alpha, Image.Resampling.HAMMING) for c in range(3)], axis=-1)
-    low, high = _window_extrema(alpha, _support_bounds(image.height, h, 1.0), _support_bounds(image.width, w, 1.0))
-    cover = np.clip(scaled(alpha, Image.Resampling.LANCZOS), low, high)
-    cover = np.where(mix_alpha > 1e-3, np.round(cover), 0)
-    colour = np.where((cover > 0)[..., None], np.round(mix / np.maximum(mix_alpha, 1e-3)[..., None]), 0)
-    out = np.dstack([np.clip(colour, 0, 255), np.clip(cover, 0, 255)]).astype(np.uint8)
-    return Image.fromarray(out, "RGBA")
-
-
 def build_strip(frames: list[Image.Image], *, max_cells: int = STRIP_MAX_CELLS, max_height: int = STRIP_MAX_HEIGHT, max_width: int = STRIP_MAX_WIDTH, cycle_seconds: float, body_height: int | None = None, anchor: str = "none", kind: str = "periodic", standing_src: int | None = None) -> tuple[Image.Image, dict[str, Any]]:
     """Union-crop (no bottom pad so feet meet the floor), scale, bottom-align, tile horizontally.
 
@@ -901,7 +881,10 @@ def run_loop(
     interpolate: rife_mod.Interpolate | None = None,
     jolt_max: float | None = None,
     head_step_max: float | None = None,
+    size_hold: str = "auto",
 ) -> dict[str, Any]:
+    if size_hold not in SIZE_HOLD_MODES:
+        raise SystemExit(f"video-loop: unknown --size-hold {size_hold!r}; expected one of {', '.join(SIZE_HOLD_MODES)}")
     if repair not in REPAIR_MODES:
         raise SystemExit(f"video-loop: unknown --repair {repair!r}; expected one of {', '.join(REPAIR_MODES)}")
     if facing not in FACINGS:
@@ -930,6 +913,9 @@ def run_loop(
     lo = min_len if min_len is not None else lo_default
     hi = max_len if max_len is not None else max(lo + 2, hi_default)
     D = distance_matrix(files)
+    # The clip's steps as keyed, before `--anchor motion-auto` reads its own distance or moves a frame:
+    # the hold is read on them, over the clip and over the cut (sprite_gen/video/held.py).
+    clip_steps = [float(D[k, k + 1]) for k in range(n - 1)]
     masses = frame_masses(files)
     periodic_attempt: dict[str, Any] | None = None
     target = (report_path or (out_dir / f"{name}.loop.report.json")).expanduser().resolve()
@@ -940,17 +926,40 @@ def run_loop(
         "seam_max": seam_max,
         "anchor": anchor,
         "seam_measurement": "rendered-cells" if anchor in ("motion", "motion-auto") else "source-frames",
+        # How many drawings the clip shows a second, and whether it shows each for two or three frames
+        # (sprite_gen/video/held.py) — over the whole clip as keyed, before any cut. A record for
+        # `video-cycle-align`, which says when a held clip stretched to the set's length must be filmed again.
+        "drawings": held_mod.measure(clip_steps, fps=fps),
     }
     cycle = None
     try:
         if anchor == "motion-auto":
             source_frames = [Image.open(f).convert("RGBA") for f in files]
+            if size_hold == "auto":
+                # A walk or run filmed from its first frame only grows or shrinks as it plays, so the
+                # frame one cycle on is not the size of the first and the loop pops at the wrap. Hold
+                # the clip at its first frame's size before the search (`size_hold`), so the cut is
+                # chosen on frames of one size. The gait fallback below then finds nothing to undo.
+                # The change is read one cycle on, so a first pose that settles into the walk is
+                # not taken for a body that shrinks (gait_fallback.cycle_drift).
+                measured = gait_fallback.cycle_drift(source_frames, min_lag=lo, max_lag=hi)
+                hold: dict[str, Any] = {"applied": False, "min": gait_fallback.SIZE_HOLD_MIN,
+                                        **{k: measured[k] for k in ("height_first_px", "height_last_px", "drift", "method",
+                                                                    "lag", "pairs", "per_lag", "pose_match", "drift_fitted_line")}}
+                if abs(measured["drift"]) >= gait_fallback.SIZE_HOLD_MIN:
+                    pad = gait_fallback.undo_padding(source_frames, measured)
+                    source_frames = gait_fallback.undo_scale(source_frames, measured, pad=pad)
+                    files = gait_fallback.write_frames(source_frames, [f.name for f in files], out_dir.expanduser().resolve() / FALLBACK_FRAMES_DIR)
+                    hold.update(applied=True, padding_ltrb=list(pad))
+                report_base["size_hold"] = hold
+            else:
+                report_base["size_hold"] = {"applied": False, "why": "--size-hold off"}
             D, trajectory, analysis = auto_motion.analyse(source_frames, fps=fps)
             report_base["automatic_motion_analysis"] = analysis
             detect = dict(gait_floor=round(prof.min_seconds*fps), periodicity_min=PERIODICITY_MIN,
                           double_tolerance=GAIT_DOUBLE_TOL, double_search=GAIT_DOUBLE_SEARCH)
             try:
-                cycle = local_cycle.detect(D, trajectory, min_len=lo, max_len=hi, **detect)
+                cycle = local_cycle.detect(D, trajectory, min_len=lo, max_len=hi, signals=leg_signals(source_frames), **detect)
             except ValueError as first:
                 # A front or back gait that walked toward the camera, or a slow one: one more
                 # search, recorded (`gait_fallback`), and only after the first found nothing.
@@ -958,7 +967,8 @@ def run_loop(
                 fallback = {"reason": str(first), "scale_drift": {k: drift[k] for k in ("height_first_px", "height_last_px", "drift")},
                             "scale_drift_min": gait_fallback.SCALE_DRIFT_MIN, "scale_undone": False}
                 if abs(drift["drift"]) >= gait_fallback.SCALE_DRIFT_MIN:
-                    source_frames = gait_fallback.undo_scale(source_frames, drift)
+                    fallback["padding_ltrb"] = list(gait_fallback.undo_padding(source_frames, drift))
+                    source_frames = gait_fallback.undo_scale(source_frames, drift, pad=tuple(fallback["padding_ltrb"]))
                     files = gait_fallback.write_frames(source_frames, [f.name for f in files], out_dir.expanduser().resolve() / FALLBACK_FRAMES_DIR)
                     D, trajectory, analysis = auto_motion.analyse(source_frames, fps=fps)
                     report_base["automatic_motion_analysis"] = analysis
@@ -970,7 +980,7 @@ def run_loop(
                 try:
                     cycle = local_cycle.detect(D, trajectory, min_len=lo, max_len=hi_long,
                                                max_fraction=gait_fallback.LONG_CYCLE_FRACTION if max_len is None else .5,
-                                               **detect)
+                                               signals=leg_signals(source_frames), **detect)
                 except ValueError as second:
                     raise ValueError(f"{second} (also with the gait fallback: window [{lo}, {hi_long}], "
                                      f"scale drift {drift['drift']:+.1%}{', undone' if fallback['scale_undone'] else ''})") from first
@@ -984,7 +994,8 @@ def run_loop(
             cycle = pinned_cycle(D, seam_max=seam_max)
         else:
             gait_floor = round(prof.min_seconds * fps) if prof.gait and prof.min_seconds > 0 else None
-            cycle = detect_cycle(D, min_len=lo, max_len=hi, gait_floor=gait_floor)
+            cycle = detect_cycle(D, min_len=lo, max_len=hi, gait_floor=gait_floor,
+                                 signals=leg_signals([Image.open(f).convert("RGBA") for f in files]))
             cycle["kind"] = "periodic"
             floor = periodicity_floor(n, cycle["period_global"], partial_repeat=prof.action_seconds is not None)
             cycle["periodicity_min"] = floor
@@ -1011,6 +1022,8 @@ def run_loop(
             raise SystemExit(f"video-loop: {exc}") from exc
         raise
     i, L = cycle["start"], cycle["length"]
+    # The same, over the cut alone: a clip held for part of its length is held where the cut is.
+    report_base["cycle_drawings"] = held_mod.measure_cycle(clip_steps, start=i, length=L, fps=fps)
     # playback density, not a fixed count: a long cycle gets more frames so every state plays at
     # ~gif_fps (a fixed 12 made a 2.5 s jump hold each frame 210 ms while a 1.1 s walk held 90 ms)
     if n_out is None:
@@ -1099,12 +1112,23 @@ def run_loop(
     for old in cycle_dir.glob("frame-*.png"):
         old.unlink()
     shutil.rmtree(out_dir / CYCLE_SOURCE_DIR, ignore_errors=True)
+    # A new cut makes a follow-through over the old strip stale (`video-follow` reads this source).
+    (out_dir / FOLLOW_SOURCE).unlink(missing_ok=True)
     for k, im in enumerate(frames):
         im.save(cycle_dir / f"frame-{k:03d}.png")
     strip, strip_meta = build_strip(frames, max_height=strip_height, cycle_seconds=cycle_seconds, body_height=body_height, anchor="feet" if anchor == "feet" else "none", kind=str(cycle.get("kind") or "periodic"),
                                     standing_src=first_frame_height(files[0]) if body_height is not None else None)
     # The scaled-back frames are read for the last time above; the cycle cells keep them.
     shutil.rmtree(out_dir / FALLBACK_FRAMES_DIR, ignore_errors=True)
+    if state:
+        # `video-cycle-align` reads the gait floor of this state when it screens a loop for two cycles.
+        strip_meta["state"] = str(state).strip().lower()
+    # `video-cycle-align` reads the hold here, over the cut (`cycle_drawings`) and over the clip
+    # (`drawings`, where the cut is too short to read): read on the keyed steps, since `--anchor
+    # motion-auto` moves each frame of a pair apart in the cut it writes (sprite_gen/video/held.py).
+    strip_meta["drawings"] = {k: report_base["drawings"][k] for k in ("hold", "drawings_per_second", "contrast", "frames")}
+    strip_meta["cycle_drawings"] = {k: report_base["cycle_drawings"][k] for k in ("start", "length", "steps", "hold", "drawings_per_second", "contrast")
+                                    } | ({"why": report_base["cycle_drawings"]["why"]} if "why" in report_base["cycle_drawings"] else {})
     if motion is not None:
         strip_meta["foot_anchor"] = anchor
         strip_meta["motion_anchor"] = motion
@@ -1225,6 +1249,7 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--jolt-max", type=float, default=None, help=f"walk/run: fail the repaired loop when its jolt index (how far each step strays from its neighbours' mean, over the median step) exceeds this. Default: no gate — the index is reported and a value over {repair_mod.JOLT_REFERENCE} is a warning line")
     parser.add_argument("--head-step-max", type=float, default=None, help=f"walk/run: fail the repaired loop when the head's largest sideways move in one frame exceeds this %% of the body height. Default: no gate — reported, and over {repair_mod.HEAD_STEP_REFERENCE} is a warning line")
     parser.add_argument("--facing", choices=FACINGS, default="right", help="which way the body faces in the frames (default right): the hair the jump search watches is behind it")
+    parser.add_argument("--size-hold", choices=SIZE_HOLD_MODES, default="auto", help="--anchor motion-auto: auto (default) scales a clip whose height, read one cycle on (the same pose a cycle later), changes by 1 %% or more over the clip back to its first frame's size before the cycle search, so the loop's last frame is the size of its first (recorded as size_hold, with the evidence); off: search the frames as filmed")
     parser.add_argument("--name", default="loop", help="basename for strip/gif/webp outputs")
     parser.add_argument("--report", type=Path)
 
@@ -1242,9 +1267,11 @@ def run(**kwargs: object) -> int:
         anchor_regions=kwargs.get("anchor_region"),
         repair=str(kwargs.get("repair") or "auto"), facing=str(kwargs.get("facing") or "right"),
         jolt_max=kwargs.get("jolt_max"), head_step_max=kwargs.get("head_step_max"),  # type: ignore[arg-type]
+        size_hold=str(kwargs.get("size_hold") or "auto"),
     )
     summary = {k: payload[k] for k in ("state", "frames_total", "window", "cycle_seconds", "n_out", "delay_ms", "resampled_seam_ratio", "specks_dropped", "report")}
-    summary["cycle"] = {k: payload["cycle"].get(k) for k in ("kind", "start", "length", "period_global", "ratio", "review_recommended", "half_period_guard")}
+    summary["cycle"] = {k: payload["cycle"].get(k) for k in ("kind", "start", "length", "period_global", "ratio", "review_recommended", "half_period_guard", "fundamental")}
+    summary["drawings"] = {k: payload["drawings"][k] for k in ("hold", "drawings_per_second")}
     if payload["periodic_attempt"]:
         summary["periodic_attempt"] = payload["periodic_attempt"]["why_rejected"]
     if payload.get("motion_anchor", {}).get("applied") is False:

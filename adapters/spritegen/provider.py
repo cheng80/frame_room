@@ -19,7 +19,7 @@ from PIL import Image
 
 ENGINE_ROOT = Path(__file__).resolve().parents[2] / "engine" / "sprite-gen"
 ENGINE_COMMIT = "b058341f7543f3adcbea227bd4e6b7587895b1bc"
-ADAPTER_VERSION = "1.2.0"
+ADAPTER_VERSION = "1.3.0"
 DEFAULT_MODEL = "gpt-6-sol"
 
 
@@ -110,6 +110,7 @@ def providers() -> list[dict]:
              "prompt": True, "model": True, "modelTarget": "codex-agent",
              "imageModelSelection": False, "quality": False, "resolution": False,
              "aspectRatio": False, "nativeAlphaRequest": True, "transparentOutputGuaranteed": False,
+             "layoutGuide": True,
              "remoteCancel": False, "resultLookup": False,
              "scope": ["states", "sheet", "frame"], "frameCount": {"min": 1, "max": 24, "mode": "prompt-only"},
              "imagesPerCall": 1, "concurrency": 1, "automaticRetry": False, "fallback": False,
@@ -139,6 +140,10 @@ def _validate(params: dict, reference: dict, regeneration_target: dict | None = 
     count = params.get("frameCount", 1)
     if type(count) is not int or not 1 <= count <= 24:
         raise ProviderError("provider.invalid_frame_count", "요청 프레임 수는 1–24 정수여야 합니다.")
+    if type(params.get("layoutGuide", False)) is not bool:
+        raise ProviderError("provider.invalid_layout_guide", "layoutGuide는 참 또는 거짓이어야 합니다.")
+    if params.get("layoutGuide", False) and count != 1:
+        raise ProviderError("provider.invalid_layout_guide", "구도 가이드는 요청 프레임 수가 1장일 때 사용할 수 있습니다.")
     scope = params.get("scope", "states")
     if scope not in ("states", "sheet", "frame") or (scope == "frame" and count != 1):
         raise ProviderError("provider.invalid_scope", "단일 프레임 생성은 scope=frame, frameCount=1이 필요합니다.")
@@ -168,6 +173,10 @@ def _prompt(params: dict, reference: dict, refs: list[dict], count: int) -> str:
         rule = {"identity": "Preserve this character's identity and fixed traits.",
                 "style": "Transfer rendering style only, never character identity, costume or anatomy.",
                 "pose": "Use only pose/motion guidance; preserve the identity reference character.",
+                "derived-guide": (
+                    "Locally drawn layout aid, NOT user artwork, character identity or style. "
+                    "Use its placement guides only; do not copy its lines, colors or background."
+                ),
                 "regeneration-target": (
                     "This is the selected frame to regenerate. Use its pose/action as the replacement target "
                     "and starting point, applying the requested corrections. This supplemental image is NOT "
@@ -264,7 +273,29 @@ def generate(params: dict, reference: dict, asset_path: Callable[[str], Path], o
         if _hash(dest) != ref["sha256"]:
             raise ProviderError("provider.reference_changed", "참조 원본이 변경되었습니다. 새 snapshot으로 요청하세요.")
         copied.append(dest)
+    guide = None
+    if params.get("layoutGuide", False):
+        # Draw before the submission marker: this local operation cannot incur a
+        # provider charge. Snapshot the actual attachment, not an engine side effect.
+        relative = f"references/{len(refs) + 1:03d}-derived-guide.png"
+        guide_path = attempt / relative
+        try:
+            cell = engine.draw_layout_guide(guide_path, None)
+            guide_text = engine.layout_guide_text(cell)
+            guide_hash = _hash(guide_path)
+        except (SystemExit, Exception) as exc:
+            raise ProviderError("provider.layout_guide_failed", "로컬 구도 가이드를 만들지 못했습니다. 생성 요청은 전송하지 않았습니다.") from exc
+        guide = {"file": relative, "sha256": guide_hash, "cell": cell, "prompt": guide_text}
+        refs.append({"assetId": None, "role": "derived-guide", "file": relative, "sha256": guide_hash,
+                     "origin": {"kind": "local-layout-guide", "generator": "sprite_gen.gen.draw_layout_guide",
+                                "aspectRatio": None, "cell": cell}})
+        copied.append(guide_path)
     engine_prompt = _prompt(params, reference, refs, count)
+    if guide is not None:
+        engine_prompt += "\n\n" + guide["prompt"]
+    # Match generate_image's boundary normalization before hashing/snapshotting.
+    # The caller's original text remains untouched in params and snapshot.prompt.
+    engine_prompt = engine_prompt.strip()
     snapshot = {"schemaVersion": 1, "adapterVersion": ADAPTER_VERSION, "engineCommit": ENGINE_COMMIT,
                 "providerId": "codex", "billingRoute": "chatgpt-subscription", "model": model,
                 "params": params, "reference": reference, "references": refs, "prompt": params["prompt"],
@@ -272,9 +303,11 @@ def generate(params: dict, reference: dict, asset_path: Callable[[str], Path], o
                 "enginePrompt": engine_prompt, "promptHash": hashlib.sha256(engine_prompt.encode()).hexdigest(),
                 "scope": scope, "requestedFrameCount": count, "requestedImageCount": 1,
                 "requestedNativeAlpha": params.get("background") == "transparent",
+                "layoutGuide": {"enabled": guide is not None, **(guide or {})},
                 "concurrency": 1, "automaticRetry": False, "fallback": False,
                 "engineOptions": {"transparent": False, "trim_alpha": False, "facing": None,
-                                  "facing_fix": "none", "keep_session": True}, "createdAt": _now()}
+                                  "facing_fix": "none", "keep_session": True,
+                                  "layout_guide": False}, "createdAt": _now()}
     _write_json(attempt / "request-snapshot.json", snapshot)
     # Written BEFORE entering the engine. If this process is killed, worker must
     # retain unknown acceptance, never infer failure from missing result.json.
@@ -284,7 +317,7 @@ def generate(params: dict, reference: dict, asset_path: Callable[[str], Path], o
         result = engine.generate_image("codex", engine_prompt, attempt / "generated.png", refs=copied,
                                        model=model, quality=None, resolution=None, facing=None,
                                        facing_fix="none", transparent=False, trim_alpha=False,
-                                       keep_session=True, workdir=attempt)
+                                       keep_session=True, workdir=attempt, layout_guide=False)
         raw_receipt = result.to_dict()
         _write_json(attempt / "engine-receipt.json", raw_receipt)
         with Image.open(result.out) as image:

@@ -53,6 +53,16 @@ def cells():
     return [one, two]
 
 
+def hidden_rgb_cells():
+    images = cells()
+    for index, image in enumerate(images):
+        for y in range(image.height):
+            for x in range(image.width):
+                if image.getpixel((x, y))[3] == 0:
+                    image.putpixel((x, y), (31 + x * 17, 43 + y * 23, 57 + index * 71, 0))
+    return images
+
+
 @pytest.mark.parametrize("loop", [True, False])
 def test_canonical_bundle_sheets_preserve_every_slot_and_metadata(project, tmp_path, loop):
     snapshot, path, _ = project
@@ -178,7 +188,7 @@ def test_subcentisecond_gif_omitted_without_changing_other_outputs(tmp_path, dur
 @pytest.mark.parametrize("loop", [True, False])
 @pytest.mark.parametrize("indices,durations", [([0], [83]), ([0, 0, 0], [20, 80, 41]), ([0, 0, 1, 1, 0], [17, 41, 83, 20, 25])])
 def test_webp_rgba_exact_with_single_duplicate_and_variable_frames(tmp_path, loop, indices, durations):
-    originals = cells()
+    originals = hidden_rgb_cells()
     images = [originals[i] for i in indices]
     before = [image.tobytes() for image in images]
     out = write_animation_formats(images, durations, loop, tmp_path)
@@ -191,6 +201,73 @@ def test_webp_rgba_exact_with_single_duplicate_and_variable_frames(tmp_path, loo
     assert metadata["decodedDurationsMs"] == decoded_durations
     assert metadata["durationMs"] == sum(durations)
     assert metadata["fullRGBAParity"] and not metadata["lossy"]
+
+
+@pytest.mark.parametrize("loop", [True, False])
+@pytest.mark.parametrize("opaque_pixel", [False, True])
+def test_webp_preserves_frames_differing_only_in_hidden_rgb(tmp_path, loop, opaque_pixel):
+    one = Image.new("RGBA", (7, 5), (91, 137, 213, 0))
+    if opaque_pixel:
+        one.putpixel((3, 2), (25, 50, 75, 255))
+    two = one.copy()
+    two.putpixel((0, 0), (193, 71, 49, 0))
+    images, durations = [one, two, two, one], [1, 83, 125, 41]
+    before = [image.tobytes() for image in images]
+    out = write_animation_formats(images, durations, loop, tmp_path)
+    frames, actual_durations, actual_loop = decoded_animation((tmp_path / "animation.webp").read_bytes())
+    assert actual_loop == (0 if loop else 1)
+    assert_timeline(frames, actual_durations, images, durations)
+    assert [image.tobytes() for image in images] == before
+    assert out["formats"]["webp"]["fullRGBAParity"]
+
+
+@pytest.mark.parametrize("loop", [True, False])
+def test_webp_opaque_frames_and_long_constant_timing(loop):
+    # The total exceeds ANMF's 24-bit duration limit, but each source slot fits.
+    image = Image.new("RGBA", (3, 2), (25, 75, 125, 255))
+    images, durations = [image] * 280, [60000] * 280
+    data, metadata = animation_exports._webp(images, durations, loop)
+    frames, actual_durations, actual_loop = decoded_animation(data)
+    assert actual_loop == (0 if loop else 1)
+    assert sum(actual_durations) == sum(durations) > 0xFFFFFF
+    assert all(frame.tobytes() == image.tobytes() for frame in frames)
+    assert metadata["fullRGBAParity"]
+
+
+@pytest.mark.parametrize("changed", ["hidden-rgb", "visible-rgb", "alpha", "duration", "order", "loop"])
+def test_webp_verifier_rejects_full_rgba_or_timeline_changes(changed):
+    images, durations = hidden_rgb_cells(), [17, 83]
+    data, _ = animation_exports._webp(images, durations, True)
+    expected = [image.copy() for image in images]
+    expected_loop = True
+    if changed == "hidden-rgb":
+        expected[0].putpixel((0, 0), (1, 2, 3, 0))
+    elif changed == "visible-rgb":
+        expected[0].putpixel((6, 2), (1, 2, 3, 255))
+    elif changed == "alpha":
+        expected[0].putpixel((1, 3), (40, 80, 120, 127))
+    elif changed == "duration":
+        durations = [18, 82]  # Same total; the interval boundary must still match.
+    elif changed == "order":
+        expected.reverse()
+    else:
+        expected_loop = False
+    with pytest.raises(animation_exports.AnimationExportError):
+        animation_exports._verify_animation(data, expected, durations, expected_loop, "WEBP")
+
+
+def test_webp_loss_of_hidden_rgb_blocks_output(tmp_path, monkeypatch):
+    encode = animation_exports._encoded
+
+    def drop_exact(image, format, **options):
+        if format == "WEBP":
+            options["exact"] = False
+        return encode(image, format, **options)
+
+    monkeypatch.setattr(animation_exports, "_encoded", drop_exact)
+    with pytest.raises(animation_exports.AnimationExportError):
+        write_animation_formats(hidden_rgb_cells(), [17, 83], True, tmp_path)
+    assert not (tmp_path / "animation.webp").exists()
 
 
 def test_different_cell_sizes_only_padded_top_left(tmp_path):

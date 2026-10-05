@@ -18,6 +18,8 @@ import {VideoStep} from '../src/VideoStep';
 import {JobCard} from '../src/FinishSteps';
 import {EditorCanvas} from '../src/Canvas';
 import {VideoBatchPlan} from '../src/VideoBatchPlan';
+import {VideoBasePreset} from '../src/VideoBasePreset';
+import {VideoDiagnostics} from '../src/VideoDiagnostics';
 import {defaultVideoProcessing, type VideoGenerationSettings} from '../src/videoWorkflow';
 
 type Node = ReactElement<any>;
@@ -79,7 +81,7 @@ describe('video batch controls', () => {
     let inRun = false;
     vi.mocked(s.run).mockImplementation(async fn => {inRun = true; try {return await fn();} finally {inRun = false;}});
     vi.mocked(s.setBase).mockImplementation(next => {expect(inRun).toBe(true); s.snapshot = next as Snapshot;});
-    const generation: VideoGenerationSettings = {assetId: 'image-1', model: 'grok-imagine-video-1.5', durationSeconds: '3', resolution: '480p', direction: 'side', facing: 'right', motionPrompt: ''};
+    const generation: VideoGenerationSettings = {assetId: 'image-1', model: 'grok-imagine-video-1.5', durationSeconds: '3', resolution: '480p', direction: 'side', facing: 'right', motionPrompt: '', bodyPlan: '', equipment: ''};
     const processing = defaultVideoProcessing(), onSubmitted = vi.fn();
     const options = {s, generation, processing, available: true, active: false, visible: true, onSubmitted};
     const h = new Harness(s, vi.fn(), () => VideoBatchPlan(options));
@@ -186,13 +188,58 @@ describe('video batch controls', () => {
 afterEach(() => vi.restoreAllMocks());
 
 describe('video source tool events', () => {
+  it('prominently defaults to eight and lets twelve or a manual count replace only the next request', async () => {
+    const original = structuredClone(s.snapshot), h = new Harness(s);
+    expect(text(h.tree)).toContain('한 주기 기본 8장');
+    expect(h.field('최대 후보 수').props.value).toBe('8');
+    await h.click('12장'); expect(h.field('최대 후보 수').props.value).toBe('12');
+    await h.submit(); expect(s.job).toHaveBeenLastCalledWith('generate_video', ['image-1'], expect.objectContaining({maxFrames: 12}));
+    h.change('최대 후보 수', '24'); await h.submit();
+    expect(s.job).toHaveBeenLastCalledWith('generate_video', ['image-1'], expect.objectContaining({maxFrames: 24}));
+    await h.click('8장 · 기본'); expect(h.field('최대 후보 수').props.value).toBe('8');
+    expect(s.snapshot).toEqual(original); expect(s.edit).not.toHaveBeenCalled();
+  });
+  it('sends structured subject and independent phase controls without generating on change', async () => {
+    const h = new Harness(s);
+    h.change('신체 구조', 'quadruped'); h.change('장비와 손', 'sword:right; shield:left');
+    h.change('주기 보간', 'off'); h.change('시작 발', 'left');
+    expect(s.job).not.toHaveBeenCalled();
+    await h.submit();
+    expect(s.job).toHaveBeenLastCalledWith('generate_video', ['image-1'], expect.objectContaining({bodyPlan: 'quadruped', equipment: 'sword:right; shield:left', between: 'off', startFoot: 'left', repairMode: 'off'}));
+    await h.click('기존 영상 처리'); h.change('수동 시작 위치 · 선택', '3');
+    expect(h.field('시작 발').props.disabled).toBe(true);
+    await h.submit();
+    const params = vi.mocked(s.job).mock.calls[1][2];
+    expect(params).toMatchObject({between: 'off', startFoot: 'left', startIndex: 3});
+    expect(params).not.toHaveProperty('bodyPlan'); expect(params).not.toHaveProperty('equipment');
+    await h.click('새 영상 생성'); await h.submit();
+    expect(vi.mocked(s.job).mock.calls[2][2]).not.toHaveProperty('startIndex');
+  });
+  it('allows matching without RIFE when interpolation is explicitly off', async () => {
+    s.providers[0].capabilities = {rife: {available: false}};
+    s.snapshot!.clips = [{clipId: 'target', name: '걷기', loop: true, occurrences: Array.from({length: 8}, () => ({durationMs: 125}))}] as any;
+    const h = new Harness(s); h.change('주기 보간', 'off'); h.change('주기를 맞출 동작', 'target');
+    await h.submit();
+    expect(s.job).toHaveBeenCalledWith('generate_video', ['image-1'], expect.objectContaining({between: 'off', matchClipId: 'target'}));
+  });
+  it('uses saved VFR timing in range marking and labels average-FPS fallback honestly', async () => {
+    const h = new Harness(s); await h.click('기존 영상 처리');
+    expect(text(h.tree)).toContain('평균 fps로 환산한 예상값');
+    s.snapshot!.videos = [{...video, frameCount: 3, durationMs: 400}];
+    s.jobs = [{operation: 'process_video', result: {videoId: 'video-1', processing: {source: {timesMs: [0, 100, 125, 400]}}}}] as Job[];
+    h.render();
+    expect(text(h.tree)).toContain('저장된 원본 프레임 시각');
+    nodes(h.tree).find(n => n.type === 'video')!.props.ref.current = {currentTime: .12};
+    await h.click('현재 위치를 시작으로'); expect(h.field('시작 프레임 · 포함').props.value).toBe('1');
+    expect(s.job).not.toHaveBeenCalled();
+  });
   it('shows cost-sensitive choices before one generation and supplies its approved base image', async () => {
     const h = new Harness(s);
     expect(text(h.tree)).toContain('Grok Pro · 3초 · 480p · 생성 1회');
     expect(h.field('기준 이미지').props.value).toBe('image-1');
     await h.submit();
     expect(s.job).toHaveBeenCalledOnce();
-    expect(s.job).toHaveBeenCalledWith('generate_video', ['image-1'], expect.objectContaining({referenceRevisionId: 'reference-1', durationSeconds: 3, resolution: '480p', maxFrames: 32, bodyHeight: 94, cellWidth: 64, cellHeight: 128, finishMode: 'gif'}));
+    expect(s.job).toHaveBeenCalledWith('generate_video', ['image-1'], expect.objectContaining({referenceRevisionId: 'reference-1', durationSeconds: 3, resolution: '480p', maxFrames: 8, bodyHeight: 94, cellWidth: 64, cellHeight: 128, finishMode: 'gif'}));
   });
   it('defaults to GIF-equivalent PNG colors and sends RGBA only when selected', async () => {
     const h = new Harness(s);
@@ -423,6 +470,12 @@ describe('video source tool events', () => {
 });
 
 describe('video job recovery actions', () => {
+  it('renders diagnostics from the stored job record without adding a regeneration button', () => {
+    const processing = {selection: {retake: {suggested: true, reasons: ['held-drawings']}}};
+    const tree = JobCard({s, job: {operation: 'process_video', status: 'needs_review', result: {processing}} as Job});
+    expect(nodes(tree).find(node => node.type === VideoDiagnostics)?.props.processing).toBe(processing);
+    expect(nodes(tree).filter(node => node.type === 'button')).toHaveLength(0);
+  });
   it('never presents a retry button for an unknown or unmarked generation receipt', () => {
     for (const job of [{status: 'provider_outcome_unknown', resumable: true}, {status: 'failed'}, {status: 'interrupted', resumable: false}]) {
       const tree = JobCard({s, job: {operation: 'generate_video', ...job} as Job});
@@ -435,6 +488,23 @@ describe('video job recovery actions', () => {
     expect(text(tree)).toContain('접수한 영상 생성 결과 조회'); expect(text(button)).toBe('접수한 요청 조회 재개');
     await button.props.onClick();
     expect(mockedApi).toHaveBeenCalledWith('/jobs/old/retry', 'POST', expect.objectContaining({reuseCheckpoint: true, failedStep: 'poll'}));
+    expect(s.job).not.toHaveBeenCalled();
+  });
+});
+
+describe('video base subject guidance', () => {
+  it('does not impose biped body parts on quadruped or legless base prompts', async () => {
+    const onApply = vi.fn(), h = new Harness(s, vi.fn(), () => VideoBasePreset({onApply}));
+    h.change('기준 그림의 신체 구조', 'quadruped');
+    h.change('기준 그림의 장비와 손', 'sword:right; shield:left');
+    await h.click('기준 그림 설명 추가');
+    expect(onApply.mock.calls[0][0]).toContain('신체 구조: quadruped');
+    expect(onApply.mock.calls[0][0]).toContain('sword:right; shield:left');
+    expect(onApply.mock.calls[0][0]).not.toContain('한 발은 자기 골반');
+    expect(onApply.mock.calls[0][0]).not.toContain('양발 끝');
+    h.change('기준 그림의 신체 구조', 'legless'); h.change('기준 그림의 장비와 손', '');
+    await h.click('기준 그림 설명 추가');
+    expect(onApply.mock.calls[1][0]).not.toContain('두 발');
     expect(s.job).not.toHaveBeenCalled();
   });
 });

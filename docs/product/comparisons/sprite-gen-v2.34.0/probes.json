@@ -1,0 +1,59 @@
+{
+  "recordedDate": "2026-10-06",
+  "scope": "Isolated imports, deterministic synthetic pixels; no user project or AI/RIFE generation. Faulty interpolation is an injected black rectangle, not RIFE.",
+  "results": {
+    "frameRoom": {
+      "resizeSha256": "c4ce07a2339adfb6431d148dfd16ed7993b47ababcf4d1a89b88d48434c45ae6",
+      "resampleSignature": "(frames: 'list[Image.Image]', length: 'int', interpolate: 'rife_mod.Interpolate | None') -> 'tuple[list[Image.Image], dict[str, Any]]'",
+      "cyan": {
+        "accepted": true,
+        "route": "extract:cyan"
+      },
+      "syntheticFaultyInterpolation": {
+        "made_by_rife": 4,
+        "made_at": [
+          1,
+          3,
+          5,
+          7
+        ],
+        "nearest_at": null,
+        "between": null
+      },
+      "syntheticFaults": []
+    },
+    "skillV234": {
+      "resizeSha256": "c4ce07a2339adfb6431d148dfd16ed7993b47ababcf4d1a89b88d48434c45ae6",
+      "resampleSignature": "(frames: 'list[Image.Image]', length: 'int', interpolate: 'rife_mod.Interpolate | None', *, between: 'str' = 'auto') -> 'tuple[list[Image.Image], dict[str, Any]]'",
+      "cyan": {
+        "accepted": false,
+        "reason": "cutout: unknown key 'cyan'; expected one of auto|white|magenta|green"
+      },
+      "syntheticFaultyInterpolation": {
+        "made_by_rife": 0,
+        "made_at": [],
+        "nearest_at": [
+          1,
+          3,
+          5,
+          7
+        ],
+        "between": "auto"
+      },
+      "syntheticFaults": [
+        [
+          "smear"
+        ],
+        [
+          "smear"
+        ],
+        [
+          "smear"
+        ],
+        [
+          "smear"
+        ]
+      ]
+    }
+  }
+}

@@ -45,6 +45,7 @@ def test_capabilities_do_not_invoke_generation(monkeypatch):
     assert not codex['capabilities']['quality'] and not codex['capabilities']['resolution']
     assert codex['capabilities']['concurrency'] == 1
     assert codex['capabilities']['nativeAlphaRequest'] is True
+    assert codex['capabilities']['layoutGuide'] is True
     assert 'regeneration-target' in codex['capabilities']['referenceRoles']
     assert codex['capabilities']['transparentOutputGuaranteed'] is False
     assert codex['capabilities']['remoteCancel'] is False
@@ -72,6 +73,8 @@ def test_readiness_distinguishes_subscription_login(monkeypatch, output, returnc
     ({'resolution': '1k'}, 'provider.unsupported_option'), ({'aspectRatio': '1:1'}, 'provider.unsupported_option'),
     ({'model': 'unsupported-model'}, 'provider.unsupported_model'), ({'prompt': ' '}, 'provider.invalid_prompt'),
     ({'frameCount': 0}, 'provider.invalid_frame_count'), ({'frameCount': True}, 'provider.invalid_frame_count'),
+    ({'layoutGuide': 'true'}, 'provider.invalid_layout_guide'), ({'layoutGuide': 1}, 'provider.invalid_layout_guide'),
+    ({'layoutGuide': None}, 'provider.invalid_layout_guide'), ({'layoutGuide': True}, 'provider.invalid_layout_guide'),
     ({'scope': 'frame'}, 'provider.invalid_scope'), ({'scope': 'other'}, 'provider.invalid_scope')])
 def test_validation_before_any_submission(inputs, monkeypatch, change, code):
     params, reference, asset_path, out_dir = inputs
@@ -96,6 +99,7 @@ def test_generate_passes_roles_and_preserves_receipt_and_raw(inputs, monkeypatch
     original = copy.deepcopy((params, reference))
     before = asset_path('identity').read_bytes()
     seen = []
+    monkeypatch.setattr(gen, 'draw_layout_guide', lambda *a: pytest.fail('disabled guide must not be drawn'))
     def generate(provider_id, prompt, out, **kwargs):
         seen.append((provider_id, prompt, out, kwargs))
         assert (out.parent / 'submission.json').is_file()
@@ -111,11 +115,16 @@ def test_generate_passes_roles_and_preserves_receipt_and_raw(inputs, monkeypatch
     result = provider.generate(params, reference, asset_path, out_dir)
     assert len(seen) == 1 and seen[0][0] == 'codex'
     prompt, options = seen[0][1], seen[0][3]
-    assert params['prompt'] in prompt and 'Image 2: style.' in prompt and 'Image 3: pose.' in prompt
+    assert prompt.startswith('walk & $(do not run)  \n')
+    assert 'Image 2: style.' in prompt and 'Image 3: pose.' in prompt
+    assert result['requestSnapshot']['prompt'] == params['prompt'] == '  walk & $(do not run)  '
+    assert result['requestSnapshot']['enginePrompt'] == prompt
     assert options['model'] == provider.DEFAULT_MODEL
     assert options['quality'] is None and options['resolution'] is None
     assert options['facing'] is None and options['facing_fix'] == 'none' and options['keep_session']
     assert not options['transparent'] and not options['trim_alpha']
+    assert options['layout_guide'] is False
+    assert result['requestSnapshot']['layoutGuide'] == {'enabled': False}
     assert result['requestSnapshot']['params'] == params
     assert result['requestSnapshot']['requestedNativeAlpha'] is False
     assert result['requestSnapshot']['reference'] == reference
@@ -160,13 +169,34 @@ def test_engine_timeout_is_not_retried(tmp_path, monkeypatch):
     assert calls == [1]
 
 
+def test_layout_guide_failure_is_pre_submission_and_preserves_inputs(inputs, monkeypatch):
+    params, reference, asset_path, out_dir = inputs
+    params.update(layoutGuide=True, frameCount=1)
+    before = {aid: asset_path(aid).read_bytes() for aid in ('identity', 'style', 'pose')}
+    monkeypatch.setattr(gen, 'generate_image', lambda *a, **k: pytest.fail('must not submit'))
+    def fail(*args):
+        raise OSError('private path must not leak')
+    monkeypatch.setattr(gen, 'draw_layout_guide', fail)
+    with pytest.raises(provider.ProviderError) as error:
+        provider.generate(params, reference, asset_path, out_dir)
+    assert error.value.code == 'provider.layout_guide_failed'
+    assert error.value.outcome_unknown is False
+    assert 'private path' not in error.value.message
+    assert not (out_dir / 'provider-attempt/submission.json').exists()
+    assert not (out_dir / 'provider-attempt/failure.json').exists()
+    assert before == {aid: asset_path(aid).read_bytes() for aid in before}
+
+
 @pytest.mark.parametrize('background', [None, 'transparent', 'white', 'green', 'magenta'])
 @pytest.mark.parametrize('frame_regeneration', [False, True], ids=['sheet', 'frame-target'])
-def test_real_engine_transport_local_rollout_preserved(inputs, monkeypatch, tmp_path, background, frame_regeneration):
+@pytest.mark.parametrize('layout_guide', [False, True], ids=['no-guide', 'local-guide'])
+def test_real_engine_transport_local_rollout_preserved(inputs, monkeypatch, tmp_path, background, frame_regeneration, layout_guide):
     """Real adapter+engine path, fake only CLI transport. No external call."""
     params, reference, asset_path, out_dir = inputs
     if background is not None:
         params['background'] = background
+    if layout_guide:
+        params.update(layoutGuide=True, frameCount=1)
     target = None
     if frame_regeneration:
         params.update(scope='frame', frameCount=1, frameVersionId='selected-frame-v2')
@@ -196,6 +226,18 @@ def test_real_engine_transport_local_rollout_preserved(inputs, monkeypatch, tmp_
     calls = []
     def run(argv, **kwargs):
         calls.append((argv, kwargs))
+        # Evidence must describe the exact files and full prompt before the sole
+        # transport call. No generated guide may be appended behind the snapshot.
+        attempt = out_dir / 'provider-attempt'
+        snapshot = json.loads((attempt / 'request-snapshot.json').read_text())
+        attached = [Path(argv[i + 1]) for i, value in enumerate(argv) if value == '-i']
+        assert attached == [attempt / ref['file'] for ref in snapshot['references']]
+        assert [hashlib.sha256(path.read_bytes()).hexdigest() for path in attached] == [
+            ref['sha256'] for ref in snapshot['references']]
+        assert snapshot['enginePrompt'] in kwargs['input']
+        assert snapshot['enginePrompt'] == kwargs['input'].split('프롬프트:\n', 1)[1].removesuffix('\n')
+        assert snapshot['promptHash'] == hashlib.sha256(snapshot['enginePrompt'].encode()).hexdigest()
+        assert snapshot['prompt'] == snapshot['params']['prompt'] == original_inputs[0]['prompt']
         rollout.parent.mkdir()
         rollout.write_text(payload)
         return SimpleNamespace(returncode=0, stdout=json.dumps({'type': 'thread.started', 'thread_id': sid}), stderr='')
@@ -211,6 +253,7 @@ def test_real_engine_transport_local_rollout_preserved(inputs, monkeypatch, tmp_
     assert (attempt / 'codex-rollout.jsonl').read_text() == payload
     assert rollout.is_file()
     assert (attempt / 'transport-prompt.txt').read_text() == kwargs['input']
+    assert json.loads((attempt / 'engine-receipt.json').read_text())['prompt'] == result['requestSnapshot']['enginePrompt']
     assert Path(result['paths'][0]).read_bytes() == buffer.getvalue()
     assert (attempt / 'generated.png.raw.png').read_bytes() == buffer.getvalue()
     assert result['receipt']['sessionId'] == sid
@@ -219,17 +262,20 @@ def test_real_engine_transport_local_rollout_preserved(inputs, monkeypatch, tmp_
     assert snapshot['params'] == params and snapshot['regenerationTarget'] == target
     assert 'regenerationTarget' not in params
     attachments = [Path(argv[i + 1]) for i, value in enumerate(argv) if value == '-i']
-    assert len(attachments) == (4 if frame_regeneration else 3)
+    assert len(attachments) == (4 if frame_regeneration else 3) + int(layout_guide)
     assert attachments[0].read_bytes() == asset_path('identity').read_bytes()
+    assert attachments[1].read_bytes() == asset_path('style').read_bytes()
+    assert attachments[2].read_bytes() == asset_path('pose').read_bytes()
+    assert [ref['role'] for ref in snapshot['references'][:3]] == ['identity', 'style', 'pose']
     if frame_regeneration:
-        attached_target = snapshot['references'][-1]
+        attached_target = snapshot['references'][3]
         assert attached_target['role'] == 'regeneration-target'
         assert attached_target['frameVersionId'] == params['frameVersionId']
         assert attached_target['assetId'] == target['imageAssetId']
         assert attached_target['sha256'] == target['sha256']
-        assert attachments[-1].name == '004-regeneration-target.png'
-        assert attachments[-1].read_bytes() == target_path.read_bytes() == target_bytes
-        with Image.open(attachments[-1]) as attached:
+        assert attachments[3].name == '004-regeneration-target.png'
+        assert attachments[3].read_bytes() == target_path.read_bytes() == target_bytes
+        with Image.open(attachments[3]) as attached:
             assert attached.size == (9, 13)  # no normalization or per-pose fit
         assert 'This is the selected frame to regenerate' in kwargs['input']
         assert 'pose/action as the replacement target' in kwargs['input']
@@ -237,6 +283,29 @@ def test_real_engine_transport_local_rollout_preserved(inputs, monkeypatch, tmp_
         assert 'single replacement for the selected regeneration-target frame' in snapshot['enginePrompt']
     else:
         assert all(ref['role'] != 'regeneration-target' for ref in snapshot['references'])
+    assert snapshot['engineOptions']['layout_guide'] is False
+    if layout_guide:
+        guide = snapshot['layoutGuide']
+        record = snapshot['references'][-1]
+        assert guide['enabled'] is True
+        assert record['role'] == 'derived-guide' and record['assetId'] is None
+        assert record['origin'] == {'kind': 'local-layout-guide', 'generator': 'sprite_gen.gen.draw_layout_guide',
+                                    'aspectRatio': None, 'cell': guide['cell']}
+        assert guide['sha256'] == record['sha256'] == hashlib.sha256(attachments[-1].read_bytes()).hexdigest()
+        assert guide['file'] == record['file'] and attempt / guide['file'] == attachments[-1]
+        assert guide['prompt'] == gen.layout_guide_text(guide['cell'])
+        assert snapshot['enginePrompt'].count(guide['prompt']) == 1
+        assert 'NOT user artwork' in snapshot['enginePrompt']
+        assert 'no boxes, guide lines' in kwargs['input']
+        with Image.open(attachments[-1]) as image:
+            cell = guide['cell']
+            assert image.size == (cell['width'], cell['height']) == (1024, 1024)
+            assert 0 < cell['crown_y'] < cell['floor_y'] < image.height
+            assert image.getpixel((cell['safe_margin_x'] + 1, cell['crown_y'])) == (255, 122, 0)
+            assert image.getpixel((cell['safe_margin_x'] + 1, cell['floor_y'])) == (0, 167, 167)
+        assert not (attempt / 'layout-guide.png').exists()  # no second engine-generated guide
+    else:
+        assert snapshot['layoutGuide'] == {'enabled': False}
     assert json.loads((attempt / 'request-snapshot.json').read_text()) == snapshot
     assert result['requestSnapshot']['requestedNativeAlpha'] is (background == 'transparent')
     assert result['requestSnapshot']['engineOptions']['transparent'] is False
@@ -267,9 +336,12 @@ def test_codex_timeout_preserves_stream(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize('mode', ['mixed-rgba', 'opaque-rgba', 'rgb', 'palette-trns'])
-def test_native_alpha_request_measures_actual_output_without_modifying_raw(inputs, monkeypatch, mode):
+@pytest.mark.parametrize('layout_guide', [False, True])
+def test_native_alpha_request_measures_actual_output_without_modifying_raw(inputs, monkeypatch, mode, layout_guide):
     params, reference, asset_path, out_dir = inputs
     params['background'] = 'transparent'
+    if layout_guide:
+        params.update(layoutGuide=True, frameCount=1)
     if mode == 'mixed-rgba':
         image = Image.new('RGBA', (2, 2))
         image.putdata([(1, 2, 3, 0), (10, 20, 30, 128), (40, 50, 60, 255), (70, 80, 90, 0)])

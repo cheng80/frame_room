@@ -17,6 +17,8 @@ export const VIDEO_UPLOAD_LIMIT = 64 * 1024 * 1024;
 export const VIDEO_BATCH_LIMIT = 16;
 export interface VideoProcessingSettings {
   state: string;
+  direction?: string;
+  facing?: string;
   key: string;
   loopMode: string;
   startFrame: string;
@@ -28,6 +30,9 @@ export interface VideoProcessingSettings {
   spillReferenceAssetId: string;
   finishMode: 'gif' | 'rgba';
   repairMode: 'off' | 'auto' | 'on';
+  between: 'auto' | 'on' | 'off';
+  startFoot: 'auto' | 'left' | 'right';
+  startIndex: string;
   matchClipId: string;
 }
 export interface VideoGenerationSettings {
@@ -38,11 +43,14 @@ export interface VideoGenerationSettings {
   direction: string;
   facing: string;
   motionPrompt: string;
+  bodyPlan: string;
+  equipment: string;
 }
 export const defaultVideoProcessing = (): VideoProcessingSettings => ({
   state: 'walk', key: 'auto', loopMode: 'auto', startFrame: '0', endFrame: '',
-  maxFrames: '32', bodyHeight: '94', cellWidth: '64', cellHeight: '128',
+  maxFrames: '8', bodyHeight: '94', cellWidth: '64', cellHeight: '128',
   spillReferenceAssetId: '', finishMode: 'gif', repairMode: 'off', matchClipId: '',
+  between: 'auto', startFoot: 'auto', startIndex: '',
 });
 export const imageProviders = (providers: Provider[]) => providers.filter(p => p.mediaKind !== 'video');
 export function approvedVideoReference(snapshot: Snapshot, assetId?: string) {
@@ -75,7 +83,12 @@ export function videoProcessingParams(settings: VideoProcessingSettings, video?:
     cellHeight: integer(settings.cellHeight, 32, 1024, '셀 높이'),
     finishMode: oneOf(settings.finishMode, ['gif', 'rgba'], '색상 마무리'),
     repairMode: oneOf(settings.repairMode, ['off', 'auto', 'on'], '동작 흔들림 보정'),
+    between: oneOf(settings.between ?? 'auto', ['auto', 'on', 'off'], '주기 보간'),
+    startFoot: oneOf(settings.startFoot ?? 'auto', ['auto', 'left', 'right'], '시작 발'),
   };
+  if (settings.direction) params.direction = oneOf(settings.direction, VIDEO_DIRECTIONS.map(d => d.id), '원본 보기 방향');
+  if (settings.facing) params.facing = oneOf(settings.facing, ['right', 'left'], '원본 캐릭터 방향');
+  if (settings.startIndex?.trim()) params.startIndex = integer(settings.startIndex, 0, 63, '수동 시작 위치');
   if (Number(settings.bodyHeight) > Number(settings.cellHeight) - 4) throw new Error('셀 높이는 공통 몸 높이보다 4px 이상 크게 지정해 주세요.');
   if (settings.loopMode === 'manual') {
     if (!video) throw new Error('수동 구간은 등록한 영상을 선택한 뒤 지정해 주세요.');
@@ -101,7 +114,10 @@ function validateMatchClip(snapshot: Snapshot, clipId: string) {
 }
 export function videoGenerationRequest(snapshot: Snapshot, settings: VideoGenerationSettings, processing: VideoProcessingSettings) {
   if (!snapshot.assets.some(a => a.assetId === settings.assetId)) throw new Error('영상에 사용할 기준 이미지를 선택해 주세요.');
+  if (processing.startIndex?.trim()) throw new Error('수동 시작 위치는 생성 완료된 영상의 기존 영상 처리에서 지정해 주세요.');
   if (settings.motionPrompt.length > 2000) throw new Error('추가 동작 지시는 2,000자 이하로 입력해 주세요.');
+  const bodyPlan = (settings.bodyPlan ?? '').trim();
+  const equipment = (settings.equipment ?? '').trim();
   validateMatchClip(snapshot, processing.matchClipId);
   const reference = approvedVideoReference(snapshot, settings.assetId);
   return {
@@ -114,6 +130,7 @@ export function videoGenerationRequest(snapshot: Snapshot, settings: VideoGenera
       direction: oneOf(settings.direction, VIDEO_DIRECTIONS.map(direction => direction.id), '보기 방향'),
       facing: oneOf(settings.facing, ['right', 'left'], '캐릭터 방향'),
       motionPrompt: settings.motionPrompt.trim(),
+      bodyPlan, equipment,
       ...(reference ? {referenceRevisionId: reference.referenceRevisionId} : {}),
     },
   };
@@ -137,12 +154,19 @@ export function videoProcessingRequest(snapshot: Snapshot, videoId: string, proc
   const video = snapshot.videos?.find(v => v.videoId === videoId);
   if (!video) throw new Error('처리할 원본 영상을 선택해 주세요.');
   validateMatchClip(snapshot, processing.matchClipId);
+  const params = videoProcessingParams(processing, video);
+  if (typeof params.startIndex === 'number') {
+    const target = snapshot.clips?.find(clip => clip.clipId === processing.matchClipId);
+    const rangeLength = processing.loopMode === 'manual' ? Number(params.endFrame) - Number(params.startFrame) : video.frameCount;
+    const maximum = target?.occurrences.length ?? Math.min(Number(params.maxFrames), rangeLength);
+    if (params.startIndex >= maximum) throw new Error(`수동 시작 위치는 ${maximum}장 결과에서 0~${maximum - 1} 사이로 지정해 주세요.`);
+  }
   const spillReferenceAssetId = processing.spillReferenceAssetId;
   if (spillReferenceAssetId && !snapshot.assets.some(a => a.assetId === spillReferenceAssetId)) {
     throw new Error('색 번짐 판정 기준 이미지가 현재 프로젝트에 없습니다. 영상 제작에 쓴 원본 그림을 다시 선택해 주세요.');
   }
   return {operation: 'process_video', assetIds: [], params: {
-    ...videoProcessingParams(processing, video), videoId,
+    ...params, videoId,
     ...(spillReferenceAssetId ? {spillReferenceAssetId} : {}),
   }};
 }
@@ -191,10 +215,40 @@ export function videoClipColorLabel(snapshot: Snapshot, clip: Clip) {
   return '색상 마무리 기록 없음 · 기존 후보 그대로 표시';
 }
 
-/** Video controls use average FPS only to suggest an editable, zero-based range. */
+export function videoHasExactTimes(video: Video): boolean {
+  const times = video.timesMs;
+  return Array.isArray(times) && times.length === video.frameCount + 1 && times.every((time, index) =>
+    typeof time === 'number' && Number.isFinite(time) && time >= 0 && (!index || time > times[index - 1]));
+}
+/** Read timing from this video's stored processing record, never another video's result. */
+export function videoRangeSource(video: Video, jobs: Job[]): Video {
+  if (videoHasExactTimes(video)) return video;
+  for (const job of jobs) {
+    if (job.result?.videoId !== video.videoId) continue;
+    const source = job.result.processing?.source;
+    if (!source) continue;
+    const timed = {...video, timesMs: source.timesMs};
+    if (videoHasExactTimes(timed)) return timed;
+  }
+  return video;
+}
+/** Exact VFR boundaries where recorded; average FPS is only a fallback suggestion. */
 export function videoRangeBoundary(video: Video, seconds: number, boundary: 'start' | 'end') {
-  if (!Number.isFinite(seconds) || seconds < 0 || !Number.isFinite(video.fps) || video.fps <= 0 || video.frameCount < 1) return null;
-  const frame = Math.min(video.frameCount - 1, Math.floor(seconds * video.fps));
+  if (!Number.isFinite(seconds) || seconds < 0 || video.frameCount < 1) return null;
+  let frame: number;
+  if (videoHasExactTimes(video)) {
+    const times = video.timesMs!;
+    let lo = 0, hi = video.frameCount;
+    while (lo < hi) {
+      const mid = Math.ceil((lo + hi) / 2);
+      if (times[mid] <= seconds * 1000) lo = mid;
+      else hi = mid - 1;
+    }
+    frame = Math.min(video.frameCount - 1, lo);
+  } else {
+    if (!Number.isFinite(video.fps) || video.fps <= 0) return null;
+    frame = Math.min(video.frameCount - 1, Math.floor(seconds * video.fps));
+  }
   return String(boundary === 'end' ? frame + 1 : frame);
 }
 

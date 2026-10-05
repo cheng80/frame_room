@@ -28,7 +28,7 @@ CLI:
         [--ref REF.png ...] [--transparent [--alpha-mode auto|native|chroma]
         [--chroma-key magenta|green]] [--white-check CHECK.png] [--model ID]
         [--aspect-ratio 1:1] [--quality low|medium|high|xhigh|max|auto]
-        [--resolution 1k|1.5k|2k]
+        [--resolution 1k|1.5k|2k] [--layout-guide]
         [--report REPORT.json] [--keep-session]
 """
 
@@ -45,9 +45,13 @@ from pathlib import Path
 from typing import Any
 
 from sprite_gen.spec.runio import atomic_write_text
+from sprite_gen.video import body_plan as body_mod
+from sprite_gen.video.body_plan import Body
 
 from . import chroma as chroma_mod
 from . import facing as facing_mod
+from . import handedness as handed_mod
+from . import prompt_parts
 from .base import (
     QUALITIES,
     RESOLUTIONS,
@@ -87,6 +91,97 @@ HARD_DEFAULT_PROVIDER = "codex"
 EXPLICIT_ONLY_PROVIDERS = ("openai",)
 _CODEX_PROBE_TIMEOUT_SECONDS = 15
 
+# `--layout-guide`: the one-slot form of the guide `prepare` draws for every row
+# (`draw_guide`, the same 9.4 % safe margin), attached after the caller's refs, with
+# the anatomy lines of the row guide experiments on it: an orange line where the
+# skull's crown goes and a teal line where the soles stand, each one safe margin
+# INSIDE the safe box. On the box's own edges the lines read as frame edges: hair and
+# hats fill the room above the crown and feet float off a floor taken for a border,
+# so both were moved in by a margin. A single still drawn without the guide fills
+# its frame top to bottom, and a tall subject then has nothing above the head for an
+# in-place motion to bob into; a box alone is read loosely, the lines set the scale.
+LAYOUT_GUIDE_LONG_EDGE = 1024
+LAYOUT_GUIDE_NAME = "layout-guide.png"
+CROWN_LINE = "#ff7a00"
+CROWN_MARK = "#ffb15c"
+FLOOR_LINE = "#00a7a7"
+FLOOR_MARK = "#63d6d6"
+def layout_guide_text(cell: dict[str, Any]) -> str:
+    """The prompt's half of the guide: where the two lines are, as shares of the frame height."""
+    height = int(cell["height"])
+    crown = round(100 * int(cell["crown_y"]) / height)
+    floor = round(100 * int(cell["floor_y"]) / height)
+    return (
+        "Layout: the last attached image is a layout guide, not part of the character. It shows the frame, "
+        "its inner safe area (the blue box), the center line, an orange crown line and a teal floor line. "
+        f"Place the anatomical top of the skull on the orange line, {crown}% of the frame height from the top, "
+        f"and the lowest supporting sole on the teal line, {floor}% from the top, centered on the center line: "
+        f"an upright crown-to-floor span of {floor - crown}% of the frame height. Ignore hair tufts, raised "
+        "limbs, hats, accessories and props when identifying the crown; they may rise above the orange line "
+        "but stay inside the blue box. The teal line sits INSIDE the safe area, above the bottom safe padding: "
+        "it is a ground-contact line, not a frame edge. The supporting soles must touch it and may not float "
+        "above it, and the space below it stays empty. The colored lines set the character's scale and height "
+        "in the frame; they are not artwork. Do not reproduce the layout guide itself: no boxes, guide lines, "
+        "center marks, labels, guide colors or the guide's grey background may appear in the output."
+    )
+
+
+def layout_guide_size(aspect_ratio: str | None) -> tuple[int, int]:
+    """The guide's pixels for the requested ratio, long edge {LAYOUT_GUIDE_LONG_EDGE}; square without one.
+
+    Only the proportions matter to the model, so the size is the ratio's own and not a
+    provider's output size (codex has none to ask for).
+    """
+    if aspect_ratio in (None, "", "auto"):
+        return LAYOUT_GUIDE_LONG_EDGE, LAYOUT_GUIDE_LONG_EDGE
+    try:
+        width_part, height_part = str(aspect_ratio).split(":")
+        width, height = float(width_part), float(height_part)
+        if width <= 0 or height <= 0:
+            raise ValueError
+    except ValueError as exc:
+        raise SystemExit(f"gen: --layout-guide cannot read aspect ratio {aspect_ratio!r}") from exc
+    scale = LAYOUT_GUIDE_LONG_EDGE / max(width, height)
+    return round(width * scale), round(height * scale)
+
+
+def layout_guide_cell(aspect_ratio: str | None) -> dict[str, Any]:
+    """The one-slot guide's cell for the requested ratio: its size, safe margins and the two anatomy lines,
+    one margin inside the safe box's top and bottom edges. What `layout_guide_text` says and
+    `draw_layout_guide` draws."""
+    # Imported here: `prepare` owns the row guide and pulls in the row machinery.
+    from .prepare import normalize_cell
+
+    width, height = layout_guide_size(aspect_ratio)
+    cell = normalize_cell({"width": width, "height": height}, width, None)
+    margin_y = int(cell["safe_margin_y"])
+    return {**cell, "crown_y": 2 * margin_y, "floor_y": height - 1 - 2 * margin_y}
+
+
+def draw_layout_guide(path: Path, aspect_ratio: str | None) -> dict[str, Any]:
+    """Draws the one-slot guide at `path` and answers its cell (`layout_guide_cell`)."""
+    from .prepare import draw_guide
+
+    from PIL import Image, ImageDraw
+
+    cell = layout_guide_cell(aspect_ratio)
+    width, height = int(cell["width"]), int(cell["height"])
+    draw_guide(path, 1, {key: value for key, value in cell.items() if key not in ("crown_y", "floor_y")})
+    # The anatomy lines as the row experiments drew them on a 256 px cell (5 px lines, 16 px x 7 px
+    # centre marks), scaled to this guide.
+    scale = height / 256
+    margin_x = int(cell["safe_margin_x"])
+    crown_y, floor_y = int(cell["crown_y"]), int(cell["floor_y"])
+    center = width // 2
+    line, mark, half = max(1, round(5 * scale)), max(1, round(7 * scale)), round(8 * scale)
+    image = Image.open(path).convert("RGB")
+    draw = ImageDraw.Draw(image)
+    for y, colour, accent in ((crown_y, CROWN_LINE, CROWN_MARK), (floor_y, FLOOR_LINE, FLOOR_MARK)):
+        draw.line((margin_x, y, width - 1 - margin_x, y), fill=colour, width=line)
+        draw.line((center - half, y, center + half, y), fill=accent, width=mark)
+    image.save(path)
+    return cell
+
 
 def _make_provider(name: str, *, keep_session: bool):
     if name == "codex":
@@ -105,8 +200,17 @@ def _make_provider(name: str, *, keep_session: bool):
 # alpha source, so `auto` does not gamble on it — the decision is made before the
 # model runs, printed, and recorded in the report (`alpha.strategy_source`).
 # An explicit `--alpha-mode native` still forces it (and fails loud on RGB).
+# The key planned this way is applied only to a raw that needs it: a raw that came
+# back with a real transparent background anyway (`chroma.classify_raw_alpha`,
+# 2026-10-04: a transparent `--ref` is answered with alpha) is published on its own
+# alpha, measured as a native one (STRATEGY_SOURCE_REFS_RAW_ALPHA), because keying
+# it again mattes the outline away. A checkerboard or key background is still keyed.
+# Because the key is the engine's plan, the engine asks for it: a prompt that names no
+# key background gets the chosen key's line (`chroma.KEY_BACKGROUND_TEXT`), since a ref
+# prompt without one came back on white and keying white takes the outline with it.
 STRATEGY_SOURCE_PROVIDER = "provider-default"
 STRATEGY_SOURCE_REFS = "refs-attached"
+STRATEGY_SOURCE_REFS_RAW_ALPHA = "refs-attached-raw-alpha"
 STRATEGY_SOURCE_EXPLICIT = "explicit"
 
 
@@ -246,6 +350,9 @@ def generate_image(
     refs: list[Path] | None = None,
     facing: str | None = None,
     facing_fix: str = "none",
+    view: str | None = None,
+    handed: list[handed_mod.Handed] | None = None,
+    body_plan: list[Body] | None = None,
     model: str | None = None,
     aspect_ratio: str | None = None,
     quality: str | None = None,
@@ -258,6 +365,7 @@ def generate_image(
     keep_session: bool = False,
     workdir: Path | None = None,
     decontam: str = "off",
+    layout_guide: bool = False,
 ) -> GenResult:
     """Generate one image and return a GenResult. Raises SystemExit on any failure."""
     if decontam not in ("off", "auto", "palette"):
@@ -269,58 +377,118 @@ def generate_image(
         raise SystemExit("gen: empty prompt; pass --prompt or --prompt-file")
     if facing is not None:
         facing_mod.validate(facing, facing_fix)
+    _check_view(view, facing, facing_fix, handed, body_plan)
     out = out.expanduser().resolve()
     refs = [Path(r).expanduser().resolve() for r in (refs or [])]
     for ref in refs:
         if not ref.is_file():
             raise SystemExit(f"gen: reference image not found: {ref}")
 
-    if refs and facing is not None:
-        prompt += "\n\n" + facing_mod.prompt_suffix(facing)
     backend = _make_provider(provider, keep_session=keep_session)
     # Decided before the model runs: the strategy shapes the transport prompt
     # (native asks for alpha) and the post-process (chroma keys it out).
     strategy: str | None = None
     strategy_source: str | None = None
     if transparent:
-        strategy, strategy_source = resolve_transparency_strategy(backend, alpha_mode, refs=refs)
+        # The layout guide is an attached image as much as a --ref is: the same step down applies.
+        attached_for_strategy = [*refs, Path(LAYOUT_GUIDE_NAME)] if layout_guide else refs
+        strategy, strategy_source = resolve_transparency_strategy(backend, alpha_mode, refs=attached_for_strategy)
         if decontam == "palette" and strategy != TRANSPARENCY_CHROMA:
             # before the provider is called: a paid generation must not end in this refusal
             raise SystemExit(f"gen: --decontam removes a chroma key; this image would use {strategy} alpha "
                              "(pass --alpha-mode chroma to key it instead)")
-        if strategy_source == STRATEGY_SOURCE_REFS:
-            print(
-                f"[gen] {len(refs)} reference image(s) attached — using chroma keying instead of "
-                f"{backend.name}'s native alpha (native output with refs is unstable, 2026-09-08). "
-                "Pass --alpha-mode native to force it.",
-                file=sys.stderr,
-            )
+    # The key is the engine's plan when `auto` stepped down for the refs, so the engine asks for it: a
+    # ref prompt with no key background is answered on white or another light ground, and keying that
+    # takes the outline and light fills with it (2026-10-04). A key the prompt already names stays.
+    parts = still_prompt(prompt, view=view, facing=facing, handed=handed, body_plan=body_plan, refs=bool(refs),
+                         key=chroma_key if strategy_source == STRATEGY_SOURCE_REFS else None,
+                         layout=layout_guide_cell(aspect_ratio) if layout_guide else None)
+    prompt = parts.text
+    for line in prompt_parts.note_lines(parts):
+        print(f"[gen] {line}", file=sys.stderr)
+    key_background: dict[str, Any] | None = None
+    if (key_piece := parts.piece("key-background")) is not None:
+        key_background = {"injected": key_piece.added, "key": key_piece.found or chroma_key}
+        print(
+            f"[gen] {len(refs)} reference image(s) attached — using chroma keying instead of "
+            f"{backend.name}'s native alpha (native output with refs is unstable, 2026-09-08); "
+            + (f"added a {chroma_key} key background line to the prompt; " if key_piece.added
+               else f"the prompt already asks for a {key_piece.found} key background; ")
+            + "a result that already has a transparent background keeps its own alpha. "
+            "Pass --alpha-mode native to force it.",
+            file=sys.stderr,
+        )
     owns_workdir = workdir is None
     workdir = Path(workdir).expanduser().resolve() if workdir else Path(tempfile.mkdtemp(prefix="sprite-gen-gen-"))
     workdir.mkdir(parents=True, exist_ok=True)
     raw = workdir / "raw.png"
 
     try:
+        guide_cell: dict[str, Any] | None = None
+        attached = list(refs)
+        if layout_guide:
+            guide = workdir / LAYOUT_GUIDE_NAME
+            guide_cell = draw_layout_guide(guide, aspect_ratio)
+            # Last, so "the last attached image" in the prompt is the guide whatever the caller attached.
+            attached.append(guide)
         request = GenRequest(
             prompt=prompt,
             raw=raw,
-            refs=refs,
+            refs=attached,
             model=model,
             aspect_ratio=aspect_ratio,
             quality=quality,
             resolution=resolution,
             native_alpha=strategy == TRANSPARENCY_NATIVE,
         )
-        # Product fork: a timed-out request may already have been accepted.
-        # Never resend it; the app worker records provider_outcome_unknown.
+        # Product fork: an accepted timeout must never submit a second paid request.
+        # The worker records provider_outcome_unknown and preserves the receipt.
         run = backend.generate(request, workdir)
         verify_png(raw)
         facing_report = None
         if refs and facing is not None:
             request, run, facing_report = facing_mod.prepare_correction(
-                backend, request, run, workdir, facing=facing, fix=facing_fix)
+                backend, request, run, workdir, facing=facing, fix=facing_fix, mirror_ok=not handed)
             raw = request.raw
         raw_bytes = verify_png(raw)
+
+        # Only the key `auto` planned because of the refs is checked against the raw; an
+        # explicit --alpha-mode chroma is the caller's own key and runs as asked.
+        raw_alpha: dict[str, Any] | None = None
+        decontam_skipped: dict[str, Any] | None = None
+        if strategy_source == STRATEGY_SOURCE_REFS:
+            raw_alpha = chroma_mod.classify_raw_alpha(raw)
+            if raw_alpha["verdict"] == chroma_mod.RAW_ALPHA_REAL:
+                if decontam != "off":
+                    # The generation is paid for and its alpha is good: decontam has no key to
+                    # remove, so it is skipped and said, not refused (see the refusal before the call).
+                    decontam_skipped = {
+                        "requested": decontam,
+                        "skipped": f"the raw came back with a transparent background "
+                                   f"({raw_alpha['alpha_zero_pct']}% alpha 0) and has no key to remove",
+                    }
+                    print(f"[gen] {'warning: ' if decontam == 'palette' else ''}--decontam {decontam} skipped: "
+                          f"{decontam_skipped['skipped']}", file=sys.stderr)
+                strategy, strategy_source = TRANSPARENCY_NATIVE, STRATEGY_SOURCE_REFS_RAW_ALPHA
+                print(
+                    f"[gen] the raw came back with a transparent background ({raw_alpha['alpha_zero_pct']}% "
+                    f"alpha 0, {raw_alpha['border_alpha_zero_pct']}% of the border) — publishing its own "
+                    "alpha instead of keying it.",
+                    file=sys.stderr,
+                )
+            elif raw_alpha["verdict"] == chroma_mod.RAW_ALPHA_AMBIGUOUS:
+                raw_alpha["warning"] = (
+                    f"the raw has some transparent pixels ({raw_alpha['alpha_zero_pct']}% alpha 0, "
+                    f"{raw_alpha['border_alpha_zero_pct']}% of the border) but not a transparent background "
+                    f"(needs {chroma_mod.RAW_ALPHA_MIN_ZERO_PCT}% and {chroma_mod.RAW_ALPHA_MIN_BORDER_ZERO_PCT}% "
+                    "of the border); keyed as planned — check the outline, or pass --alpha-mode native"
+                )
+                print(f"[gen] warning: {raw_alpha['warning']}", file=sys.stderr)
+        ref_stats = {
+            **({"key_background": key_background} if key_background is not None else {}),
+            **({"raw_alpha": raw_alpha} if raw_alpha is not None else {}),
+            **({"decontam": decontam_skipped} if decontam_skipped is not None else {}),
+        }
 
         chroma_stats: dict[str, Any] | None = None
         alpha_stats: dict[str, Any] | None = None
@@ -329,12 +497,14 @@ def generate_image(
             alpha_stats = {
                 "strategy": TRANSPARENCY_NATIVE,
                 "strategy_source": strategy_source,
+                **ref_stats,
                 **chroma_mod.verify_native_alpha(raw, out, white_check=white_check),
             }
         elif strategy == TRANSPARENCY_CHROMA:
             chroma_stats = chroma_mod.key_transparent(raw, out, key=chroma_key, white_check=white_check,
                                                       decontam=decontam)
-            alpha_stats = {"strategy": TRANSPARENCY_CHROMA, "strategy_source": strategy_source, **chroma_stats}
+            alpha_stats = {"strategy": TRANSPARENCY_CHROMA, "strategy_source": strategy_source,
+                           **ref_stats, **chroma_stats}
         else:
             shutil.copyfile(raw, out)
         verify_png(out)
@@ -366,11 +536,70 @@ def generate_image(
             alpha=alpha_stats,
             chroma=chroma_stats,
             extra={**run.extra, **({"trim_alpha": trim_stats} if trim_stats else {}),
-                   **({"facing": facing_report} if facing_report else {})},
+                   **({"facing": facing_report} if facing_report else {}),
+                   **({"view": {"direction": view, "facing": facing if view in handed_mod.LATERAL_VIEWS else None,
+                                "handed": [vars(h) for h in handed or []],
+                                **({"body_plan": [vars(b) for b in body_plan]} if body_plan else {})}} if view else {}),
+                   **({"layout_guide": guide_cell} if guide_cell else {}),
+                   **({"prompt_notes": parts.notes} if parts.notes else {})},
         )
     finally:
         if owns_workdir:
             shutil.rmtree(workdir, ignore_errors=True)
+
+
+def _check_view(view: str | None, facing: str | None, facing_fix: str, handed: list[handed_mod.Handed] | None,
+                body_plan: list[Body] | None = None) -> None:
+    """Refuse a `--direction` / `--facing` / `--handed` / `--body-plan` combination that cannot be drawn, before
+    anything runs."""
+    if view is None:
+        if handed:
+            raise SystemExit("gen: --handed needs --direction: where an item shows depends on the view")
+        if body_plan:
+            raise SystemExit("gen: --body-plan needs --direction: it changes the view sentence, which only "
+                             "--direction adds")
+        return
+    handed_mod.validate_view(view, facing)
+    if view not in handed_mod.LATERAL_VIEWS and facing is not None:
+        raise SystemExit(f"gen: the {view} view is not turned to a side; drop --facing")
+    if handed and facing_fix == "mirror":
+        raise SystemExit("gen: --facing-fix mirror turns the picture over and moves every --handed item to the other "
+                         "side; use regen (it never mirrors with --handed) or none")
+
+
+def still_prompt(prompt: str, *, view: str | None = None, facing: str | None = None,
+                 handed: list[handed_mod.Handed] | None = None, body_plan: list[Body] | None = None,
+                 refs: bool = False, key: str | None = None,
+                 layout: dict[str, Any] | None = None) -> prompt_parts.Prompt:
+    """The prompt a still is drawn from: the caller's text, then the engine's pieces (`prompt_parts.Prompt.add`;
+    without `handed` or `body_plan`, 2.22.0's prompt to the byte). In order:
+
+    - `view` (`--direction`): the sentence for drawing the still at that view, turned to `facing` (the side and
+      diagonal views; a `body_plan` that is not one biped gets it without the feet, chest, hips, shoulders and
+      shoes and with what it stands on, `still_view_text`), then where each `handed` item is in it
+      (`handedness.text`);
+    - with `refs` and a `facing`: the turn over the reference (`facing.prompt_suffix`);
+    - `key` (green / magenta, a ref run `auto` planned to key): the key background line, unless the prompt
+      names a key background already;
+    - `layout` (the `--layout-guide` cell): where the guide's lines are.
+    """
+    figures = body_mod.figures(body_plan)
+    parts = prompt_parts.Prompt(prompt, caller=f"{prompt} {figures}" if figures else None)
+    if view is not None:
+        # The view sentences are the video pipeline's (a still is drawn for the clip that starts from it).
+        from sprite_gen.video.batch import still_view_text
+
+        text = still_view_text(view, facing or "right", body_plan)
+        parts.add("view", text[0].upper() + text[1:] + ".", facing=facing or prompt_parts.NO_TURN)
+        if handed:
+            parts.add("handed", handed_mod.text(handed, view, facing), sep=" ", handed=handed)
+    if refs and facing is not None:
+        parts.add("facing", facing_mod.prompt_suffix(facing), facing=facing)
+    if key is not None:
+        parts.add("key-background", chroma_mod.KEY_BACKGROUND_TEXT[key], key=key)
+    if layout is not None:
+        parts.add("layout", layout_guide_text(layout))
+    return parts
 
 
 def _run(args: argparse.Namespace) -> int:
@@ -404,6 +633,9 @@ def _run(args: argparse.Namespace) -> int:
         refs=args.ref,
         facing=None if args.facing == "preserve" else args.facing,
         facing_fix=args.facing_fix,
+        view=getattr(args, "direction", None),
+        handed=handed_mod.parse_all(list(getattr(args, "handed", None) or [])) or None,
+        body_plan=body_mod.parse_all(list(getattr(args, "body_plan", None) or [])) or None,
         model=args.model,
         aspect_ratio=args.aspect_ratio,
         quality=args.quality,
@@ -416,6 +648,7 @@ def _run(args: argparse.Namespace) -> int:
         keep_session=args.keep_session,
         workdir=args.workdir,
         decontam=str(getattr(args, "decontam", None) or "off"),
+        layout_guide=bool(getattr(args, "layout_guide", False)),
     )
     payload = result.to_dict()
     # `provider` in the payload is always the backend that actually generated the
@@ -513,7 +746,8 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
         default=ALPHA_MODE_AUTO,
         help=(
             "transparency strategy for --transparent: auto = the provider's declared strategy "
-            "(native on codex and openai, but chroma whenever --ref is attached — native alpha with refs is unstable); "
+            "(native on codex and openai, but chroma whenever --ref is attached — native alpha with refs is unstable — "
+            "with the --chroma-key background line added to a prompt that names no key); "
             "chroma forces chroma keying (e.g. a codex prompt that already carries a key background); "
             "native forces native alpha and is refused on a provider that cannot return alpha"
         ),
@@ -529,7 +763,19 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--chroma-key", choices=sorted(chroma_mod.KEYS), default="magenta")
     parser.add_argument("--facing", choices=(*facing_mod.FACINGS, "preserve"), default="preserve", help="with --ref: required direction; preserve (default) leaves prompt and pixels unchanged")
     parser.add_argument("--facing-fix", choices=facing_mod.FIXES, default="none", help="with --ref and --facing: record only (none, default), or opt into mirror / one regen")
+    parser.add_argument("--direction", choices=handed_mod.VIEWS, help="draw the still at this sprite view: the engine's view sentence is added to the prompt (side and diagonal views also take --facing right|left)")
+    parser.add_argument("--handed", action="append", default=[], metavar="ITEM=SIDE [PART]", help="with --direction: an asymmetric item on one of the character's own sides, e.g. 'the black smartwatch=left wrist' (repeatable); the prompt says where it is in this view, and the still is never mirrored")
+    parser.add_argument("--body-plan", action="append", default=[], metavar="PLAN | FIGURE=PLAN", help="with --direction: what the character stands on, biped (default), quadruped or legless; a scene of several figures names each, e.g. 'the man=biped' 'the horse=quadruped' (repeatable): the view sentence names no part the body lacks, as video-set --body-plan")
     parser.add_argument("--trim-alpha", action="store_true", help="with --transparent: crop the published PNG to its opaque bbox so the bottom edge is the foot line (margins reported)")
+    parser.add_argument(
+        "--layout-guide",
+        action="store_true",
+        help=(
+            "attach a one-slot layout guide (frame, inner safe area at the row guide's 9.4 %% margin, "
+            "center line) after any --ref and ask for the whole subject inside the safe area, with room "
+            "above the head and below the feet; drawn for --aspect-ratio, square without one"
+        ),
+    )
     parser.add_argument("--white-check", type=Path, help="write a white-composite check image")
     parser.add_argument("--keep-session", action="store_true", help="codex: do not delete the rollout jsonl")
     parser.add_argument("--report", type=Path, help="write the generation report JSON here")

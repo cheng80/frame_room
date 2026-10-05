@@ -22,9 +22,69 @@
   },
   "patches": [
     {
+      "path": "docs/README.md",
+      "upstreamSha256": "e9ce083bf2059eee913cab23ed28de4522c85735bb4eedc344f32cc7298b30ec",
+      "forkSha256": "c40c9f4606c8019344fb461b4ec81e735a6f9607835ff6a711c22cb3b32db170"
+    },
+    {
+      "path": "docs/video-pipeline.md",
+      "upstreamSha256": "c86d17ed3ae0babe40f88f29ee37a5fe698a5cc81a6ed9b866edb1c1f9fe23d2",
+      "forkSha256": "6ea4608826ceb944fa625b7e3f126fb450d710789b82a02427b0548bcfeab178"
+    },
+    {
+      "path": "sprite_gen/_modules.py",
+      "upstreamSha256": "e0c2e1017d73a492c50ff96e366674537f5079a74939b399cbfdd8e367afd7ef",
+      "forkSha256": "167193aa3e6c56a45c5dd96ae8ba12adf7d77c2ae69c8df04f9c2c91b4a054a7"
+    },
+    {
+      "path": "sprite_gen/cli.py",
+      "upstreamSha256": "a57b90a48b65af75d2ebced3ff61eba7b0ab79638aced92e98beb3c89190ead5",
+      "forkSha256": "70e5c97c71585339f01644f737bcf9528bd9249809d7a6c42588638d7686570c"
+    },
+    {
+      "path": "sprite_gen/compose/compose_atlas.py",
+      "upstreamSha256": "fe6ab8ba853bf3173d24d2ccd9fcfa3b66282ccbf077efd756d376807c5d6dea",
+      "forkSha256": "b2ca3b64b2864e007b3e8d04028c24d16298159adf073dc280d4cd0c96b1cb79"
+    },
+    {
+      "path": "sprite_gen/curate/curation.py",
+      "upstreamSha256": "7e29512cc957dd014cb9bd5f13a3883a2ee817ab9ce0b24064ae80e4d056ee79",
+      "forkSha256": "2cd9a50c411c129150822d566cb100e75e06bc17b958978548c946ea1e0065cd"
+    },
+    {
+      "path": "sprite_gen/effects/breathe.py",
+      "upstreamSha256": "3aabd3ae9ea4d0587d9c9dba5845c36a2fc5bb4d9a40d814dba23bc62ed90809",
+      "forkSha256": "2ecb13e494f761d619cd4943100670dc9e8130daa4d21c3f7a4bcc6cb5bb471f"
+    },
+    {
+      "path": "sprite_gen/frames/cutout.py",
+      "upstreamSha256": "7a3af893abecba52347ac0c301079e3aa61531001c6c16254238b2661fa37067",
+      "forkSha256": "90f3de004c0a5e4a94da9163b10ca43d44fb48b4406e1de8e1d1783d254f57d8"
+    },
+    {
+      "path": "sprite_gen/frames/decontam.py",
+      "upstreamSha256": "8175da03954b1fd14b90dafa20ccbe8e5d5bc2955d2b5a4e7c3b5b012dd77261",
+      "forkSha256": "8c6c7df6b1ff48e4b75ad66a32419e2aa7982f0437c37b1b9bebf276f11cf9cf"
+    },
+    {
+      "path": "sprite_gen/frames/extract.py",
+      "upstreamSha256": "2e347dfce9f9dfd471ffcb1c841c69209b6d940a35f24555e67aea7cb71242cb",
+      "forkSha256": "41c6e4df7e0df74524f7f7a770e9483d17a7cc858ad010a04416c4c25dad2347"
+    },
+    {
+      "path": "sprite_gen/frames/slice_sheet.py",
+      "upstreamSha256": "af4ae3ae63d55f2fdca2ccbc6e069842eed04281325eed4899ca0896f63b038d",
+      "forkSha256": "269053f3efeb84f72fa7df8417aeb1c831dd3ea681b531cfcf0613c8cb52cf91"
+    },
+    {
       "path": "sprite_gen/gen/__init__.py",
       "upstreamSha256": "ceaa876def2a070f09ab01a51c35d78fd075e9293c8f34431f5ad2f1bb4f5ef1",
-      "forkSha256": "a8d151754c5c461fb0ede9e91fe9efefbab2fea1db9eb54f4022bb433f34533e"
+      "forkSha256": "7117e00f4e520b8e694d6af3111f7c1c15fbe00e5a2323b0b8f682957d1af363"
+    },
+    {
+      "path": "sprite_gen/gen/chroma.py",
+      "upstreamSha256": "b87847b4e728e0ada5a8d84caf3dba8310c224bc96ad58881d52146873f33d53",
+      "forkSha256": "fdba12f4aceb2ac44b5f39e9de91966c8c50335f35563f61967f25f9e4519f37"
     },
     {
       "path": "sprite_gen/gen/codex_provider.py",
@@ -32,39 +92,49 @@
       "forkSha256": "2cfc0572cfdfbb1439a37fad92e579018772a9bb7af6eed53addea00cd9bf726"
     },
     {
-      "path": "tests/gen/test_gen.py",
-      "upstreamSha256": "70a12e0120dcef954d1a2c9bc98ed0472166d8285b405a23debd76c20f71ef01",
-      "forkSha256": "687f996968d0ca0740553816ad8e0091c452bfdc5e36f99ccc425ed321576057"
+      "path": "sprite_gen/gen/facing.py",
+      "upstreamSha256": "d7e1e36f0506b273d2475ad0dc69e489308309a3a3af5c818c176d967eaadc49",
+      "forkSha256": "2e45567ffc8fee5de3a7efd8a9fc168b8b9f130b255180e172152829b030e4bf"
     },
     {
-      "path": "sprite_gen/frames/extract.py",
-      "upstreamSha256": "2e347dfce9f9dfd471ffcb1c841c69209b6d940a35f24555e67aea7cb71242cb",
-      "forkSha256": "f11c14cd5f35d3f36041cb309e6b33964c4e722c57c809dd4ffa101000f052c6"
+      "path": "sprite_gen/gen/handedness.py",
+      "upstreamSha256": null,
+      "forkSha256": "e314ad429ac26360a2662b2f269acc8da186788e2650a60e43c16ebcf188858c"
     },
     {
-      "path": "sprite_gen/frames/cutout.py",
-      "upstreamSha256": "7a3af893abecba52347ac0c301079e3aa61531001c6c16254238b2661fa37067",
-      "forkSha256": "c3f11578aba2f9256d5e08325f5fa4e45155de9ab0ae69af118fcaa4f7bac7c3"
+      "path": "sprite_gen/gen/prepare.py",
+      "upstreamSha256": "e8d7c58d693cb484323365db4f9a3e8ef1e033ca462283bcf94326e6e28c4c28",
+      "forkSha256": "6a5c20de65be0b2785cac1ce653b546780e6226e0e046250cc1fdcc07215fbc3"
+    },
+    {
+      "path": "sprite_gen/gen/prompt_parts.py",
+      "upstreamSha256": null,
+      "forkSha256": "2561fa165349f77b047904dc897fe169f3288fe52455df65d8cf55e15f2d11ed"
     },
     {
       "path": "sprite_gen/gen/video.py",
       "upstreamSha256": "655e3abe34ff9adcac07d29a6ec167b89f1bc47f4d54bebf913d936e2f6fa8cb",
-      "forkSha256": "ce6cd6c249fe27332e7adab1486875ee2a43d50d0f8add9b9e6fbbdb6a2c1b09"
+      "forkSha256": "5e070f6040e48024a29f81d2125cfc3995d94dd5ff8a46196b141170df2266f6"
     },
     {
-      "path": "sprite_gen/video/loop.py",
-      "upstreamSha256": "5475953492d1cb8dee53364152498f232a952b51e006591aaf404b170a147980",
-      "forkSha256": "0d5767a365e2b765f320d44049709654a32621c27749abd068a3e89bf3f90c21"
+      "path": "sprite_gen/qa/handed.py",
+      "upstreamSha256": null,
+      "forkSha256": "9bc4c7a445b0599f2a17ef1372e689fe46e88cae2da2ad5e66c3a4ab66fad307"
     },
     {
-      "path": "sprite_gen/video/batch.py",
-      "upstreamSha256": "ed664fbb40ad655c5e031e74feb4f8d9a683993d4210d155d4dd82d56abc716a",
-      "forkSha256": "4d50df6c10c629479d7e263a92b0a3c2dce19123723cfaddac2d7c72f8adf069"
+      "path": "sprite_gen/scene/render.py",
+      "upstreamSha256": "9ff2aec06826df09f4732d888c8111f3d91c890d0e285b41dbdce5849b977db1",
+      "forkSha256": "8346c2f9f9b607c9dc0e54d5d9818caab5e674df677b3f2dd532b61b67a27b7c"
     },
     {
-      "path": "sprite_gen/video/frames.py",
-      "upstreamSha256": "6165b06ea709173bb811a3a09baaef86b6cca380da4c4a46dc2d0a0ddcc31109",
-      "forkSha256": "9ebd14259bef8df89ef7128ab78535b063f8891a97e8fb03d7749c8dfc759ef2"
+      "path": "sprite_gen/util/resample.py",
+      "upstreamSha256": null,
+      "forkSha256": "7689e90b4bc6e8eacdd1565c759a36876c23c2efdb5d7fff80c84913afd856e9"
+    },
+    {
+      "path": "sprite_gen/video/align.py",
+      "upstreamSha256": null,
+      "forkSha256": "8c5bac8826a548796b85f1d2ab0a908cb72be0261867b6b4793eb88187b09b73"
     },
     {
       "path": "sprite_gen/video/auto_motion.py",
@@ -72,14 +142,64 @@
       "forkSha256": "e3a397d33b31b974b2102a7520b1c8d69282ee7e91c9c00bfb7caab822ed3e3a"
     },
     {
-      "path": "sprite_gen/video/local_cycle.py",
-      "upstreamSha256": "24950d17a10b64060d3162002d5050d720878ce8e816209d7978cfca5d5783ce",
-      "forkSha256": "b6e9b8ad173aac8b387bf0849f5a1bdf539839f778ee27568bb77be61e8261d4"
+      "path": "sprite_gen/video/batch.py",
+      "upstreamSha256": "ed664fbb40ad655c5e031e74feb4f8d9a683993d4210d155d4dd82d56abc716a",
+      "forkSha256": "c85a49e291ec5580969e4a1b35a6a633c83a07902b7b7ddd2a9afd708a47e117"
+    },
+    {
+      "path": "sprite_gen/video/body_plan.py",
+      "upstreamSha256": null,
+      "forkSha256": "3713132e3407ff5ba69a5740a4eac36f3436622372d8bcb4369e35cf21e4c3f5"
+    },
+    {
+      "path": "sprite_gen/video/canvas.py",
+      "upstreamSha256": "386a90bc6bd71bf5cdc09172865ac8f1e7a87bb8087c9dc6f487fad788404b44",
+      "forkSha256": "2fbc5d3e836f640abcb53b9bfc317132406ae0b16887bfcba37916697183a203"
+    },
+    {
+      "path": "sprite_gen/video/clip_prompt.py",
+      "upstreamSha256": null,
+      "forkSha256": "0c36cd0c881b64bb003578bd539d04a6c86b682ad02a745d05b9de303f5e9cf3"
+    },
+    {
+      "path": "sprite_gen/video/follow.py",
+      "upstreamSha256": null,
+      "forkSha256": "e2706670bc9ac72f1500f63913162bee6e242e32fae68ad4dd70e6e460343fe8"
+    },
+    {
+      "path": "sprite_gen/video/frames.py",
+      "upstreamSha256": "6165b06ea709173bb811a3a09baaef86b6cca380da4c4a46dc2d0a0ddcc31109",
+      "forkSha256": "08143c3ba4ba74d58e8fe2380b9dccfaf01589d24c34b5ecc0a23d978a4729ce"
     },
     {
       "path": "sprite_gen/video/gait_fallback.py",
       "upstreamSha256": null,
-      "forkSha256": "46ef2d12e54ea00354b9ca8ae049a7023f5b6194f675cf24e813bdf76f0d465b"
+      "forkSha256": "fb21af3398fd4f10a5e040798d749fef3cbe50f7bc948d587cf76f8d0f28fa8b"
+    },
+    {
+      "path": "sprite_gen/video/held.py",
+      "upstreamSha256": null,
+      "forkSha256": "693289432bd867ecb36822f10afae8573144d5bbf17a0140c25962f8565cf3b0"
+    },
+    {
+      "path": "sprite_gen/video/legs.py",
+      "upstreamSha256": null,
+      "forkSha256": "faf428e16e99afe6d8f53470c44cbcf13f9fccc2a2617f72bea089d04b44cf05"
+    },
+    {
+      "path": "sprite_gen/video/local_cycle.py",
+      "upstreamSha256": "24950d17a10b64060d3162002d5050d720878ce8e816209d7978cfca5d5783ce",
+      "forkSha256": "05613d9e0f5f38df22bf20046c7f09db073d8ab5b3042ca05c5614a5616a0c9e"
+    },
+    {
+      "path": "sprite_gen/video/loop.py",
+      "upstreamSha256": "5475953492d1cb8dee53364152498f232a952b51e006591aaf404b170a147980",
+      "forkSha256": "151ee6748100b3176fde2161bce6dfceec59973c76172fd3b0d8a664bfdea22b"
+    },
+    {
+      "path": "sprite_gen/video/period.py",
+      "upstreamSha256": null,
+      "forkSha256": "b58268527aaed1194131bf896eb79095456776ef4f32a6af0b4d40588310e0d1"
     },
     {
       "path": "sprite_gen/video/repair.py",
@@ -89,7 +209,7 @@
     {
       "path": "sprite_gen/video/rife.py",
       "upstreamSha256": null,
-      "forkSha256": "ea2c9c7bd3b959102acf2ada066c6b4dd6cca96154bf2560b05478042bc9091a"
+      "forkSha256": "d5e6edf3b0e5582a4b05fbbfba202767fa718e6b393a1a25d222c65affda6454"
     },
     {
       "path": "sprite_gen/video/rife_install.py",
@@ -97,44 +217,104 @@
       "forkSha256": "4b9ceb06510b14f9ca17f99b22a7c4e768f82ad1b563c3b2c6bd456f649560b8"
     },
     {
-      "path": "sprite_gen/video/align.py",
+      "path": "tests/curate/test_transform_resample.py",
       "upstreamSha256": null,
-      "forkSha256": "1b631866db259731996d7c9abddf3778c8ef7f331453652eff1277c2c19f917f"
+      "forkSha256": "95f60b7cd8971d971e7c84e151f4fe922d0ebd4eded862d8b0891485a1c89e0e"
     },
     {
-      "path": "tests/video/test_cycle_align.py",
+      "path": "tests/fixtures/prepare-rows-v2.32.0.json.gz",
       "upstreamSha256": null,
-      "forkSha256": "b2a1e6952879cb989c24c8ff7cb4216328f1206064f308bd7c57105bf26c2995"
+      "forkSha256": "6c529e7891225e714567f8f4f2fef4a7c7e138c35b77b58ef6dc958f2adb3500"
     },
     {
-      "path": "tests/video/test_gait_fallback.py",
+      "path": "tests/fixtures/prompts-v2.22.0.json.gz",
       "upstreamSha256": null,
-      "forkSha256": "f68df7410effae5025295c9e004e2a103586a9b0c2a8de580ffebf00e641cd99"
+      "forkSha256": "4321700a6e1a9dbcfcf4f5ca0759be63296d773bba92c8ce4ffb72182ab84a3c"
     },
     {
-      "path": "tests/video/test_loop_repair.py",
-      "upstreamSha256": null,
-      "forkSha256": "89773fbfcad64b894dfc0fd75c4c5e1751c8598a896907cb722a3a9ecfcee4f6"
+      "path": "tests/frames/test_chroma_decontam.py",
+      "upstreamSha256": "71c4e4812b2d845c190be4dfd73d9266e0f1e65350553f2183fb2781c6e71549",
+      "forkSha256": "1cbad5874d8bbc8c4da5ff8bcac73e3ca74d79cfc57a87320a223dea481584c0"
     },
     {
-      "path": "tests/video/test_rife.py",
+      "path": "tests/frames/test_keyed_resample.py",
       "upstreamSha256": null,
-      "forkSha256": "f50a162c329d6e20e8749f9cabfa8f52466df26c9bf2fd2aa223959c85830a64"
+      "forkSha256": "1ec8eb34c635956df8e4569001e4bc26f7e0a7f9c214ab333d52f897629ad0fc"
     },
     {
-      "path": "tests/video/test_rife_install.py",
+      "path": "tests/gen/prepare_freeze_table.py",
       "upstreamSha256": null,
-      "forkSha256": "a7a8f8ca35a5726a1f73f2e363c714a697ed0c5386038bc359f44d4af108c9d2"
+      "forkSha256": "6303d97c5b6478fde8dedff1ed2a76033972c85aee6cb7e183ff5db86ed46768"
     },
     {
-      "path": "tests/video/test_strip_resample.py",
+      "path": "tests/gen/prompt_freeze_table.py",
       "upstreamSha256": null,
-      "forkSha256": "5e3ad5ab50f7bdb104f3382dafc89d9a0f110a86498e34d81c17b59f0e6e8bde"
+      "forkSha256": "9d32d0a398c366d791c0a3453b94bff1f18f8d7ecf2fa69485f04f2a1ceb3031"
+    },
+    {
+      "path": "tests/gen/test_body_plan_sheets.py",
+      "upstreamSha256": null,
+      "forkSha256": "8e2e130150b4335a8a25566d4517d69569dac3cd02312c1a9334e41868df2fad"
+    },
+    {
+      "path": "tests/gen/test_gen.py",
+      "upstreamSha256": "70a12e0120dcef954d1a2c9bc98ed0472166d8285b405a23debd76c20f71ef01",
+      "forkSha256": "687f996968d0ca0740553816ad8e0091c452bfdc5e36f99ccc425ed321576057"
+    },
+    {
+      "path": "tests/gen/test_handedness.py",
+      "upstreamSha256": null,
+      "forkSha256": "7f07ff42f300a16bff89c073274d5b401445bbc4c8ce5d1d9bc7f47ee1229e4d"
+    },
+    {
+      "path": "tests/gen/test_layout_guide.py",
+      "upstreamSha256": null,
+      "forkSha256": "d823df9f11e85b5fb61aaa586230121bae0187820c63d10b320b6e8ec4947b37"
+    },
+    {
+      "path": "tests/gen/test_prompt_assembly.py",
+      "upstreamSha256": null,
+      "forkSha256": "8171f3d32a1264a2f5369c5b3533779da6d0fbd836083763eaf990394cf35025"
+    },
+    {
+      "path": "tests/gen/test_prompt_freeze.py",
+      "upstreamSha256": null,
+      "forkSha256": "77dd7cedb2e95a26693f5296004f151e37b9c96f289fdf842256972b631e8941"
+    },
+    {
+      "path": "tests/keyed_figure.py",
+      "upstreamSha256": null,
+      "forkSha256": "3fa402753031e9466a133c94a59252cc09a257a6ee189761164271ec26f4c0c9"
+    },
+    {
+      "path": "tests/qa/test_handed_check.py",
+      "upstreamSha256": null,
+      "forkSha256": "b7df207f0e496e7368bb5f2be9e76e23464b76e2b8668ab48b58e4dcc910c868"
+    },
+    {
+      "path": "tests/scene/test_layer_resample.py",
+      "upstreamSha256": null,
+      "forkSha256": "6387a96dd454b6046ed33a7ea75fb48ef5c7f919b761ed1286a417dabcaca38c"
+    },
+    {
+      "path": "tests/video/test_attack_headroom.py",
+      "upstreamSha256": null,
+      "forkSha256": "4259abce84d29cc30a6e35df47805f77196bf94a02655a0d87c243d732ea4762"
+    },
+    {
+      "path": "tests/video/test_auto_motion.py",
+      "upstreamSha256": "9b0c79f1564efcb481fca442eee9e5e98d9f160db976ed0a81380c71269ac661",
+      "forkSha256": "5081fcf95f0c80756f5fdcfb0c5bc1c8dd740a3b491bf23b2228c132260b3ee1"
+    },
+    {
+      "path": "tests/video/test_auto_motion_uncorrected.py",
+      "upstreamSha256": "7635dffd9424dad37d80ca0f9b44089d4767e9396a9ac62418c63af638a710aa",
+      "forkSha256": "23fbbe12ac8e074d8c5c7796e48e770d5a263b9cc2ec9276e13f267028740113"
     },
     {
       "path": "tests/video/test_backport_edges.py",
       "upstreamSha256": null,
-      "forkSha256": "15a6cc7421cfdad9ea2b3c4eae395f64a1f529990f26e5b5f064336132465158"
+      "forkSha256": "81fd627a2c3bef8ccf2af79eae7f7680728f92966d113b27101e910955c436e8"
     },
     {
       "path": "tests/video/test_batch_bases.py",
@@ -142,9 +322,104 @@
       "forkSha256": "6892b87e59432a0f27fa59afb048fc25377fcac1b8ab011d8aa05eacbdd1f7a7"
     },
     {
+      "path": "tests/video/test_batch_handed.py",
+      "upstreamSha256": null,
+      "forkSha256": "2beeb2ddaca386bc5ea0c16f9d1ff455de334c68c19e2f92531ba5825168aa9f"
+    },
+    {
+      "path": "tests/video/test_body_anchor.py",
+      "upstreamSha256": "aaff83097e8be7e850489d4bc119d0582e3ece092b3b03e3caa47c87fb11c177",
+      "forkSha256": "e3ffd3c6792330a3e8d3331133bdc4acf0029efbce3bf1f6697427442f37e352"
+    },
+    {
+      "path": "tests/video/test_body_plan.py",
+      "upstreamSha256": null,
+      "forkSha256": "1e03312b5a58caa44b68be5c1c7f2221321c19993d002cc03ba9fac14e33a7c9"
+    },
+    {
+      "path": "tests/video/test_clip_prompt.py",
+      "upstreamSha256": null,
+      "forkSha256": "d56960717401a3a2e702ee91c4f4ff0af5606344717e144a4fd85f02a27dface"
+    },
+    {
+      "path": "tests/video/test_cycle_align.py",
+      "upstreamSha256": null,
+      "forkSha256": "64ec6f1b18c81b12a2e32792b110c867d74f51d3f322951a51e8e58f1d2f96a3"
+    },
+    {
+      "path": "tests/video/test_cycle_align_foot.py",
+      "upstreamSha256": null,
+      "forkSha256": "68e3e2c555fceb4c5c09540048ce533ff9dc919e196b66492b05569ef9104c35"
+    },
+    {
+      "path": "tests/video/test_cycle_align_foot_margin.py",
+      "upstreamSha256": null,
+      "forkSha256": "01089499ead6b4122abd9d0867ef35e2062caf0e943aaf9817351d9d4b6d805c"
+    },
+    {
+      "path": "tests/video/test_cycle_suspects.py",
+      "upstreamSha256": null,
+      "forkSha256": "0e9add93d9406eaa44d9e32b477a83942b5fa3b2e573542a89433abe16649b84"
+    },
+    {
+      "path": "tests/video/test_duration_window_oneshot.py",
+      "upstreamSha256": "5292c0baa1e8555b9bf64f98850709b0c569a60300d39bd8e2f610181e02f9c9",
+      "forkSha256": "867171de6db094179f3482148bbbec3e93d7f00dcd2e49c7e14de14cb5589767"
+    },
+    {
+      "path": "tests/video/test_follow.py",
+      "upstreamSha256": null,
+      "forkSha256": "61a4deb643e688443dc583b3f22f07da35ddb2c3f923986c888fb21b4c130944"
+    },
+    {
+      "path": "tests/video/test_gait_fallback.py",
+      "upstreamSha256": null,
+      "forkSha256": "13722e3b387e084e0bc53946b9eb5025bf209e171f1eb29dc60978c215397464"
+    },
+    {
+      "path": "tests/video/test_gait_fallback_resample.py",
+      "upstreamSha256": null,
+      "forkSha256": "89d133918960cf6767ec93fe60ef1fc361208c538588d06a2a9500065b7da9cc"
+    },
+    {
+      "path": "tests/video/test_held_drawings.py",
+      "upstreamSha256": null,
+      "forkSha256": "fc88a6e1525ad6bf0c7c7b95f9048a1e0b97c3ad2fa1360b6695ceed7def90ac"
+    },
+    {
+      "path": "tests/video/test_loop_repair.py",
+      "upstreamSha256": null,
+      "forkSha256": "db3fbd4d3d6fce5d16c18a5453e0364bbea1ad35e540f0366698738c5e03d4d1"
+    },
+    {
+      "path": "tests/video/test_motion_anchor.py",
+      "upstreamSha256": "4cdd5ffe55bf8fc29eb00e600dd073b1ea0021da090ab9cbe7918ef45a357586",
+      "forkSha256": "dac4c6d7f9411d079989cb7329cf7d39af0ecb873a02ec6257cf4366c83a9033"
+    },
+    {
+      "path": "tests/video/test_rife.py",
+      "upstreamSha256": null,
+      "forkSha256": "ba8b39feb5680b6366357a86a8e337af2df437ceaccdac461b72afd0ca6f3286"
+    },
+    {
+      "path": "tests/video/test_rife_install.py",
+      "upstreamSha256": null,
+      "forkSha256": "43d081c889ff2e566030266be6133e37fa66aa1ec4ae9e357766e06032c927bd"
+    },
+    {
+      "path": "tests/video/test_strip_resample.py",
+      "upstreamSha256": null,
+      "forkSha256": "0c17678ed3f3efa12a91de75d4e32263861c3cd307f98baecbe1b20451d2f176"
+    },
+    {
       "path": "tests/video/test_video_pipeline.py",
       "upstreamSha256": "0a77949a54dc6827548e236fa61eb5f105339149376135be8e46b038f5881ea2",
-      "forkSha256": "5a03747d106b9b64ae61b6af8e23f3c56e5940e9e12ab60a843c59c85f0192a6"
+      "forkSha256": "ca917141b198d9c7a96d6776c62cbc0ad239ad58c1ae55cad29526f20952abcc"
+    },
+    {
+      "path": "tests/video/test_walk_defaults.py",
+      "upstreamSha256": null,
+      "forkSha256": "8323273f324f44c229655cdb0964e1487c9ef1030f44f3177a678695a946867a"
     }
   ],
   "environment": {
@@ -188,9 +463,9 @@
     "sha256": "645c1dec7c8ca1143958a7a0a36bc98211f7e489da268f0d11cffdd1586e0f60"
   },
   "adapter": {
-    "version": "1.2.0",
+    "version": "1.3.0",
     "file": "adapters/spritegen/provider.py",
-    "sha256": "976470a7e35594f45791847005462407b4a814b035d316a1c8b6d41421dc1788"
+    "sha256": "7662231fa6b2138e1c8e9c70d8325840023b4f94d6a6de7d3505db9e40b77760"
   },
   "validation": {
     "externalGenerationCalls": 0,
@@ -200,7 +475,8 @@
     "warnings": 18,
     "scope": "local provider/engine regressions; no external generation",
     "providerTestsPassed": 48,
-    "upstreamGenerationTestsPassed": 60
+    "upstreamGenerationTestsPassed": 60,
+    "recordedScope": "Historical initial adapter validation; see backports for subsequent validation."
   },
   "backports": [
     {
@@ -322,6 +598,405 @@
         "realProjectRifeTestsPassed": 1,
         "externalGenerationCalls": 0
       }
+    },
+    {
+      "name": "public-quality-v2.34.0",
+      "tag": "v2.34.0",
+      "commit": "1fc35090fa9c359bc96d1287fbc32f733acaa7e4",
+      "baseEngineUnchanged": "2.12.1",
+      "files": [
+        {
+          "path": "docs/README.md",
+          "upstream234Sha256": "69891a210dba8147a37865cf89293c1472e0256384f7b149f5d3461a5cc523e0",
+          "forkSha256": "c40c9f4606c8019344fb461b4ec81e735a6f9607835ff6a711c22cb3b32db170"
+        },
+        {
+          "path": "docs/video-pipeline.md",
+          "upstream234Sha256": "17959f28f96d70db1e6df1c8e5f6302d470209cb8a351fadb906f5ee0217f223",
+          "forkSha256": "6ea4608826ceb944fa625b7e3f126fb450d710789b82a02427b0548bcfeab178"
+        },
+        {
+          "path": "sprite_gen/_modules.py",
+          "upstream234Sha256": "167193aa3e6c56a45c5dd96ae8ba12adf7d77c2ae69c8df04f9c2c91b4a054a7",
+          "forkSha256": "167193aa3e6c56a45c5dd96ae8ba12adf7d77c2ae69c8df04f9c2c91b4a054a7"
+        },
+        {
+          "path": "sprite_gen/cli.py",
+          "upstream234Sha256": "70e5c97c71585339f01644f737bcf9528bd9249809d7a6c42588638d7686570c",
+          "forkSha256": "70e5c97c71585339f01644f737bcf9528bd9249809d7a6c42588638d7686570c"
+        },
+        {
+          "path": "sprite_gen/compose/compose_atlas.py",
+          "upstream234Sha256": "b2ca3b64b2864e007b3e8d04028c24d16298159adf073dc280d4cd0c96b1cb79",
+          "forkSha256": "b2ca3b64b2864e007b3e8d04028c24d16298159adf073dc280d4cd0c96b1cb79"
+        },
+        {
+          "path": "sprite_gen/curate/curation.py",
+          "upstream234Sha256": "2cd9a50c411c129150822d566cb100e75e06bc17b958978548c946ea1e0065cd",
+          "forkSha256": "2cd9a50c411c129150822d566cb100e75e06bc17b958978548c946ea1e0065cd"
+        },
+        {
+          "path": "sprite_gen/effects/breathe.py",
+          "upstream234Sha256": "2ecb13e494f761d619cd4943100670dc9e8130daa4d21c3f7a4bcc6cb5bb471f",
+          "forkSha256": "2ecb13e494f761d619cd4943100670dc9e8130daa4d21c3f7a4bcc6cb5bb471f"
+        },
+        {
+          "path": "sprite_gen/frames/cutout.py",
+          "upstream234Sha256": "b011b6d49206b64305842062b5df7e823ceb4c86354210d10420295bbf787990",
+          "forkSha256": "90f3de004c0a5e4a94da9163b10ca43d44fb48b4406e1de8e1d1783d254f57d8"
+        },
+        {
+          "path": "sprite_gen/frames/decontam.py",
+          "upstream234Sha256": "8c6c7df6b1ff48e4b75ad66a32419e2aa7982f0437c37b1b9bebf276f11cf9cf",
+          "forkSha256": "8c6c7df6b1ff48e4b75ad66a32419e2aa7982f0437c37b1b9bebf276f11cf9cf"
+        },
+        {
+          "path": "sprite_gen/frames/extract.py",
+          "upstream234Sha256": "51fb0eaedae168db43d2d93535806f5ca0a76a646460b85267778a17a4b28878",
+          "forkSha256": "41c6e4df7e0df74524f7f7a770e9483d17a7cc858ad010a04416c4c25dad2347"
+        },
+        {
+          "path": "sprite_gen/frames/slice_sheet.py",
+          "upstream234Sha256": "269053f3efeb84f72fa7df8417aeb1c831dd3ea681b531cfcf0613c8cb52cf91",
+          "forkSha256": "269053f3efeb84f72fa7df8417aeb1c831dd3ea681b531cfcf0613c8cb52cf91"
+        },
+        {
+          "path": "sprite_gen/gen/__init__.py",
+          "upstream234Sha256": "f0fdb4fd93eb5a0dbb87f47a7b1f7d1cf965fb60d9586222ca6cb10db24e4054",
+          "forkSha256": "7117e00f4e520b8e694d6af3111f7c1c15fbe00e5a2323b0b8f682957d1af363"
+        },
+        {
+          "path": "sprite_gen/gen/chroma.py",
+          "upstream234Sha256": "fdba12f4aceb2ac44b5f39e9de91966c8c50335f35563f61967f25f9e4519f37",
+          "forkSha256": "fdba12f4aceb2ac44b5f39e9de91966c8c50335f35563f61967f25f9e4519f37"
+        },
+        {
+          "path": "sprite_gen/gen/facing.py",
+          "upstream234Sha256": "2e45567ffc8fee5de3a7efd8a9fc168b8b9f130b255180e172152829b030e4bf",
+          "forkSha256": "2e45567ffc8fee5de3a7efd8a9fc168b8b9f130b255180e172152829b030e4bf"
+        },
+        {
+          "path": "sprite_gen/gen/handedness.py",
+          "upstream234Sha256": "e314ad429ac26360a2662b2f269acc8da186788e2650a60e43c16ebcf188858c",
+          "forkSha256": "e314ad429ac26360a2662b2f269acc8da186788e2650a60e43c16ebcf188858c"
+        },
+        {
+          "path": "sprite_gen/gen/prepare.py",
+          "upstream234Sha256": "6a5c20de65be0b2785cac1ce653b546780e6226e0e046250cc1fdcc07215fbc3",
+          "forkSha256": "6a5c20de65be0b2785cac1ce653b546780e6226e0e046250cc1fdcc07215fbc3"
+        },
+        {
+          "path": "sprite_gen/gen/prompt_parts.py",
+          "upstream234Sha256": "2561fa165349f77b047904dc897fe169f3288fe52455df65d8cf55e15f2d11ed",
+          "forkSha256": "2561fa165349f77b047904dc897fe169f3288fe52455df65d8cf55e15f2d11ed"
+        },
+        {
+          "path": "sprite_gen/gen/video.py",
+          "upstream234Sha256": "5e070f6040e48024a29f81d2125cfc3995d94dd5ff8a46196b141170df2266f6",
+          "forkSha256": "5e070f6040e48024a29f81d2125cfc3995d94dd5ff8a46196b141170df2266f6"
+        },
+        {
+          "path": "sprite_gen/qa/handed.py",
+          "upstream234Sha256": "9bc4c7a445b0599f2a17ef1372e689fe46e88cae2da2ad5e66c3a4ab66fad307",
+          "forkSha256": "9bc4c7a445b0599f2a17ef1372e689fe46e88cae2da2ad5e66c3a4ab66fad307"
+        },
+        {
+          "path": "sprite_gen/scene/render.py",
+          "upstream234Sha256": "8346c2f9f9b607c9dc0e54d5d9818caab5e674df677b3f2dd532b61b67a27b7c",
+          "forkSha256": "8346c2f9f9b607c9dc0e54d5d9818caab5e674df677b3f2dd532b61b67a27b7c"
+        },
+        {
+          "path": "sprite_gen/util/resample.py",
+          "upstream234Sha256": "7689e90b4bc6e8eacdd1565c759a36876c23c2efdb5d7fff80c84913afd856e9",
+          "forkSha256": "7689e90b4bc6e8eacdd1565c759a36876c23c2efdb5d7fff80c84913afd856e9"
+        },
+        {
+          "path": "sprite_gen/video/align.py",
+          "upstream234Sha256": "8c5bac8826a548796b85f1d2ab0a908cb72be0261867b6b4793eb88187b09b73",
+          "forkSha256": "8c5bac8826a548796b85f1d2ab0a908cb72be0261867b6b4793eb88187b09b73"
+        },
+        {
+          "path": "sprite_gen/video/batch.py",
+          "upstream234Sha256": "c85a49e291ec5580969e4a1b35a6a633c83a07902b7b7ddd2a9afd708a47e117",
+          "forkSha256": "c85a49e291ec5580969e4a1b35a6a633c83a07902b7b7ddd2a9afd708a47e117"
+        },
+        {
+          "path": "sprite_gen/video/body_plan.py",
+          "upstream234Sha256": "3713132e3407ff5ba69a5740a4eac36f3436622372d8bcb4369e35cf21e4c3f5",
+          "forkSha256": "3713132e3407ff5ba69a5740a4eac36f3436622372d8bcb4369e35cf21e4c3f5"
+        },
+        {
+          "path": "sprite_gen/video/canvas.py",
+          "upstream234Sha256": "2fbc5d3e836f640abcb53b9bfc317132406ae0b16887bfcba37916697183a203",
+          "forkSha256": "2fbc5d3e836f640abcb53b9bfc317132406ae0b16887bfcba37916697183a203"
+        },
+        {
+          "path": "sprite_gen/video/clip_prompt.py",
+          "upstream234Sha256": "0c36cd0c881b64bb003578bd539d04a6c86b682ad02a745d05b9de303f5e9cf3",
+          "forkSha256": "0c36cd0c881b64bb003578bd539d04a6c86b682ad02a745d05b9de303f5e9cf3"
+        },
+        {
+          "path": "sprite_gen/video/follow.py",
+          "upstream234Sha256": "e2706670bc9ac72f1500f63913162bee6e242e32fae68ad4dd70e6e460343fe8",
+          "forkSha256": "e2706670bc9ac72f1500f63913162bee6e242e32fae68ad4dd70e6e460343fe8"
+        },
+        {
+          "path": "sprite_gen/video/frames.py",
+          "upstream234Sha256": "08143c3ba4ba74d58e8fe2380b9dccfaf01589d24c34b5ecc0a23d978a4729ce",
+          "forkSha256": "08143c3ba4ba74d58e8fe2380b9dccfaf01589d24c34b5ecc0a23d978a4729ce"
+        },
+        {
+          "path": "sprite_gen/video/gait_fallback.py",
+          "upstream234Sha256": "fb21af3398fd4f10a5e040798d749fef3cbe50f7bc948d587cf76f8d0f28fa8b",
+          "forkSha256": "fb21af3398fd4f10a5e040798d749fef3cbe50f7bc948d587cf76f8d0f28fa8b"
+        },
+        {
+          "path": "sprite_gen/video/held.py",
+          "upstream234Sha256": "693289432bd867ecb36822f10afae8573144d5bbf17a0140c25962f8565cf3b0",
+          "forkSha256": "693289432bd867ecb36822f10afae8573144d5bbf17a0140c25962f8565cf3b0"
+        },
+        {
+          "path": "sprite_gen/video/legs.py",
+          "upstream234Sha256": "faf428e16e99afe6d8f53470c44cbcf13f9fccc2a2617f72bea089d04b44cf05",
+          "forkSha256": "faf428e16e99afe6d8f53470c44cbcf13f9fccc2a2617f72bea089d04b44cf05"
+        },
+        {
+          "path": "sprite_gen/video/local_cycle.py",
+          "upstream234Sha256": "05613d9e0f5f38df22bf20046c7f09db073d8ab5b3042ca05c5614a5616a0c9e",
+          "forkSha256": "05613d9e0f5f38df22bf20046c7f09db073d8ab5b3042ca05c5614a5616a0c9e"
+        },
+        {
+          "path": "sprite_gen/video/loop.py",
+          "upstream234Sha256": "151ee6748100b3176fde2161bce6dfceec59973c76172fd3b0d8a664bfdea22b",
+          "forkSha256": "151ee6748100b3176fde2161bce6dfceec59973c76172fd3b0d8a664bfdea22b"
+        },
+        {
+          "path": "sprite_gen/video/period.py",
+          "upstream234Sha256": "b58268527aaed1194131bf896eb79095456776ef4f32a6af0b4d40588310e0d1",
+          "forkSha256": "b58268527aaed1194131bf896eb79095456776ef4f32a6af0b4d40588310e0d1"
+        },
+        {
+          "path": "sprite_gen/video/rife.py",
+          "upstream234Sha256": "d5e6edf3b0e5582a4b05fbbfba202767fa718e6b393a1a25d222c65affda6454",
+          "forkSha256": "d5e6edf3b0e5582a4b05fbbfba202767fa718e6b393a1a25d222c65affda6454"
+        },
+        {
+          "path": "tests/curate/test_transform_resample.py",
+          "upstream234Sha256": "95f60b7cd8971d971e7c84e151f4fe922d0ebd4eded862d8b0891485a1c89e0e",
+          "forkSha256": "95f60b7cd8971d971e7c84e151f4fe922d0ebd4eded862d8b0891485a1c89e0e"
+        },
+        {
+          "path": "tests/fixtures/prepare-rows-v2.32.0.json.gz",
+          "upstream234Sha256": "6c529e7891225e714567f8f4f2fef4a7c7e138c35b77b58ef6dc958f2adb3500",
+          "forkSha256": "6c529e7891225e714567f8f4f2fef4a7c7e138c35b77b58ef6dc958f2adb3500"
+        },
+        {
+          "path": "tests/fixtures/prompts-v2.22.0.json.gz",
+          "upstream234Sha256": "4321700a6e1a9dbcfcf4f5ca0759be63296d773bba92c8ce4ffb72182ab84a3c",
+          "forkSha256": "4321700a6e1a9dbcfcf4f5ca0759be63296d773bba92c8ce4ffb72182ab84a3c"
+        },
+        {
+          "path": "tests/frames/test_chroma_decontam.py",
+          "upstream234Sha256": "1cbad5874d8bbc8c4da5ff8bcac73e3ca74d79cfc57a87320a223dea481584c0",
+          "forkSha256": "1cbad5874d8bbc8c4da5ff8bcac73e3ca74d79cfc57a87320a223dea481584c0"
+        },
+        {
+          "path": "tests/frames/test_keyed_resample.py",
+          "upstream234Sha256": "1ec8eb34c635956df8e4569001e4bc26f7e0a7f9c214ab333d52f897629ad0fc",
+          "forkSha256": "1ec8eb34c635956df8e4569001e4bc26f7e0a7f9c214ab333d52f897629ad0fc"
+        },
+        {
+          "path": "tests/gen/prepare_freeze_table.py",
+          "upstream234Sha256": "6303d97c5b6478fde8dedff1ed2a76033972c85aee6cb7e183ff5db86ed46768",
+          "forkSha256": "6303d97c5b6478fde8dedff1ed2a76033972c85aee6cb7e183ff5db86ed46768"
+        },
+        {
+          "path": "tests/gen/prompt_freeze_table.py",
+          "upstream234Sha256": "9d32d0a398c366d791c0a3453b94bff1f18f8d7ecf2fa69485f04f2a1ceb3031",
+          "forkSha256": "9d32d0a398c366d791c0a3453b94bff1f18f8d7ecf2fa69485f04f2a1ceb3031"
+        },
+        {
+          "path": "tests/gen/test_body_plan_sheets.py",
+          "upstream234Sha256": "8e2e130150b4335a8a25566d4517d69569dac3cd02312c1a9334e41868df2fad",
+          "forkSha256": "8e2e130150b4335a8a25566d4517d69569dac3cd02312c1a9334e41868df2fad"
+        },
+        {
+          "path": "tests/gen/test_handedness.py",
+          "upstream234Sha256": "7f07ff42f300a16bff89c073274d5b401445bbc4c8ce5d1d9bc7f47ee1229e4d",
+          "forkSha256": "7f07ff42f300a16bff89c073274d5b401445bbc4c8ce5d1d9bc7f47ee1229e4d"
+        },
+        {
+          "path": "tests/gen/test_layout_guide.py",
+          "upstream234Sha256": "d823df9f11e85b5fb61aaa586230121bae0187820c63d10b320b6e8ec4947b37",
+          "forkSha256": "d823df9f11e85b5fb61aaa586230121bae0187820c63d10b320b6e8ec4947b37"
+        },
+        {
+          "path": "tests/gen/test_prompt_assembly.py",
+          "upstream234Sha256": "8171f3d32a1264a2f5369c5b3533779da6d0fbd836083763eaf990394cf35025",
+          "forkSha256": "8171f3d32a1264a2f5369c5b3533779da6d0fbd836083763eaf990394cf35025"
+        },
+        {
+          "path": "tests/gen/test_prompt_freeze.py",
+          "upstream234Sha256": "77dd7cedb2e95a26693f5296004f151e37b9c96f289fdf842256972b631e8941",
+          "forkSha256": "77dd7cedb2e95a26693f5296004f151e37b9c96f289fdf842256972b631e8941"
+        },
+        {
+          "path": "tests/keyed_figure.py",
+          "upstream234Sha256": "3fa402753031e9466a133c94a59252cc09a257a6ee189761164271ec26f4c0c9",
+          "forkSha256": "3fa402753031e9466a133c94a59252cc09a257a6ee189761164271ec26f4c0c9"
+        },
+        {
+          "path": "tests/qa/test_handed_check.py",
+          "upstream234Sha256": "b7df207f0e496e7368bb5f2be9e76e23464b76e2b8668ab48b58e4dcc910c868",
+          "forkSha256": "b7df207f0e496e7368bb5f2be9e76e23464b76e2b8668ab48b58e4dcc910c868"
+        },
+        {
+          "path": "tests/scene/test_layer_resample.py",
+          "upstream234Sha256": "6387a96dd454b6046ed33a7ea75fb48ef5c7f919b761ed1286a417dabcaca38c",
+          "forkSha256": "6387a96dd454b6046ed33a7ea75fb48ef5c7f919b761ed1286a417dabcaca38c"
+        },
+        {
+          "path": "tests/video/test_attack_headroom.py",
+          "upstream234Sha256": "4259abce84d29cc30a6e35df47805f77196bf94a02655a0d87c243d732ea4762",
+          "forkSha256": "4259abce84d29cc30a6e35df47805f77196bf94a02655a0d87c243d732ea4762"
+        },
+        {
+          "path": "tests/video/test_auto_motion.py",
+          "upstream234Sha256": "5081fcf95f0c80756f5fdcfb0c5bc1c8dd740a3b491bf23b2228c132260b3ee1",
+          "forkSha256": "5081fcf95f0c80756f5fdcfb0c5bc1c8dd740a3b491bf23b2228c132260b3ee1"
+        },
+        {
+          "path": "tests/video/test_auto_motion_uncorrected.py",
+          "upstream234Sha256": "23fbbe12ac8e074d8c5c7796e48e770d5a263b9cc2ec9276e13f267028740113",
+          "forkSha256": "23fbbe12ac8e074d8c5c7796e48e770d5a263b9cc2ec9276e13f267028740113"
+        },
+        {
+          "path": "tests/video/test_backport_edges.py",
+          "upstream234Sha256": null,
+          "forkSha256": "81fd627a2c3bef8ccf2af79eae7f7680728f92966d113b27101e910955c436e8"
+        },
+        {
+          "path": "tests/video/test_batch_handed.py",
+          "upstream234Sha256": "2beeb2ddaca386bc5ea0c16f9d1ff455de334c68c19e2f92531ba5825168aa9f",
+          "forkSha256": "2beeb2ddaca386bc5ea0c16f9d1ff455de334c68c19e2f92531ba5825168aa9f"
+        },
+        {
+          "path": "tests/video/test_body_anchor.py",
+          "upstream234Sha256": "e3ffd3c6792330a3e8d3331133bdc4acf0029efbce3bf1f6697427442f37e352",
+          "forkSha256": "e3ffd3c6792330a3e8d3331133bdc4acf0029efbce3bf1f6697427442f37e352"
+        },
+        {
+          "path": "tests/video/test_body_plan.py",
+          "upstream234Sha256": "1e03312b5a58caa44b68be5c1c7f2221321c19993d002cc03ba9fac14e33a7c9",
+          "forkSha256": "1e03312b5a58caa44b68be5c1c7f2221321c19993d002cc03ba9fac14e33a7c9"
+        },
+        {
+          "path": "tests/video/test_clip_prompt.py",
+          "upstream234Sha256": "d56960717401a3a2e702ee91c4f4ff0af5606344717e144a4fd85f02a27dface",
+          "forkSha256": "d56960717401a3a2e702ee91c4f4ff0af5606344717e144a4fd85f02a27dface"
+        },
+        {
+          "path": "tests/video/test_cycle_align.py",
+          "upstream234Sha256": "64ec6f1b18c81b12a2e32792b110c867d74f51d3f322951a51e8e58f1d2f96a3",
+          "forkSha256": "64ec6f1b18c81b12a2e32792b110c867d74f51d3f322951a51e8e58f1d2f96a3"
+        },
+        {
+          "path": "tests/video/test_cycle_align_foot.py",
+          "upstream234Sha256": "68e3e2c555fceb4c5c09540048ce533ff9dc919e196b66492b05569ef9104c35",
+          "forkSha256": "68e3e2c555fceb4c5c09540048ce533ff9dc919e196b66492b05569ef9104c35"
+        },
+        {
+          "path": "tests/video/test_cycle_align_foot_margin.py",
+          "upstream234Sha256": "01089499ead6b4122abd9d0867ef35e2062caf0e943aaf9817351d9d4b6d805c",
+          "forkSha256": "01089499ead6b4122abd9d0867ef35e2062caf0e943aaf9817351d9d4b6d805c"
+        },
+        {
+          "path": "tests/video/test_cycle_suspects.py",
+          "upstream234Sha256": "0e9add93d9406eaa44d9e32b477a83942b5fa3b2e573542a89433abe16649b84",
+          "forkSha256": "0e9add93d9406eaa44d9e32b477a83942b5fa3b2e573542a89433abe16649b84"
+        },
+        {
+          "path": "tests/video/test_duration_window_oneshot.py",
+          "upstream234Sha256": "867171de6db094179f3482148bbbec3e93d7f00dcd2e49c7e14de14cb5589767",
+          "forkSha256": "867171de6db094179f3482148bbbec3e93d7f00dcd2e49c7e14de14cb5589767"
+        },
+        {
+          "path": "tests/video/test_follow.py",
+          "upstream234Sha256": "61a4deb643e688443dc583b3f22f07da35ddb2c3f923986c888fb21b4c130944",
+          "forkSha256": "61a4deb643e688443dc583b3f22f07da35ddb2c3f923986c888fb21b4c130944"
+        },
+        {
+          "path": "tests/video/test_gait_fallback.py",
+          "upstream234Sha256": "13722e3b387e084e0bc53946b9eb5025bf209e171f1eb29dc60978c215397464",
+          "forkSha256": "13722e3b387e084e0bc53946b9eb5025bf209e171f1eb29dc60978c215397464"
+        },
+        {
+          "path": "tests/video/test_gait_fallback_resample.py",
+          "upstream234Sha256": "89d133918960cf6767ec93fe60ef1fc361208c538588d06a2a9500065b7da9cc",
+          "forkSha256": "89d133918960cf6767ec93fe60ef1fc361208c538588d06a2a9500065b7da9cc"
+        },
+        {
+          "path": "tests/video/test_held_drawings.py",
+          "upstream234Sha256": "fc88a6e1525ad6bf0c7c7b95f9048a1e0b97c3ad2fa1360b6695ceed7def90ac",
+          "forkSha256": "fc88a6e1525ad6bf0c7c7b95f9048a1e0b97c3ad2fa1360b6695ceed7def90ac"
+        },
+        {
+          "path": "tests/video/test_loop_repair.py",
+          "upstream234Sha256": "db3fbd4d3d6fce5d16c18a5453e0364bbea1ad35e540f0366698738c5e03d4d1",
+          "forkSha256": "db3fbd4d3d6fce5d16c18a5453e0364bbea1ad35e540f0366698738c5e03d4d1"
+        },
+        {
+          "path": "tests/video/test_motion_anchor.py",
+          "upstream234Sha256": "dac4c6d7f9411d079989cb7329cf7d39af0ecb873a02ec6257cf4366c83a9033",
+          "forkSha256": "dac4c6d7f9411d079989cb7329cf7d39af0ecb873a02ec6257cf4366c83a9033"
+        },
+        {
+          "path": "tests/video/test_rife.py",
+          "upstream234Sha256": "ba8b39feb5680b6366357a86a8e337af2df437ceaccdac461b72afd0ca6f3286",
+          "forkSha256": "ba8b39feb5680b6366357a86a8e337af2df437ceaccdac461b72afd0ca6f3286"
+        },
+        {
+          "path": "tests/video/test_rife_install.py",
+          "upstream234Sha256": "43d081c889ff2e566030266be6133e37fa66aa1ec4ae9e357766e06032c927bd",
+          "forkSha256": "43d081c889ff2e566030266be6133e37fa66aa1ec4ae9e357766e06032c927bd"
+        },
+        {
+          "path": "tests/video/test_strip_resample.py",
+          "upstream234Sha256": "0c17678ed3f3efa12a91de75d4e32263861c3cd307f98baecbe1b20451d2f176",
+          "forkSha256": "0c17678ed3f3efa12a91de75d4e32263861c3cd307f98baecbe1b20451d2f176"
+        },
+        {
+          "path": "tests/video/test_video_pipeline.py",
+          "upstream234Sha256": "ca917141b198d9c7a96d6776c62cbc0ad239ad58c1ae55cad29526f20952abcc",
+          "forkSha256": "ca917141b198d9c7a96d6776c62cbc0ad239ad58c1ae55cad29526f20952abcc"
+        },
+        {
+          "path": "tests/video/test_walk_defaults.py",
+          "upstream234Sha256": "8323273f324f44c229655cdb0964e1487c9ef1030f44f3177a678695a946867a",
+          "forkSha256": "8323273f324f44c229655cdb0964e1487c9ef1030f44f3177a678695a946867a"
+        }
+      ],
+      "adaptations": [
+        "Single image submission and project Codex OAuth isolation retained.",
+        "Cyan key and registered row cap retained.",
+        "App walk defaults to 8 original samples; exact source cycle duration retained.",
+        "App GIF finishing and nearest editing retained; latest RGBA and RIFE safety are explicit paths.",
+        "Latest standalone engine helpers and app-connected features are listed separately in upgrade report."
+      ],
+      "repository": "https://github.com/aldegad/sprite-gen",
+      "validation": {
+        "date": "2026-10-06",
+        "engineTestsPassed": 8472,
+        "engineTestsSkipped": 1,
+        "appIntegrationTestsPassed": 652,
+        "webTestsPassed": 282,
+        "build": "passed",
+        "preservedRealVideos": 3,
+        "externalGenerationCalls": 0,
+        "report": "docs/product/LATEST_SKILL_UPGRADE_2026-10-06.md",
+        "additionalQaComposeEffectsTestsPassed": 475,
+        "packagingTestsPassed": 264
+      }
     }
   ],
   "localTools": {
@@ -355,5 +1030,6 @@
       "binary": "/opt/homebrew/bin/img2webp",
       "purpose": "lossless-alpha engine WebP export regression verification"
     }
-  }
+  },
+  "qualityVersion": "2.34.0"
 }

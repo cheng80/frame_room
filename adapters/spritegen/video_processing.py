@@ -26,7 +26,7 @@ import tempfile
 from PIL import Image, ImageSequence
 
 ENGINE_ROOT = Path(__file__).resolve().parents[2] / "engine" / "sprite-gen"
-VERSION = "video-processing-v3"
+VERSION = "video-processing-v4-sprite-gen-2.34"
 STATES = ("idle", "walk", "run", "jump", "attack", "dance", "wave", "cheer")
 DIRECTIONS = ("side", "front", "back", "front_diagonal", "back_diagonal")
 KEYS = ("auto", "green", "magenta", "cyan", "white")
@@ -219,106 +219,17 @@ def prepare_still(source: Path, dest: Path, params: dict) -> dict:
 
 
 def build_motion_prompt(params: dict) -> str:
-    """Local prompt only, adapted from Apache-2.0 sprite-gen v2.19.0 batch.py.
-
-    Incorporates the measured Lite calm-walk clause, view locks and grip rules.
-    A caller's explicit motion replaces the default gait; the calm clause must
-    not contradict a requested march/sneak. No import of remote batch runners.
-    """
-    state = _choice(params, "state", STATES, "walk")
-    direction = _choice(params, "direction", DIRECTIONS, "side")
-    facing = _choice(params, "facing", ("right", "left"), "right")
-    custom = params.get("motionPrompt", "")
-    if not isinstance(custom, str):
-        raise VideoProcessingError("VIDEO_INVALID_PARAMS", "motionPrompt는 문자열이어야 합니다.")
-    custom = " ".join(custom.split())
-    motions = {
-        "idle": "The character stands still with both feet planted, gently breathing and settling its loose cloth. "
-                "The feet never step, shuffle or slide; no walking or turning.",
-        "walk": "The character walks naturally in place, as if on a treadmill.",
-        "run": "The character runs naturally in place, as if on a treadmill.",
-        "jump": "The character performs a modest vertical hop in place: compress, spring up, land softly and return "
-                "to the exact starting stance; repeat at an even rhythm and the same height.",
-        "attack": "The character performs one melee attack with what it already holds: a windup, one clean strike, "
-                  "a held impact pose, then a recovery to the exact starting stance.",
-        "dance": "The character dances in place with a small, evenly repeated rhythmic step and gentle body sway, "
-                 "returning to the starting stance without turning or travelling.",
-        "wave": "The character waves in place: raises one free hand for a friendly wave, then settles back to the "
-                "exact starting stance. Any held equipment stays in its original grip.",
-        "cheer": "The character celebrates in place: rises into a raised, spread-out cheer pose, holds it for a beat, "
-                 "then settles back to the exact starting stance at an even rhythm.",
-    }
-    views = {
-        "side": f"Keep the input image's side-view angle, facing {facing} throughout; no turning or drifting across the screen.",
-        "front": "Keep facing the viewer directly throughout, without coming any closer or turning to the side.",
-        "back": "Keep facing directly away from the viewer throughout; the face stays hidden, without moving farther away.",
-        "front_diagonal": f"Keep the exact three-quarter front angle of the image throughout, heading diagonally "
-                          f"toward the viewer and to the {facing}, like moving down and to the {facing} in an isometric game. "
-                          "Never turn into a side view or move across the screen.",
-        "back_diagonal": f"Keep the exact three-quarter back angle of the image throughout, heading diagonally away "
-                         f"from the viewer toward the upper {facing}, like moving up and to the {facing} in an isometric game. "
-                         "The face stays hidden; never turn into a side view or move across the screen.",
-    }
-    parts = ["2D game sprite animation.", custom or motions[state], views[direction]]
-    if state in ("walk", "run"):
-        parts.append("Stay in place as if on a treadmill; do not draw a treadmill or ground line.")
-    if state == "walk" and params.get("model") == "grok-imagine-video-1.5-lite" and not custom:
-        parts.append("A slow, relaxed, unhurried walk: small, low steps with the feet barely leaving the ground, "
-                     "a gentle arm swing close to the body and no bounce — never running, jogging, skipping or hopping.")
-    if state == "walk" and params.get("model") == "grok-imagine-video-1.5-lite" and direction == "back_diagonal":
-        parts.append("The head stays level and steady over the body the whole time: it does not bob, nod, tilt or sway "
-                     "from side to side; only the legs, arms and the ends of the hair move.")
-    parts += [
-        "Every grip stays as shown in the image. Keep equipment in the same hand; never switch, drop or add gear. "
-        "A hand the action does not use stays with its equipment. Preserve the design, colors, proportions and clothing.",
-        "The full body, hair and all equipment stay inside the frame with margin and constant scale. "
-        "Camera completely locked: no zoom, pan, rotation or reframing.",
-        "Keep the input's perfectly flat background color for the whole clip: no shadows, particles, lighting changes or effects. "
-        "Crisp frames without motion blur, smears or afterimages.",
-        "Return to the starting pose at the end." if state in ("idle", "attack") or
-        (state in ("walk", "run") and direction in ("front_diagonal", "back_diagonal")) else
-        "Consistent, evenly paced motion so the animation can loop.",
-    ]
-    return " ".join(parts)
+    from .video_prompt import build_motion_prompt as build
+    return build(params)
 
 
 def _timing(clip: Path) -> dict:
-    """Read display timestamps as well as fps; MP4 duration is not n / fps by definition."""
-    binary = shutil.which("ffprobe")
-    if not binary:
-        raise VideoProcessingError("VIDEO_FFMPEG_UNAVAILABLE", "ffprobe가 필요합니다.")
-    proc = subprocess.run([binary, "-v", "error", "-select_streams", "v:0", "-show_frames",
-                           "-show_entries", "frame=best_effort_timestamp_time,duration_time,pkt_duration_time:"
-                           "stream=width,height,r_frame_rate,duration", "-of", "json", str(clip)],
-                          capture_output=True, text=True, timeout=60)
+    from .video_probe import read_timing
     try:
-        data = json.loads(proc.stdout)
-        stream = data["streams"][0]
-        num, den = stream["r_frame_rate"].split("/")
-        fps = float(num) / float(den)
-        rows = data["frames"]
-        pts = [float(row["best_effort_timestamp_time"]) * 1000 for row in rows]
-        pts = [p - pts[0] for p in pts]
-        last_duration = float(rows[-1].get("duration_time") or rows[-1].get("pkt_duration_time") or 0) * 1000
-        # Some muxers omit per-frame duration. The video stream's own duration is
-        # preferred over the format/audio duration for the final display boundary.
-        end = float(stream.get("duration") or 0) * 1000
-        if end <= pts[-1]:
-            end = pts[-1] + (last_duration or 1000 / fps)
-        times = pts + [end]
-        if proc.returncode or not math.isfinite(fps) or fps <= 0 or not all(math.isfinite(p) for p in times):
-            raise ValueError("invalid fps/timestamps")
-        if any(b <= a for a, b in zip(times, times[1:])):
-            raise ValueError("non-monotonic timestamps")
-        # Same 100ms muxer-padding allowance as the API's 15s validation.
-        if not 1 <= len(rows) <= 600 or not 0 < end <= 15100 or not 1 <= max(stream["width"], stream["height"]) <= 2048:
-            raise ValueError("video limits exceeded")
-        cfr = all(abs((b - a) - 1000 / fps) < 1.5 for a, b in zip(pts, pts[1:]))
-        return {"width": stream["width"], "height": stream["height"], "fps": fps,
-                "frameCount": len(rows), "durationMs": end, "timesMs": times, "constantFrameRate": cfr}
-    except (KeyError, IndexError, TypeError, ValueError, ZeroDivisionError) as exc:
+        return read_timing(clip)
+    except (ValueError, OSError, subprocess.SubprocessError) as exc:
         raise VideoProcessingError("VIDEO_INVALID_MEDIA", "영상 프레임과 재생 시각을 확인할 수 없습니다.",
-                                   {"reason": str(exc), "probeError": proc.stderr[:300]}) from exc
+                                   {"reason": str(exc)}) from exc
 
 
 def _manifest(work: Path, paths: list[Path]) -> list[dict]:
@@ -375,7 +286,7 @@ def _spill_decision(directory: Path, options: dict, first_frame: Path) -> dict:
 def _run_extraction(clip: Path, directory: Path, options: dict, source: dict) -> dict:
     engine = _engine("video.frames")
     if source["constantFrameRate"]:
-        files = engine.extract(clip, directory / "raw")
+        files = engine.extract(clip, directory / "raw", stream_index=source["streamIndex"])
     else:
         # The engine's default ffmpeg image output can duplicate/drop VFR frames.
         # Keep display order exactly, then reuse its keying and spill decisions.
@@ -384,7 +295,7 @@ def _run_extraction(clip: Path, directory: Path, options: dict, source: dict) ->
         binary = shutil.which("ffmpeg")
         if not binary:
             raise VideoProcessingError("VIDEO_FFMPEG_UNAVAILABLE", "ffmpeg가 필요합니다.")
-        proc = subprocess.run([binary, "-v", "error", "-i", str(clip), "-map", "0:v:0", "-fps_mode", "passthrough",
+        proc = subprocess.run([binary, "-v", "error", "-i", str(clip), "-map", f"0:{source["streamIndex"]}", "-fps_mode", "passthrough",
                                str(raw / "frame-%04d.png")], capture_output=True, text=True, timeout=60)
         if proc.returncode:
             raise VideoProcessingError("VIDEO_EXTRACTION_FAILED", "원시 프레임을 추출하지 못했습니다.",
@@ -405,6 +316,72 @@ def _run_extraction(clip: Path, directory: Path, options: dict, source: dict) ->
     return report
 
 
+def _scale_correction(images, measured):
+    engine = _engine("video.gait_fallback")
+    padding = engine.undo_padding(images, measured)
+    transforms = []
+    for index, height in enumerate(measured["height"]):
+        scale = float(measured["height"][0] / height)
+        ax, ay = float(measured["foot_x"][index]), float(measured["foot_y"][index])
+        transforms.append({"sourceFrameIndex": index, "fittedHeightPx": float(height),
+                           "footAnchor": {"x": ax, "y": ay},
+                           "sourceTransform": {"scaleX": scale, "scaleY": scale,
+                                               "offsetX": ax * (1 - scale) + padding[0],
+                                               "offsetY": ay * (1 - scale) + padding[1]}})
+    record = {"method": "pose-height-about-foot-v2.34", "paddingLTRB": list(padding),
+              "sourceCoordinateSpace": "decoded-video-canvas", "coordinateSpace": "processed-video-canvas",
+              "referenceSourceFrameIndex": 0, "referenceFittedHeightPx": float(measured["height"][0]),
+              "resampler": "separate-color-alpha-affine", "frames": transforms}
+    return engine.undo_scale(images, measured, pad=padding), record
+
+
+def _hold_size(files, source, options, directory):
+    # Corresponding poses a cycle apart distinguish camera scale from a knee bend.
+    if options["loopMode"] != "auto" or options["state"] not in ("walk", "run"):
+        return files, {"applied": False, "reason": "automatic gait only"}
+    engine, loop = _engine("video.gait_fallback"), _engine("video.loop")
+    images = [Image.open(path).convert("RGBA") for path in files]
+    lo, hi = loop.profile_for(options["state"]).window(len(files), source["fps"])
+    measured = engine.cycle_drift(images, min_lag=lo, max_lag=hi)
+    record = {"applied": False, "min": engine.SIZE_HOLD_MIN,
+              **{k: v for k, v in measured.items() if k not in ("height", "foot_x", "foot_y")}}
+    if abs(measured["drift"]) >= engine.SIZE_HOLD_MIN:
+        images, correction = _scale_correction(images, measured)
+        files = engine.write_frames(images, [p.name for p in files], directory / "size-held")
+        record.update(applied=True, scaleCorrection=correction)
+    return files, _finite(record)
+
+
+def _view(options):
+    direction = options["direction"]
+    return direction + "@" + options["facing"] if direction in ("side", "front_diagonal", "back_diagonal") else direction
+
+
+def _foot_strike(images, options):
+    strike = _engine("video.align").foot_strike(images, view=_view(options),
+                 foot=options["startFoot"] if options["startFoot"] != "auto" else "right")
+    if options.get("bodyPlan"):
+        from .video_prompt import parse_structured_params
+        bodies, _ = parse_structured_params({"bodyPlan": options["bodyPlan"]})
+        if not _engine("video.body_plan").biped(bodies):
+            strike.update(start_foot=None, start_foot_source=None,
+                          foot_why="body plan is not biped; automatic own-foot naming is not supported")
+    return strike
+
+
+def _cycle_diagnostics(files, source, selection, options):
+    align = _engine("video.align")
+    images = [Image.open(path).convert("RGBA") for path in files[selection["startFrame"]:selection["endFrame"]]]
+    if not selection["loop"] or len(images) < 2:
+        return
+    fps = len(images) * 1000 / (source["timesMs"][selection["endFrame"]] - source["timesMs"][selection["startFrame"]])
+    selection["period"] = _finite(align.cycle_screen(images, fps=fps, state=options["state"]))
+    selection["held"] = _finite(align.held_drawings(images, fps=fps))
+    selection["footStrike"] = _finite(_foot_strike(images, options))
+    selection["footStrike"]["indexSpace"] = "selected-source-cycle"
+    selection["retake"] = {"suggested": False, "reasons": [], "automaticGeneration": False}
+
+
 def _gait_fallback(files, source, profile, directory, first_error):
     """One bounded, recorded re-search; never replaces a successful first cut."""
     loop, fallback = _engine("video.loop"), _engine("video.gait_fallback")
@@ -420,22 +397,9 @@ def _gait_fallback(files, source, profile, directory, first_error):
     hi = fallback.long_window(lo, len(files), source["fps"])
     record.update(window=[lo, hi], maxFraction=fallback.LONG_CYCLE_FRACTION)
     if abs(drift["drift"]) >= fallback.SCALE_DRIFT_MIN:
-        images = fallback.undo_scale(images, drift)
+        images, correction = _scale_correction(images, drift)
         files = fallback.write_frames(images, [p.name for p in files], directory / "scale-corrected")
-        record["scaleUndone"] = True
-        reference_height = float(drift["height"][0])
-        transformations = []
-        for index, height in enumerate(drift["height"]):
-            scale = reference_height / float(height)
-            ax, ay = float(drift["foot_x"][index]), float(drift["foot_y"][index])
-            transformations.append({"sourceFrameIndex": index, "fittedHeightPx": float(height),
-                                    "footAnchor": {"x": ax, "y": ay},
-                                    "sourceTransform": {"scaleX": scale, "scaleY": scale,
-                                                        "offsetX": ax * (1 - scale), "offsetY": ay * (1 - scale)}})
-        record["scaleCorrection"] = {"method": "fitted-height-about-fitted-foot-v1",
-                                     "sourceCoordinateSpace": "decoded-video-canvas", "coordinateSpace": "processed-video-canvas",
-                                     "referenceSourceFrameIndex": 0, "referenceFittedHeightPx": reference_height,
-                                     "resampler": "premultiplied-bicubic", "frames": transformations}
+        record.update(scaleUndone=True, scaleCorrection=correction)
     try:
         distances, trajectory, analysis = automatic.analyse(images, fps=source["fps"])
         cycle = local_cycle.detect(distances, trajectory, min_len=lo, max_len=hi,
@@ -633,8 +597,11 @@ def _align_selected_cycle(raw, keyed, original_keyed, source, selection, options
             located = rife_interpolator()
         return located(a, b, t)
     try:
-        aligned, facts = align.resample(images, count, interpolate)
-        turned = align.foot_strike_start(aligned)
+        aligned, facts = align.resample(images, count, interpolate, between={"auto": "auto", "on": "rife", "off": "nearest"}[options["between"]])
+        strike = _foot_strike(aligned, options)
+        turned = options.get("startIndex", strike["start"])
+        if turned >= count:
+            raise VideoProcessingError("VIDEO_INVALID_PHASE", "시작 프레임은 출력 프레임 수보다 작아야 합니다.")
     except rife.RifeNotInstalled as exc:
         raise VideoProcessingError("VIDEO_RIFE_UNAVAILABLE", "프레임 수를 맞추려면 RIFE 보간이 필요합니다.", {"reason": str(exc)}) from exc
     except (rife.RifeUnavailable, subprocess.SubprocessError) as exc:
@@ -657,7 +624,10 @@ def _align_selected_cycle(raw, keyed, original_keyed, source, selection, options
         else:
             primary = start + i % length
         second = start + (i + 1) % length
-        made = fraction != 0.0
+        made = sample_index in facts["made_at"]
+        nearest = sample_index in facts.get("nearest_at", [])
+        if nearest:
+            primary, fraction = start + (i + (fraction >= 0.5)) % length, 0.0
         path = target / f"frame-{output_index:04d}.png"
         aligned[sample_index].save(path)
         existing_repair = primary in repaired
@@ -671,14 +641,21 @@ def _align_selected_cycle(raw, keyed, original_keyed, source, selection, options
                  "outputFrameIndex": output_index, "sourceFrameIndex": primary,
                  "sourceTimeMs": times[primary] + fraction * (times[primary + 1] - times[primary]),
                  "durationMs": boundaries[output_index + 1] - boundaries[output_index],
-                 "interpolated": made or existing_repair, "processing": {"kind": "cycle-alignment", "sampleIndex": sample_index}}
+                 "interpolated": made or existing_repair, "processing": {"kind": "cycle-alignment", "sampleIndex": sample_index,
+                     "samplingMethod": "rife" if made else "nearest-source" if nearest else "exact-source"}}
         if interpolation:
             frame["interpolation"] = interpolation
             frame["processing"]["interpolation"] = interpolation
         frames.append(frame)
     record = {**facts, "turnedBy": turned, "durationMs": duration,
               "sourceDurationMs": times[end] - times[start], "sourceFrameCount": length,
-              "referencePhaseChanged": False, "phase": "new cycle starts at detected foot strike"}
+              "referencePhaseChanged": False, "phase": "manual" if "startIndex" in options else "detected foot strike",
+              "indexSpace": "before-output-rotation", "footStrike": {**strike, "indexSpace": "before-output-rotation"},
+              "outputMadeAt": [(k - turned) % count for k in facts["made_at"]],
+              "outputNearestAt": [(k - turned) % count for k in facts.get("nearest_at", [])]}
+    if selection.get("held"):
+        reason = align.retake(selection["held"], facts, fps=count * 1000 / duration)
+        selection["retake"] = {"suggested": reason is not None, "reasons": [reason] if reason else [], "automaticGeneration": False}
     if located:
         record["interpolator"] = {"kind": "rife-ncnn-vulkan", **located.describe()}
     return frames, record
@@ -687,7 +664,7 @@ def _align_selected_cycle(raw, keyed, original_keyed, source, selection, options
 def _describe_source_processing(frame, selection):
     """Coordinate evidence only: never claim an interpolated image is affine raw pixels."""
     processing = frame["processing"]
-    correction = selection.get("metrics", {}).get("gaitFallback", {}).get("scaleCorrection")
+    correction = selection.get("scaleCorrection") or selection.get("metrics", {}).get("gaitFallback", {}).get("scaleCorrection")
     processing["sourceCoordinateSpace"] = "decoded-video-canvas"
     processing["coordinateSpace"] = "processed-video-canvas" if correction or frame["interpolated"] else "decoded-video-canvas"
     if frame["interpolated"]:
@@ -758,10 +735,16 @@ def process_clip(clip: Path, work: Path, params: dict, on_progress=None) -> dict
     state = _choice(params, "state", STATES, "walk")
     key = _choice(params, "key", KEYS, "auto")
     mode = _choice(params, "loopMode", ("auto", "full", "manual"), "auto")
-    limit = _integer(params.get("maxFrames", 32), "maxFrames", 4, 64)
+    limit = _integer(params.get("maxFrames", 8 if state == "walk" else 32), "maxFrames", 4, 64)
     options = {"state": state, "key": key, "loopMode": mode, "maxFrames": limit,
                "repairMode": _choice(params, "repairMode", ("off", "auto", "on"), "off"),
-               "facing": _choice(params, "facing", ("right", "left"), "right")}
+               "facing": _choice(params, "facing", ("right", "left"), "right"),
+               "direction": _choice(params, "direction", DIRECTIONS, "side"),
+               "bodyPlan": params.get("bodyPlan", ""),
+               "between": _choice(params, "between", ("auto", "on", "off"), "auto"),
+               "startFoot": _choice(params, "startFoot", ("auto", "left", "right"), "auto")}
+    if params.get("startIndex") is not None:
+        options["startIndex"] = _integer(params["startIndex"], "startIndex", 0, 63)
     if params.get("targetFrameCount") is not None:
         options["targetFrameCount"] = _integer(params["targetFrameCount"], "targetFrameCount", 4, 64)
         if params.get("targetDurationMs") is not None:
@@ -831,10 +814,22 @@ def process_clip(clip: Path, work: Path, params: dict, on_progress=None) -> dict
         _write(checkpoint, {"stage": stage, "status": "running", "options": options,
                             "extractionId": extraction_id, "artifactDir": str(artifact_dir)})
         progress(stage, "재생 구간과 프레임 시간을 분석합니다.")
-        selection = _select(keyed, source, options, artifact_dir)
         original_keyed = keyed
+        keyed, size_hold = _hold_size(keyed, source, options, artifact_dir)
+        selection = _select(keyed, source, options, artifact_dir)
+        selection["sizeHold"] = size_hold
+        first_correction = size_hold.get("scaleCorrection")
+        second_correction = selection.get("scaleCorrection") or selection.get("metrics", {}).get("gaitFallback", {}).get("scaleCorrection")
+        if first_correction and second_correction:
+            for before, after in zip(first_correction["frames"], second_correction["frames"]):
+                a, b = before["sourceTransform"], after["sourceTransform"]
+                after["sourceTransform"] = {"scaleX": a["scaleX"] * b["scaleX"], "scaleY": a["scaleY"] * b["scaleY"],
+                    "offsetX": a["offsetX"] * b["scaleX"] + b["offsetX"], "offsetY": a["offsetY"] * b["scaleY"] + b["offsetY"]}
+            second_correction["method"] = "pose-hold-then-fallback-v2.34"
+        selection["scaleCorrection"] = second_correction or first_correction
         if selection.get("_processedKeyedPaths"):
             keyed = [Path(p) for p in selection.pop("_processedKeyedPaths")]
+        _cycle_diagnostics(keyed, source, selection, options)
         keyed, repair = _repair_selection(keyed, selection, options, artifact_dir)
         selection["repair"] = repair
         loop_engine = _engine("video.loop")
@@ -845,6 +840,11 @@ def process_clip(clip: Path, work: Path, params: dict, on_progress=None) -> dict
             raise VideoProcessingError("VIDEO_EMPTY_FIRST_FRAME", "첫 프레임에서 몸 높이와 앵커를 측정할 수 없습니다.")
         standing = box[3] - box[1]
         anchor = {"x": loop_engine.foot_centre(first, box), "y": box[3]}
+        if selection.get("scaleCorrection"):
+            transform = selection["scaleCorrection"]["frames"][0]["sourceTransform"]
+            anchor = {"x": anchor["x"] * transform["scaleX"] + transform["offsetX"],
+                      "y": anchor["y"] * transform["scaleY"] + transform["offsetY"]}
+            standing *= transform["scaleY"]
         start, end = selection["startFrame"], selection["endFrame"]
         count = min(limit, end - start)
         indices = [start + i * (end - start) // count for i in range(count)]
@@ -856,7 +856,7 @@ def process_clip(clip: Path, work: Path, params: dict, on_progress=None) -> dict
                    "originalKeyedPath": str(original_keyed[i]),
                    "interpolated": i in repair.get("sourceFrameIndices", []),
                    "processing": {"kind": "rife-jump-repair" if i in repair.get("sourceFrameIndices", []) else
-                                  "scale-drift-correction" if selection.get("metrics", {}).get("gaitFallback", {}).get("scaleUndone") else "chroma-key",
+                                  "scale-drift-correction" if selection.get("scaleCorrection") else "chroma-key",
                                   **({"interpolation": {"method": "rife-ncnn-vulkan", "fraction": 0.5,
                                                        "sourceFrameIndices": [start + (i - start - 1) % (end - start),
                                                                               start + (i - start + 1) % (end - start)]}}
@@ -870,6 +870,17 @@ def process_clip(clip: Path, work: Path, params: dict, on_progress=None) -> dict
             selection["cycleAlignment"] = alignment
             count = len(frames)
             boundaries = [0, alignment["durationMs"]]
+        if "targetFrameCount" not in options and ("startIndex" in options or options["startFoot"] != "auto"):
+            if not selection["loop"]:
+                raise VideoProcessingError("VIDEO_ALIGN_NOT_LOOP", "시작 프레임 지정은 반복 동작에서 사용할 수 있습니다.")
+            strike = _foot_strike([Image.open(f["keyedPath"]).convert("RGBA") for f in frames], options)
+            turned = options.get("startIndex", strike["start"])
+            if turned >= len(frames):
+                raise VideoProcessingError("VIDEO_INVALID_PHASE", "시작 프레임은 출력 프레임 수보다 작아야 합니다.")
+            frames = frames[turned:] + frames[:turned]
+            for i, frame in enumerate(frames):
+                frame["outputFrameIndex"] = i
+            selection["outputPhase"] = {"turnedBy": turned, "manual": "startIndex" in options, "footStrike": strike}
         for frame in frames:
             _describe_source_processing(frame, selection)
         if any(frame["durationMs"] <= 0 for frame in frames):
@@ -879,7 +890,7 @@ def process_clip(clip: Path, work: Path, params: dict, on_progress=None) -> dict
         preview = _preview(frames, artifact_dir, selection["loop"])
         files = [extraction["reportPath"], str(marker), str(artifact_dir / "processing.report.json"), str(checkpoint)]
         files += [preview[k] for k in ("path", "sheetPath") if k in preview]
-        result = {"frames": frames, "source": {k: v for k, v in source.items() if k != "timesMs"},
+        result = {"version": VERSION, "options": options, "frames": frames, "source": dict(source),
                   "selection": selection, "standingHeight": standing, "anchor": anchor,
                   "boundsPaths": [str(f["keyedPath"]) for f in frames] if "targetFrameCount" in options else
                                  [str(p) for p in keyed[start:end]],

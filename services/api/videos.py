@@ -1,29 +1,28 @@
 """Immutable MP4 resources, kept separate from PNG/WebP assets."""
 from __future__ import annotations
-import json, math, shutil, subprocess, tempfile
+import json, tempfile
 from pathlib import Path
+from adapters.spritegen.video_probe import MAX_BYTES, VideoProbeError, read_timing
 from . import store as s
-
-MAX_BYTES=64*1024*1024
 
 def validate(data:bytes,filename:str)->dict:
     if len(data)>MAX_BYTES: raise s.AppError('VIDEO_LIMIT','영상은 64 MiB 이하로 선택하세요.',413)
     if len(data)<12 or data[4:8]!=b'ftyp': raise s.AppError('VIDEO_FORMAT','정상 MP4 영상을 선택하세요.')
-    binary=shutil.which('ffprobe')
-    if not binary: raise s.AppError('VIDEO_DEPENDENCY','영상 정보를 읽을 ffprobe가 필요합니다.',424)
     with tempfile.TemporaryDirectory(prefix='frame-room-video-') as d:
         path=Path(d)/'input.mp4'; path.write_bytes(data)
         try:
-            result=subprocess.run([binary,'-v','error','-protocol_whitelist','file,pipe','-select_streams','v:0','-show_entries','stream=width,height,avg_frame_rate,nb_frames,codec_name','-show_entries','format=duration','-of','json',str(path)],capture_output=True,text=True,timeout=15)
-            payload=json.loads(result.stdout); stream=payload['streams'][0]
-            num,den=stream['avg_frame_rate'].split('/'); fps=float(num)/float(den)
-            duration=float(payload['format']['duration']); width=int(stream['width']); height=int(stream['height'])
-            count=int(stream['nb_frames']) if str(stream.get('nb_frames','')).isdigit() else math.ceil(duration*fps)
-        except (OSError,subprocess.SubprocessError,KeyError,ValueError,IndexError,ZeroDivisionError) as exc:
+            timing=read_timing(path)
+        except VideoProbeError as exc:
+            if exc.code=='VIDEO_DEPENDENCY':
+                raise s.AppError(exc.code,'영상 정보를 읽을 ffprobe가 필요합니다.',424) from exc
+            if exc.code=='VIDEO_DIMENSIONS':
+                raise s.AppError(exc.code,'영상은 15초·2048px·60fps·600프레임 이하여야 합니다.',413) from exc
+            if exc.code=='VIDEO_LIMIT':
+                raise s.AppError(exc.code,'영상은 64 MiB 이하로 선택하세요.',413) from exc
             raise s.AppError('VIDEO_DECODE','영상 정보를 읽지 못했습니다. 정상 MP4를 선택하세요.') from exc
-    if result.returncode or not all(math.isfinite(x) for x in (fps,duration)) or not (1<=fps<=60 and 0<duration<=15.1 and 1<=width<=2048 and 1<=height<=2048 and 1<=count<=600):
-        raise s.AppError('VIDEO_DIMENSIONS','영상은 15초·2048px·60fps·600프레임 이하여야 합니다.',413)
-    return dict(sha256=s.digest(data),originalFilename=Path(filename).name[:250],mediaType='video/mp4',width=width,height=height,fps=fps,frameCount=count,durationMs=round(duration*1000))
+    return dict(sha256=s.digest(data),originalFilename=Path(filename).name[:250],mediaType='video/mp4',
+                **{key:timing[key] for key in ('width','height','fps','frameCount','streamIndex','constantFrameRate')},
+                durationMs=round(timing['durationMs']))
 
 def register(data,filename,provenance=None,metadata=None,c=None,project_id=None):
     meta=dict(metadata or validate(data,filename)); vid=s.uid()

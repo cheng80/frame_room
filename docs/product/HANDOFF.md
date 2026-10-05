@@ -1,6 +1,6 @@
 # 작업 재개 핸드오프
 
-기록 기준: **2026-10-05 KST**. 프레임룸은 구현·실행 가능한 로컬 스프라이트 에디터다. 영상 제작 보완, 프로젝트 폴더/SQLite 관리, 불필요한 검수 자료 정리를 마쳤다. 다른 경로나 기기에서 작업을 이어갈 때 이 문서부터 읽는다.
+기록 기준: **2026-10-06 KST**. 프레임룸은 구현·실행 가능한 로컬 스프라이트 에디터다. 프로젝트 폴더/SQLite 관리에 이어 공개 sprite-gen v2.34의 품질 기술과 게임용 걷기 기본 8장을 반영했다. [최신 기술 적용](LATEST_SKILL_UPGRADE_2026-10-06.md), [동작 보완·검사 연결](CLIP_TOOLS_2026-10-06.md)의 실제 검증 범위를 함께 읽는다. 다른 경로나 기기에서 작업을 이어갈 때 이 문서부터 읽는다.
 
 ## 1. 먼저 실제 Git 상태 확인
 
@@ -93,12 +93,15 @@ React/Vite/TypeScript + FastAPI + SQLite + 독립 Python worker. 기존 이미�
 - 원본 MP4/추출/배경 제거/축소/마무리 PNG의 출처 분리, 자동·전체·수동 구간, 공통 셀/배율/앵커, 참조 그림 기반 색 번짐 보정.
 - `gif` 기본 마무리는 사용자가 좋다고 본 GIF와 같은 색/알파 처리를 **실제 PNG 후보에 저장**한다. `rgba`는 색상/알파 분리 축소로 반투명을 유지한다.
 - 선택적 RIFE 보간과 보간 계보, 기존 동작과 주기/시간/프레임 수 맞춤. 자동 추가 이미지 생성은 하지 않는다.
+- 걷기는 기본 8장, 선택 12장이고 한 사이클 시간을 유지한다. 원본 8장 샘플링에는 RIFE를 추가하지 않는다. 최신 보간 보호·크기/여백 보정·주기/그림 갱신 빈도 진단·방향별 발 판정·수동 시작 위치를 연결했다. 체형·장비 명세, 단일 이미지 구도 가이드, 정확한 VFR/stream 처리와 lossless/exact WebP를 반영했다.
 - 동일 bake에서 atlas/PNG/runtime/Aseprite 호환 JSON/QA와 GIF·WebP·가로/격자 PNG를 출력한다. `animations.zip`, `animation-manifest.json`, `bundle.zip`에 반영된다. GIF는 10ms·255색·이진 알파 제한이 있다.
 - 외부 접수 ID를 먼저 저장하며 중단 시 기존 요청 조회부터 재개한다. 접수 불명 POST는 재전송하지 않는다. 완료 MP4를 보존해 후처리 실패에 새 생성 비용이 들지 않게 한다.
 
 프로젝트 폴더 저장은 공용 DB의 durable outbox → 원본 복사/프로젝트 SQLite 반영 → 성공 응답 순서다. 실패 시 `storage.syncPending`과 보류 기록을 유지한다. 폴더 이동 후에도 보류 반영을 재개하며 경로 탈출·손상·ID 충돌을 거부한다. 실행 중 폴더가 사라지면 해당 프로젝트의 작업만 중단한다.
 
-엔진은 v2.12.1 기반에 공개 v2.19 영상 보완을 선별 반영한 **프로젝트 전용 포크**다. 전체 upstream 교체나 비공개 spritegen 웹 내부 구현의 완전 복제를 뜻하지 않는다. 정확한 원본/패치 의존성은 `engine/engine-lock.json`, `engine/PATCHES.md`를 확인한다. 의존성 pin은 재현성 정보이며 이 저장소의 ‘최신 커밋’ 표기가 아니다.
+엔진은 v2.12.1 기반에 공개 v2.19와 v2.34 품질 보완을 반영한 **프로젝트 전용 포크**다. `qualityVersion: 2.34.0`과 기반 pin을 구분한다. 비공개 spritegen 웹 내부 구현의 완전 복제를 뜻하지 않는다. 정확한 원본/패치 의존성은 `engine/engine-lock.json`, `engine/PATCHES.md`를 확인한다. 의존성 pin은 재현성 정보이며 이 저장소의 ‘최신 커밋’ 표기가 아니다.
+
+선택 동작의 **속성 → 슬롯 → 동작 보완·검사**를 펼치면 부위 흔들림과 장비 좌우 검사를 사용한다. 저장된 편집·정렬·표시 시간을 사용하며 외부 생성은 호출하지 않는다. 흔들림은 타원 영역의 전후 미리보기 확인 후 새 검수 대기 동작으로 저장한다. 프로젝트나 설정이 바뀌면 다시 미리보기해야 한다. 장비 검사는 사용자가 지정한 표식 색에 한정되며 의심 슬롯 이동·검수판을 제공한다. 자동 수정·승인은 하지 않는다. 외부 영상 프롬프트 도우미는 엔진/CLI 범위다.
 
 ## 5. 걷기 색상 회귀를 다시 볼 때
 
@@ -112,9 +115,11 @@ React/Vite/TypeScript + FastAPI + SQLite + 독립 Python worker. 기존 이미�
 
 상세: [색상 회귀](VIDEO_COLOR_REGRESSION_2026-10-04.md), [웹 보완 적용](WEB_QUALITY_COMPLETION_2026-10-04.md).
 
+사용자 결정: 드물게 발생하는 원본 영상의 장갑·무기 변색은 **에디터 색 복원 기능으로 개발하지 않는다.** 필요할 때 해당 자료를 대상으로 GPT에 개별 작업을 요청한다. 기존 배경색 번짐 제거·GIF 마무리는 유지한다.
+
 ## 6. 검증과 정리 상태
 
-자동 검증 명령과 인계 직전 재실행 결과는 [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md)의 **2026-10-05 인계 검증**을 확인한다. 단위·통합 테스트 수를 제품 수용 기준 전체 통과나 실제 생성 품질 승인으로 대체하지 않는다.
+자동 검증 명령과 재실행 결과는 [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md)를 확인한다. 동작 보완·검사 연결 후 앱 710·웹 325개 시험이 통과했다. 엔진은 직전 품질 반영에서 9,211개 통과·기본 RIFE 실기 1건 skip이며, 이번 UI 연결에서는 엔진을 다시 변경하지 않았다. 실제 프로젝트 RIFE는 보존 영상으로 별도 실행했다. 단위·통합 테스트 수를 제품 수용 기준 전체 통과나 실제 생성 품질 승인으로 대체하지 않는다. 이하 2026-10-05 검증/정리는 당시 기록이다.
 
 이미 실행한 실제 검증:
 
@@ -135,8 +140,9 @@ React/Vite/TypeScript + FastAPI + SQLite + 독립 Python worker. 기존 이미�
 | 폴더·정리·복구 | `services/api/project_folders.py`, `services/api/desktop.py`, `services/worker/main.py` |
 | 영상 UI·요청 | `apps/web/src/VideoStep.tsx`, `VideoBatchPlan.tsx`, `VideoBasePreset.tsx`, `services/api/videos.py` |
 | 영상 생성·처리 | `services/worker/video_task.py`, `adapters/spritegen/`의 `video_provider.py`, `video_processing.py`, `video_normalization.py`, `video_finish.py` |
+| 동작 보완·검사 | `apps/web/src/ClipToolsPanel.tsx`, `clipTools.ts`, `adapters/spritegen/clip_tools.py`, `services/worker/clip_tools_task.py` |
 | bake·검증·애니메이션 출력 | `alignment/pipeline.py`, `alignment/verify_artifacts.py`, `alignment/animation_exports.py` |
-| 실행 계약 | `packages/contracts/IMPLEMENTATION.md`, `VIDEO.md`, `PROJECT_FOLDERS.md`, `openapi.json` |
+| 실행 계약 | `packages/contracts/IMPLEMENTATION.md`, `VIDEO.md`, `CLIP_TOOLS.md`, `PROJECT_FOLDERS.md`, `openapi.json` |
 | 시험 | `tests/integration/`, `apps/web/tests/`, `engine/sprite-gen/tests/video/` |
 
 현재 계약·코드·회귀 시험, 이 핸드오프/구현 현황, 날짜가 있는 과거 설계·조사를 구분해 읽는다. 초기 PRD/계획에 ‘영상 제외’, ‘구현 전’, NOT_RUN이라고 적힌 것은 당시 범위다. 계약 변경 시 코드·테스트·설명서도 함께 갱신한다.
@@ -145,4 +151,4 @@ React/Vite/TypeScript + FastAPI + SQLite + 독립 Python worker. 기존 이미�
 
 남은 제한: OS 네이티브 폴더 선택창과 다른 OS 전체 실행은 실기 검증하지 않았다. 34개 수용 기준의 모든 하위 시나리오, 화면리더/대비/키보드 조합, 복잡한 배경의 수동 복원 품질은 전체 완료로 선언하지 않는다. 생성 결과의 외형·장비·색상·동작 일관성과 수동 미술 검수는 계속 필요하다. Codex의 해상도/품질 지정·외부 취소/결과 조회는 미지원이다. 로그인/과금 서비스, 원격 협업, 공개 배포, PXF/effect_editer 통합은 구현 범위 밖이다.
 
-브라우저 검증은 `apps/web/README.md`에 따라 **ego-browser의 사용 허가된 기존 TaskSpace**를 재사용한다. 기록 당시 허가된 공간은 TaskSpace 1이었지만 다른 환경에서 같은 숫자를 자동 선택하지 않는다. Chrome/별도 Chromium을 설치·실행하지 않고 사용자 작업 창을 가로채지 않는다.
+브라우저 검증은 `apps/web/README.md`에 따라 **ego-browser의 사용 허가된 기존 TaskSpace**를 재사용한다. 10-05 폴더 검증은 TaskSpace 1, 10-06 비교/업데이트 검증은 TaskSpace 3을 사용했다. 다른 환경에서 같은 숫자를 자동 선택하지 않는다. Chrome/별도 Chromium을 설치·실행하지 않고 사용자 작업 창을 가로채지 않는다.

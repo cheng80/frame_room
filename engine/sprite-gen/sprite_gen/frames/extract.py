@@ -24,6 +24,7 @@ from sprite_gen.spec.layout import frames_dir_rel, raw_rel, take_raw_rel
 from sprite_gen.spec.runio import (REQUEST_FILENAME, acquire_run_dir_lock, atomic_save_image,
                               atomic_write_text, load_request, publish_guard, relative_posix,
                               release_run_dir_lock)
+from sprite_gen.util.resample import resize_cell
 from sprite_gen.frames.segment import separate_fused_poses
 from sprite_gen.spec.subject import SUBJECT_DEFAULT, default_min_used_pixels, sparse_frame_error, subject_kind
 
@@ -542,6 +543,7 @@ def remove_chroma_background(
     decontam_fit: str = "still",
     decontam_palette: dict[str, Any] | None = None,
     decontam_stats: dict[str, Any] | None = None,
+    decontam_edge_band: int = 0,
 ) -> Image.Image:
     """Key `chroma_key` out of `image` (hard cut + soft-alpha fringe unmix + trapped-spill despill).
 
@@ -720,7 +722,7 @@ def remove_chroma_background(
     if decontam != "off":
         data, stats = decontam_module.decontaminate(source_rgb, data, keyed_mask, chroma_key, fit=decontam_fit,
                                                     alpha_depth=unmix_reach, palette=decontam_palette, mode=decontam,
-                                                    source_alpha=source_alpha)
+                                                    source_alpha=source_alpha, edge_band=decontam_edge_band)
         if decontam_stats is not None:
             decontam_stats.update(stats)
     # Back into the converted copy rather than a fresh Image.fromarray, so the
@@ -1040,6 +1042,7 @@ def remove_chroma_background_ycbcr(
     decontam_fit: str = "still",
     decontam_palette: dict[str, Any] | None = None,
     decontam_stats: dict[str, Any] | None = None,
+    decontam_edge_band: int = 0,
 ) -> Image.Image:
     """Chrominance-plane matting with self-diagnostic pure-key rematte.
 
@@ -1296,10 +1299,7 @@ def fit_to_cell(
         if resample_name == "kcentroid":
             sprite = _kcentroid_downscale(sprite, new_size[0], new_size[1])
         else:
-            sprite = sprite.resize(
-                new_size,
-                Image.Resampling.NEAREST if resample_name == "nearest" else Image.Resampling.LANCZOS,
-            )
+            sprite = sprite.resize(new_size, Image.Resampling.NEAREST) if resample_name == "nearest" else resize_cell(sprite, new_size)
         cropped = sprite.getbbox()
         if cropped is not None:
             sprite = sprite.crop(cropped)
@@ -2522,7 +2522,7 @@ def fit_component_to_bbox(component: Image.Image, cell_width: int, cell_height: 
     box_w, box_h = max(1, x1 - x0), max(1, y1 - y0)
     ratio = min(box_w / src.width, box_h / src.height)
     tw, th = max(1, round(src.width * ratio)), max(1, round(src.height * ratio))
-    resized = src.resize((tw, th), Image.Resampling.LANCZOS)
+    resized = resize_cell(src, (tw, th))
     left = x0 + (box_w - tw) // 2
     top = y1 - th
     target.alpha_composite(resized, (left, top))

@@ -250,9 +250,11 @@ def providers():
     return {'providers':result}
 
 class JobRequest(Strict):
-    operation:Literal['generate','generate_video','process_video','cutout','extract','align','inspect','bake']; inputRevision:int; assetIds:list[str]=[]; params:dict={}; idempotencyKey:str=Field(min_length=1,max_length=200)
+    operation:Literal['generate','generate_video','process_video','cutout','extract','align','inspect','bake','preview_follow','apply_follow','check_handed']; inputRevision:int; assetIds:list[str]=[]; params:dict={}; idempotencyKey:str=Field(min_length=1,max_length=200)
 def enqueue(pid,operation,request,idem,expected=None,connection=None):
-    rh=s.digest(s.dumps(request).encode())
+    try: rh=s.digest(s.dumps(request).encode())
+    except (ValueError,TypeError) as exc:
+        raise s.AppError('JOB_REQUEST_INVALID','작업 요청에는 유한한 숫자와 JSON 값만 사용할 수 있습니다.') from exc
     with (s.transaction() if connection is None else nullcontext(connection)) as c:
         row=c.execute('SELECT body,request_hash FROM jobs WHERE project_id=? AND operation=? AND idem=?',(pid,operation,idem)).fetchone()
         if row:
@@ -262,6 +264,14 @@ def enqueue(pid,operation,request,idem,expected=None,connection=None):
         if p is not None and expected is not None: s.check_revision(p,expected)
         if p:
             for aid in request.get('assetIds',[]): find(p['assets'],'assetId',aid)
+        if operation in ('preview_follow','apply_follow','check_handed'):
+            if request.get('assetIds'): raise s.AppError('CLIP_TOOLS_INPUT','선택 동작 도구에는 별도 이미지 목록을 전달할 수 없습니다.')
+            if operation=='apply_follow':
+                from services.worker.clip_tools_task import validate_apply
+                validate_apply(p,request.get('params',{}),c)
+            else:
+                from adapters.spritegen.clip_tools import validate_params
+                validate_params(p,operation,request.get('params',{}))
         if operation=='generate':
             ref=find(p['references'],'referenceRevisionId',request['params'].get('referenceRevisionId',p['activeReferenceRevisionId']))
             if ref['approval']!='approved': raise s.AppError('REFERENCE_REQUIRED','승인된 기준이 필요합니다.',424)

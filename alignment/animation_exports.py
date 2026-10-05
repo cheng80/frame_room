@@ -176,22 +176,35 @@ def _gif(images, durations, loop):
                   "note": "GIF는 최대 255색·이진 알파·10ms 단위를 사용합니다. 실제 재생기는 짧은 지연을 늘릴 수 있습니다."}
 
 
-def _webp_single_animation(image, durations, loop):
-    """Pillow collapses a constant sequence to a still WebP, losing all timing.
-
-    Wrap its lossless VP8L data in ANIM/ANMF without changing the pixels.
-    https://developers.google.com/speed/webp/docs/riff_container
-    """
+def _webp_lossless_frame(image):
+    """Use the still encoder: Pillow's animation encoder drops ``exact``."""
     static = _encoded(image, "WEBP", lossless=True, exact=True, quality=100, method=4)
+    if (static[:4] != b"RIFF" or static[8:12] != b"WEBP"
+            or int.from_bytes(static[4:8], "little") != len(static) - 8):
+        raise AnimationExportError("무손실 WebP 단일 프레임의 헤더가 유효하지 않습니다.")
     chunks, offset = [], 12
-    while offset + 8 <= len(static):
+    while offset < len(static):
+        if offset + 8 > len(static):
+            raise AnimationExportError("무손실 WebP 단일 프레임의 청크가 잘렸습니다.")
         size = int.from_bytes(static[offset + 4:offset + 8], "little")
         end = offset + 8 + size + size % 2
+        if end > len(static):
+            raise AnimationExportError("무손실 WebP 단일 프레임의 청크가 잘렸습니다.")
         if static[offset:offset + 4] == b"VP8L":
             chunks.append(static[offset:end])
         offset = end
     if len(chunks) != 1:
         raise AnimationExportError("무손실 WebP 단일 프레임을 읽지 못했습니다.")
+    return chunks[0]
+
+
+def _webp_animation(images, durations, loop):
+    """Mux exact full-canvas VP8L frames, including single and duplicate slots.
+
+    Avoid both hidden-RGB loss and the still-image collapse in ``save_all``.
+    No frame blending, delta rectangles, or timing inference is involved.
+    https://developers.google.com/speed/webp/docs/riff_container
+    """
 
     def chunk(kind, payload):
         return kind + struct.pack("<I", len(payload)) + payload + b"\0" * (len(payload) % 2)
@@ -199,14 +212,16 @@ def _webp_single_animation(image, durations, loop):
     def uint24(value):
         return value.to_bytes(3, "little")
 
-    width, height = image.size
-    header = b"\x12\0\0\0" + uint24(width - 1) + uint24(height - 1)
+    width, height = images[0].size
+    flags = 0x02 | (0x10 if any(image.getextrema()[3][0] < 255 for image in images) else 0)
+    header = bytes([flags, 0, 0, 0]) + uint24(width - 1) + uint24(height - 1)
     parts = [b"WEBP", chunk(b"VP8X", header), chunk(b"ANIM", b"\0" * 4 + struct.pack("<H", 0 if loop else 1))]
     # Keep every source slot. This also bounds each 24-bit duration, even when
     # the total constant animation is longer than an ANMF duration can represent.
-    for duration in durations:
+    for image, duration in zip(images, durations):
+        # 0x02 replaces the entire canvas (including hidden RGB); do not blend.
         frame = uint24(0) + uint24(0) + uint24(width - 1) + uint24(height - 1) + uint24(duration) + b"\x02"
-        parts.append(chunk(b"ANMF", frame + chunks[0]))
+        parts.append(chunk(b"ANMF", frame + _webp_lossless_frame(image)))
     body = b"".join(parts)
     return b"RIFF" + struct.pack("<I", len(body)) + body
 
@@ -216,20 +231,11 @@ def _webp(images, durations, loop):
         return None, _omitted("WEBP_UNAVAILABLE", "이 Pillow 설치에 WebP 코덱이 없어 제외했습니다. PNG/runtime을 사용하세요.")
     if max(images[0].size) > 16383:
         return None, _omitted("WEBP_DIMENSION_LIMIT", "WebP 최대 프레임 크기를 넘습니다. PNG/runtime을 사용하세요.")
-    data = _encoded(images[0], "WEBP", save_all=True, append_images=images[1:], duration=durations,
-                    loop=0 if loop else 1, lossless=True, quality=100, method=4, exact=True,
-                    background=(0, 0, 0, 0), allow_mixed=False)
-    with Image.open(io.BytesIO(data)) as decoded:
-        decoded.load()
-        constant = decoded.n_frames == 1 and not decoded.info.get("duration")
-    if constant:
-        if any(image.tobytes() != images[0].tobytes() for image in images[1:]):
-            raise AnimationExportError("WebP가 서로 다른 프레임을 단일 이미지로 바꿨습니다.")
-        data = _webp_single_animation(images[0], durations, loop)
+    data = _webp_animation(images, durations, loop)
     verification = _verify_animation(data, images, durations, loop, "WEBP")
     return data, {**verification, "lossy": False, "fullRGBAParity": True, "timingLossy": False,
                   "sourceDurationsMs": durations, "playCount": 0 if loop else 1,
-                  "note": "동일한 연속 프레임은 코덱이 합칠 수 있습니다. 슬롯·앵커·정확한 시간은 runtime.json이 기준입니다."}
+                  "note": "투명 픽셀의 RGB와 중복 프레임의 시간까지 보존합니다. 슬롯·앵커·정확한 시간은 runtime.json이 기준입니다."}
 
 
 def _padded_cells(cells):

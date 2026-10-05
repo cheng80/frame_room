@@ -143,6 +143,13 @@ def publish(j,payload):
             else:
                 current['status']='canceled'; s.write_job(c,current); return
         if current.get('published'): return
+        if j['operation']=='apply_follow':
+            from services.worker.clip_tools_task import publish_follow
+            p=s.get_project(j['projectId'],c)
+            s.check_revision(p,j['inputRevision'])
+            # Register exact preview bytes only under the same transaction as
+            # the revision check and project write; stale jobs create no assets.
+            publish_follow(j,result,published,p,c)
         arts=[]
         for item in files:
             name=item if isinstance(item,str) else item['name']; path=published/name; aid=s.uid(); sha=s.digest(path.read_bytes()); media=mimetypes.guess_type(name)[0] or 'application/octet-stream'

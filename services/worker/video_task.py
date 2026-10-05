@@ -69,7 +69,7 @@ def execute_video(j,out):
         video=next(v for v in j['snapshot'].get('videos',[]) if v['videoId']==params['videoId'])
         video_path=videos.path_for(video['videoId'])
         stored_settings=video.get('provenance',{}).get('settings',{})
-        for field in ('direction','facing'):
+        for field in ('direction','facing','bodyPlan','equipment'):
             if field not in j['request'].get('params',{}) and field in stored_settings:
                 params[field]=stored_settings[field]
     with s.transaction() as c:
@@ -116,6 +116,7 @@ def execute_video(j,out):
                     **({'interpolation':item['processing']['interpolation']} if item.get('processing',{}).get('interpolation') else {})}
         if generation_id: provenance['generationVersionId']=generation_id
         source_provenance={k:v for k,v in provenance.items() if k not in ('interpolation','sourceProcessing')};source_provenance['interpolated']=False
+        source_provenance['sourceTimeMs']=source['timesMs'][item['sourceFrameIndex']]
         raw=videos_frame_asset(item['rawPath'],f"영상원본-{item['sourceFrameIndex']}.png",{**source_provenance,'kind':'video-frame-raw'})
         keyed=videos_frame_asset(item.get('originalKeyedPath',item['keyedPath']),f"영상후보-{item['sourceFrameIndex']}.png",{**source_provenance,'parentAssetId':raw['assetId'],'processing':'chroma-key','spill':spill,**({'spillReferenceAssetId':spill_reference} if spill_reference else {})})
         assets.extend([raw,keyed])
@@ -126,7 +127,7 @@ def execute_video(j,out):
         candidate=videos_frame_asset(finished_path,f"영상편집-{item['sourceFrameIndex']}.png",{**provenance,'parentAssetId':normalized_asset['assetId'],'processing':'video-finish','normalization':normalization,'finish':finish})
         assets.extend([normalized_asset,candidate]);fid=s.uid();group['frameVersionIds'].append(fid)
         frame=dict(frameId=s.uid(),frameVersionId=fid,rawAssetId=raw['assetId'],imageAssetId=candidate['assetId'],sourceRect=normalization['sourceRect'],
-                   sourceToFrameTransform=normalization['sourceToFrameTransform'],extractionVersion='video-v3-finished',nativeScaleGroupId=gid,review='pending',hidden=False,
+                   sourceToFrameTransform=normalization['sourceToFrameTransform'],extractionVersion='video-v4-2.34-finished',nativeScaleGroupId=gid,review='pending',hidden=False,
                    sourceVideoId=video['videoId'],sourceFrameIndex=item['sourceFrameIndex'],sourceTimeMs=item['sourceTimeMs'],interpolated=bool(item.get('interpolated')),
                    **({'interpolation':item['processing']['interpolation']} if item.get('processing',{}).get('interpolation') else {}))
         frame['sourceProcessing']=item.get('processing',{'kind':'chroma-key'})
@@ -158,7 +159,7 @@ def execute_video(j,out):
     files+=['final-preview/'+name for name in preview['files']]+['final-preview/preview.json']
     return dict(assets=assets,frames=frames,alignmentGroups=[group],alignments=alignments,clips=[clip],generations=generations,
                 files=files,status='needs_review',videoId=video['videoId'],clipId=clip['clipId'],frameVersionIds=group['frameVersionIds'],
-                processing={'source':source,'selection':result['selection'],'outputFrames':len(frames),'durationMs':sum(o['durationMs'] for o in occurrences),'normalization':normalization,'finish':finish,'preview':preview,'spill':spill,**({'spillReferenceAssetId':spill_reference} if spill_reference else {})},**({'receipt':receipt} if receipt else {}))
+                processing={'version':result['version'],'options':result['options'],'source':source,'selection':result['selection'],'outputFrames':len(frames),'durationMs':sum(o['durationMs'] for o in occurrences),'normalization':normalization,'finish':finish,'preview':preview,'spill':spill,**({'spillReferenceAssetId':spill_reference} if spill_reference else {})},**({'receipt':receipt} if receipt else {}))
 
 def videos_frame_asset(path,name,provenance):
     return s.register_asset(Path(path).read_bytes(),name,'derived',provenance)

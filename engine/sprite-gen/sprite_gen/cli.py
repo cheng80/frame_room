@@ -12,17 +12,22 @@ from sprite_gen.background import tile
 from sprite_gen.curate import anchor
 from sprite_gen.compose import compose_atlas, compose_cycle, compose_gif, compose_layers, export_aseprite, export_pngs
 from sprite_gen.qa import correction_loop, inspect, preview, score, motion
+from sprite_gen.qa import handed as handed_check
 from sprite_gen.frames import cutout, extract, slice_sheet, unpack_atlas
 from sprite_gen.gen import gen_set, prepare, video
 from sprite_gen.video import batch as video_batch
 from sprite_gen.video import canvas as video_canvas
 from sprite_gen.video import frames as video_frames
 from sprite_gen.video import loop as video_loop
+from sprite_gen.video import clip_prompt as video_prompt
+from sprite_gen.video import align as video_align
+from sprite_gen.video import follow as video_follow
+from sprite_gen.video import rife_install
 from sprite_gen.effects import recolor, shadow
 from sprite_gen.scene import render, inspect_scene
 from sprite_gen.serve import serve_compose, serve_curation
 from sprite_gen.spec import migrate_breathe, migrate_request
-from sprite_gen.gen.prepare import STYLE_DEFAULT, _outline_config
+from sprite_gen.gen.prepare import BODY_PLAN_HELP, STYLE_DEFAULT, _outline_config
 from sprite_gen.spec.subject import SUBJECTS
 from sprite_gen.workflow import guide, preferences
 
@@ -78,6 +83,7 @@ def _add_prepare(p: argparse.ArgumentParser) -> None:
     p.add_argument("--fit-detail-bias", action=argparse.BooleanOptionalAction, default=None)
     p.add_argument("--fit-outline", type=_outline_config, default=None, metavar="{on,off,STRENGTH}")
     p.add_argument("--fit-pitch-hint", type=int, default=None)
+    p.add_argument("--body-plan", action="append", default=[], metavar="PLAN | FIGURE=PLAN", help=BODY_PLAN_HELP)
     p.add_argument("--request", type=Path)
     p.add_argument("--request-json")
     p.add_argument("--force", action="store_true")
@@ -332,6 +338,12 @@ COMMANDS: dict[str, tuple[str, Callable[[argparse.ArgumentParser], None], Callab
         video_canvas.add_arguments,
         video_canvas.run,
     ),
+    # The prompt alone, for a clip made by a video MCP on the user's agent (ZCRE); the engine never calls it.
+    "video-prompt": (
+        "Print the clip prompt video-set would send for one (direction, state), for a clip made elsewhere (a video MCP such as ZCRE); --json adds the duration, end-frame pin and loop cut.",
+        video_prompt.add_arguments,
+        video_prompt.run,
+    ),
     "video-frames": (
         "Extract a clip's frames and key the chroma out into RGBA frames (edge-contact checked).",
         video_frames.add_arguments,
@@ -346,6 +358,27 @@ COMMANDS: dict[str, tuple[str, Callable[[argparse.ArgumentParser], None], Callab
         "Directions x states end to end (canvas -> video -> frames -> loop), rate-limit aware, one report per item.",
         video_batch.add_arguments,
         video_batch.run,
+    ),
+    # Handedness (docs/video-pipeline.md#handedness--an-item-on-one-side): an asymmetric item's side, checked by its colour per frame.
+    "handed-check": (
+        "Check that a colour-marked asymmetric item (a watch on one wrist) is on the side its handedness puts it in every frame of a still or loop; a board for the eye.",
+        handed_check.add_arguments,
+        handed_check.run,
+    ),
+    "video-cycle-align": (
+        "One cycle length for every direction of a set: resample each loop to the median length (RIFE between source frames only), start on a foot strike.",
+        video_align.add_arguments,
+        video_align.run,
+    ),
+    "video-follow": (
+        "A soft part of a looping body follows the body's motion: an ellipse of the strip moved as a damped mass on the body's own bob (after video-cycle-align).",
+        video_follow.add_arguments,
+        video_follow.run,
+    ),
+    "rife": (
+        "install: download the pinned RIFE (rife-ncnn-vulkan, sha256-checked) into the user data directory, where the loop repair finds it.",
+        rife_install.add_arguments,
+        rife_install.run,
     ),
     # The argument surface is `serve_curation.add_arguments` itself, not a copy of it: the
     # webview's own `--help` and this subcommand are the same declaration, so `sprite-gen

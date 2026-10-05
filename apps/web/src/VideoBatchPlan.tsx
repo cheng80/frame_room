@@ -38,7 +38,7 @@ export function VideoBatchPlan({s, generation, processing, available, active, vi
     if (requestBlocked || submitting.current || !items.length) return;
     setError('');
     try {
-      if (!pending.current && items.some(item => item.params.repairMode === 'on' || item.params.matchClipId) && s.providers.find(provider => provider.providerId === 'grok-video')?.capabilities?.rife?.available !== true) throw new Error('RIFE 보정·주기 맞춤을 사용할 수 없습니다. 해당 항목의 보정 설정을 확인해 다시 담아 주세요.');
+      if (!pending.current && items.some(item => item.params.repairMode === 'on' || item.params.matchClipId && item.params.between !== 'off') && s.providers.find(provider => provider.providerId === 'grok-video')?.capabilities?.rife?.available !== true) throw new Error('RIFE 보정·주기 맞춤을 사용할 수 없습니다. 해당 항목의 보정 설정을 확인해 다시 담아 주세요.');
       // Preserve the first inputRevision too: later project refreshes must not alter a retry.
       const body = pending.current ?? videoBatchRequest(snapshot, items, key);
       pending.current = body; setAttempted(body); submitting.current = true;
@@ -90,6 +90,11 @@ export function VideoBatchPlan({s, generation, processing, available, active, vi
           <div><strong>{index + 1}. {snapshot.assets.find(asset => asset.assetId === item.assetId)?.originalFilename || '기준 이미지 없음'}</strong>
             <span>{VIDEO_STATES.find(state => state.id === item.params.state)?.label} · {VIDEO_DIRECTIONS.find(direction => direction.id === item.params.direction)?.label} · {item.params.facing === 'left' ? '왼쪽' : '오른쪽'}</span>
             <span>{VIDEO_MODELS.find(model => model.id === item.params.model)?.label} · {item.params.durationSeconds}초 · {item.params.resolution} · {item.params.finishMode === 'gif' ? 'GIF 색상' : 'RGBA 유지'}</span>
+            <span>최대 {String(item.params.maxFrames)}장 · 주기 보간 {item.params.between === 'off' ? '끄기' : item.params.between === 'on' ? '켜기' : '자동 보호'} · 시작 발 {item.params.startFoot === 'left' ? '왼발' : item.params.startFoot === 'right' ? '오른발' : '자동'}</span>
+            {typeof item.params.startIndex === 'number' ? <span>수동 시작 위치 · {item.params.startIndex} (0부터)</span> : null}
+            {item.params.bodyPlan ? <span>신체 구조 · {item.params.bodyPlan}</span> : null}
+            {item.params.equipment ? <span>장비와 손 · {item.params.equipment}</span> : null}
+            {item.params.motionPrompt ? <span className="video-batch-prompt">추가 지시 · {item.params.motionPrompt}</span> : null}
             {item.params.repairMode !== 'off' ? <span>RIFE 보정 {item.params.repairMode === 'on' ? '필수' : '자동'}</span> : null}
             {typeof item.params.matchClipId === 'string' ? <span>주기 맞춤 · {snapshot.clips.find(clip => clip.clipId === item.params.matchClipId)?.name || '대상 동작 없음'}</span> : null}
           </div>

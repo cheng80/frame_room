@@ -214,24 +214,34 @@ def test_cycle_matching_uses_snapshot_timing_and_preserves_interpolation_lineage
     assert any(f.get('interpolated') for f in baked['result']['manifest']['frameSources'])
 
 
-def test_submission_checkpoint_resume_and_unknown_guard(client,media,monkeypatch,tmp_path):
+@pytest.mark.parametrize('structured', [{}, {'bodyPlan':'biped','equipment':'sword:right; shield:left'}, {'bodyPlan':'quadruped','equipment':'saddle=left side'}])
+def test_submission_checkpoint_resume_and_unknown_guard(client,media,monkeypatch,tmp_path,structured):
     from sprite_gen.gen.xai import Credential
     credential=Credential('not-a-real-token','grok-login')
     p,a=base(client,new(client));source=s.asset_path(a['assetId']);checkpoint=s.DATA/'probe'/'video.json';work=s.DATA/'probe'/'staging'
-    calls=[]
+    calls=[];submitted=[];params=vp.validate_params(structured,generation=True)
     def interrupted(method,url,token,body):
         calls.append(method)
-        if method=='POST': return 200,{'request_id':'saved-request'}
+        if method=='POST':
+            submitted.append(body['prompt'])
+            return 200,{'request_id':'saved-request'}
         raise SystemExit('test interrupted poll')
-    with pytest.raises(vp.ProviderError): vp.generate(source,work,vp.validate_params({},generation=True),checkpoint,'hash',credential=credential,call=interrupted,sleep=lambda _:None)
+    with pytest.raises(vp.ProviderError): vp.generate(source,work,params,checkpoint,'hash',credential=credential,call=interrupted,sleep=lambda _:None)
     assert calls==['POST','GET'] and vp.read_checkpoint(checkpoint)['requestId']=='saved-request'
+    assert submitted==[vp.read_checkpoint(checkpoint)['prompt']]
+    if structured.get('bodyPlan')=='quadruped':
+        assert 'all four legs' in submitted[0] and "character's own left side" in submitted[0]
+        assert 'same hand' not in submitted[0]
+    elif structured:
+        assert "character's own right hand" in submitted[0] and "character's own left hand" in submitted[0]
     def resume(method,url,token,body):
         assert method=='GET';calls.append(method)
         return 200,{'status':'done','model':vp.MODELS[0],'video':{'url':'https://example.invalid/fixture.mp4','duration':1}}
-    result=vp.generate(source,work,vp.validate_params({},generation=True),checkpoint,'hash',credential=credential,call=resume,download=lambda *_:media,sleep=lambda _:None)
+    result=vp.generate(source,work,params,checkpoint,'hash',credential=credential,call=resume,download=lambda *_:media,sleep=lambda _:None)
     assert calls==['POST','GET','GET'] and Path(result['path']).read_bytes()==media
+    assert vp.read_checkpoint(checkpoint)['postCount']==1 and submitted==[result['prompt']]
     unknown=s.DATA/'unknown.json';s.atomic_bytes(unknown,s.dumps({'requestHash':'hash','phase':'submitting','postCount':1}).encode())
-    with pytest.raises(vp.ProviderError) as e: vp.generate(source,work, vp.validate_params({},generation=True),unknown,'hash',credential=credential,call=lambda *_:pytest.fail('No replay'))
+    with pytest.raises(vp.ProviderError) as e: vp.generate(source,work,params,unknown,'hash',credential=credential,call=lambda *_:pytest.fail('No replay'))
     assert e.value.outcome_unknown
 
 
@@ -371,7 +381,7 @@ def test_fast_explicit_vfr_range_keeps_timing_and_valid_default_fps(client,media
     from alignment.pipeline import _clip_gates
     c=client;p,v=upload(c,new(c),media)
     image=Image.new('RGBA',(64,64));ImageDraw.Draw(image).rectangle((25,15,40,55),fill=(170,80,30,255));frame=tmp_path/'vfr-keyed.png';image.save(frame)
-    result={'source':{'width':64,'height':64,'fps':24,'frameCount':4,'durationMs':40},'selection':{'loop':True},'standingHeight':40,'anchor':{'x':32,'y':55},'files':[],
+    result={'version':video_processing.VERSION,'options':{},'source':{'width':64,'height':64,'fps':24,'frameCount':4,'durationMs':40,'timesMs':[0,10,20,30,40]},'selection':{'loop':True},'standingHeight':40,'anchor':{'x':32,'y':55},'files':[],
             'frames':[{'rawPath':str(frame),'keyedPath':str(frame),'sourceFrameIndex':i,'sourceTimeMs':i*10,'durationMs':10} for i in range(4)]}
     monkeypatch.setattr(video_processing,'process_clip',lambda *_a,**_kw:result)
     j=run(queue(c,p,params={'videoId':v['videoId'],'loopMode':'full','bodyHeight':32,'cellWidth':64,'cellHeight':64}).json())

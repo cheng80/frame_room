@@ -1,0 +1,25 @@
+.clip-tools { min-width: 0; }
+.clip-tools > summary { font-weight: 650; }
+.clip-tools fieldset { min-width: 0; padding: 0; border: 0; margin: 0 0 12px; }
+.clip-tools legend { font-size: 12px; font-weight: 650; margin-bottom: 8px; }
+.clip-tools .clip-tools-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 8px; }
+.clip-tools .field { min-width: 0; }
+.clip-tools input, .clip-tools select { min-width: 0; width: 100%; }
+.clip-tools .warning, .clip-tools .error { font-size: 11px; overflow-wrap: anywhere; }
+.clip-tools .clip-tools-cell { position: relative; width: 100%; overflow: hidden; border: 1px solid #526572; border-radius: 5px; }
+.clip-tools .clip-tools-cell canvas, .clip-tools .clip-tools-cell svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.clip-tools canvas, .clip-tools img { image-rendering: pixelated; }
+.clip-tools .clip-tools-cell svg { touch-action: none; cursor: crosshair; }
+.clip-tools .clip-tools-cell svg[aria-disabled="true"] { pointer-events: none; cursor: default; }
+.clip-tools ellipse { stroke: #c9ffdb; stroke-width: 2; fill: #9cf4c026; vector-effect: non-scaling-stroke; }
+.clip-tools .clip-tools-previews { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.clip-tools figure { margin: 8px 0; min-width: 0; }
+.clip-tools figcaption { font-size: 11px; margin-bottom: 5px; }
+.clip-tools img, .clip-tools .clip-tools-strip { display: block; width: 100%; height: auto; }
+.clip-tools .clip-tools-comparison { border-top: 1px solid #35414c; padding-top: 10px; margin-top: 12px; }
+.clip-tools .clip-tools-comparison > label, .clip-tools li, .clip-tools a { font-size: 11px; }
+.clip-tools .clip-tools-comparison > button { width: 100%; }
+.clip-tools input[type="range"] { padding: 0; accent-color: #9cf4c0; }
+.clip-tools .clip-tools-suspects { list-style: none; padding: 0; }
+.clip-tools .clip-tools-suspects li { display: grid; gap: 5px; margin-bottom: 10px; overflow-wrap: anywhere; }
+.clip-tools :is(button, input, select, summary, a):focus-visible { outline: 2px solid #9cf4c0; outline-offset: 3px; }

@@ -1,5 +1,7 @@
 # Video → sprite pipeline (engine SSoT)
 
+> FrameRoom 포크: 이 문서는 공개 v2.34의 엔진/CLI 계약이다. 앱 걷기는 기본 8장이고 기존 GIF 마무리를 유지한다. 앱은 Grok 로그인만 사용하며 유료 요청 자동 재시도를 금지한다. 앱 연결 범위는 [반영 기록](../../../docs/product/LATEST_SKILL_UPGRADE_2026-10-06.md), 로컬 패치는 [PATCHES](../../PATCHES.md)를 따른다.
+
 > Owns: Pipeline B engine contract: state canvas, keyed frames, true-period and one-shot cycles, strip/GIF/WebP, the batch · Index: [docs/README.md](README.md)
 
 One still becomes a whole motion set: the still is padded into the canvas a state
@@ -10,17 +12,21 @@ hand on 2026-09-08 (15 loops: 3 directions × 5 states) and the rules below are 
 ones that survived that day.
 
 ```
-still ──video-canvas──▶ canvas.png ──video──▶ clip.mp4 ──video-frames──▶ keyed/*.png ──video-loop──▶ strip · gif · webp
-                                                                                                  └── video-set runs all four per (direction, state)
+still ──video-canvas──▶ canvas.png ──video──▶ clip.mp4 ──video-frames──▶ keyed/*.png ──video-loop──▶ strip · gif · webp ──video-cycle-align──▶ one cycle length (a set)
+                    │                     ▲                                                       └── video-set runs all four per (direction, state), then aligns each walk or run across its directions
+                    └──video-prompt──▶ your agent's video MCP (ZCRE)
 ```
 
 | Verb | Module | In → out |
 |---|---|---|
 | `sprite-gen video-canvas` | `sprite_gen/video/canvas.py` | still → padded still (state canvas) + report |
 | `sprite-gen video` | `sprite_gen/gen/video.py` ([gen](video.md)) | still + prompt → mp4 + report |
+| `sprite-gen video-prompt` | `sprite_gen/video/clip_prompt.py` | (direction, state) → the prompt `video-set` sends, for a clip made by a video MCP on your agent ([below](#a-clip-from-a-video-mcp-on-your-agent--zcre)) |
 | `sprite-gen video-frames` | `sprite_gen/video/frames.py` | mp4 → `raw/`, `keyed/` RGBA frames + report |
 | `sprite-gen video-loop` | `sprite_gen/video/loop.py` | keyed frames → `cycle/`, `<name>.strip.png` + `.strip.json`, `<name>.gif`, `<name>.webp` + report |
 | `sprite-gen video-set` | `sprite_gen/video/batch.py` | bases × states → one folder per item, `set.report.json`, `table.md` |
+| `sprite-gen video-cycle-align` | `sprite_gen/video/align.py` | the loop directories of one walk or run, one per direction → one cycle length, each loop turned to start on a foot strike, + report ([loop repair](loop-repair.md) section 4) |
+| `sprite-gen video-follow` | `sprite_gen/video/follow.py` | a loop directory + an ellipse → the strip, GIF and WebP with that region following the body ([section 6](#6-follow-through--video-follow)) |
 
 Wrappers: `scripts/video_canvas.py`, `scripts/video_frames.py`, `scripts/video_loop.py`,
 `scripts/video_set.py`. Binaries: `ffmpeg`/`ffprobe` (frames), `img2webp` from libwebp
@@ -36,13 +42,28 @@ is a property of the motion state, owned by one table (`STATE_CANVAS`):
 | State | Shape | Ratio | Room | Why |
 |---|---|---|---|---|
 | `jump` | tall | 3:4 | 34 % head-room above the still | airborne frames need height |
-| `attack` | wide | 16:9 | 35 % above the still, at least 28 % in front (facing side), 20 % behind | weapon swings rise overhead and extend in front; a long weapon drawn back reaches behind |
+| `attack` | wide | 16:9 | 20 % above the still, at least 28 % in front (facing side), 20 % behind | a weapon raised overhead needs room above, a swing extends in front, and a long weapon drawn back reaches behind |
 | `projectile` | wide | 16:9 | 34 % in front | the projectile travels away |
 | everything else | square | 1:1 | — | in-place motion fits the still |
 
+The attack's room above is 20 %, not more. On a square or upright still that puts at least
+a quarter of the still's height above it, and with the still's own margin over the crown
+(8 % of its height is enough) that holds a weapon raised about a third of the body above
+the head. More room only made the body a smaller part of the clip, so `video-loop
+--body-height` scaled it up to the delivery height; at 20 % it scales down. A still cropped
+at the crown gets only the quarter — pass `--headroom 0.26` or more for an overhead swing.
+At this headroom the 16:9 ratio, not `--lead`, sets the width of a square still's canvas,
+so a smaller lead changes nothing.
+
 `--shape tall|wide|square` overrides the row; `--headroom` / `--lead` / `--trail` tune the room
 (`--trail` is the empty fraction of the width kept behind the subject, for a weapon drawn
-back before the strike); `--facing left` mirrors the wide layout. Headroom is a fraction of the full canvas
+back before the strike); `--facing left` mirrors the wide layout. A forced shape is that shape's
+own row, not the state's: `--shape tall` is the jump row, and `--shape wide` is a forced-wide
+row with 35 % above, 28 % in front and 20 % behind — not the attack row. It lands on states
+whose own row is another shape, a jump among them, and 35 % on 16:9 keeps about the room a
+jump's tall row leaves above a square or upright still. A still wider than it is tall keeps
+less above it under forced wide than under the tall row (a 3:2 still about three fifths),
+because there the wide canvas's height follows the still's width. Headroom is a fraction of the full canvas
 height; wide canvases grow both dimensions to preserve their ratio without shrinking
 the still. A still whose corners are not one flat colour
 is refused — a non-flat background cannot be extended without guessing.
@@ -82,6 +103,82 @@ stance … same height every time"). `video-set` carries those templates
 name limbs — the first drafts said "bipedal … knees … arms pumping", which prompted a
 quadruped and a legless blob into a contradiction (2026-09-09).
 
+A walk seen from the front or from behind, and a run seen from the front, take their own
+sentence (`VIEW_MOTION_TEXT`) instead: the steps lift and land straight forward and back
+under the body, toward the viewer or away from it "as if on a treadmill", and the body never
+turns to the side, steps sideways or crosses its feet; a walk also asks for a calm, natural
+cycle with small, even steps that never kick a leg out to the side. The body-neutral walk
+sentence asks for "an even left-right or front-back rhythm", and a character facing the
+viewer read that as stepping sideways: crossed feet, side kicks, a body turned to
+three-quarters. Measured on Grok (subscription), 480p 3 s, nine humanoid characters twice
+each, judged on frame sheets with the variant hidden: a front walk kept its facing and walked
+in 7 of 18 clips with the old sentence and 16 of 18 with the new one. Without the calm-steps
+clause it was 12 to 13 of 18, and five crossed their feet or kicked sideways. A back walk: 8
+of 10 with the old sentence, 10 of 10 with the new one. A front run: 11 of 18 and 15 of 18
+(a run keeps its stride and has no calm-steps clause). "on a treadmill" said as a place was
+sometimes drawn under the feet; "as if on a treadmill" was not. A side view and a run seen
+from behind keep the state's sentence (the second was not measured). A walk drawn at a
+three-quarter angle kept that angle in about half the clips (6 of 10) with the old sentence
+and in 5 of 10 with one that said to walk "toward the way its body faces in the image", and
+otherwise mostly turned to a side view: no sentence tried held a three-quarter view.
+
+Since 2.15.0 the walk says less. Spelling the steps out ("each one lifting and landing straight
+forward and back under the body") made some takes march in place, knees lifted to the waist and
+arms held stiff, so a front or back walk now says only that it walks naturally, which way it
+faces and that it stays in place: "walks naturally in place, facing the viewer, as if on a
+treadmill, without coming any closer" (and "facing away from the viewer … without moving any
+farther away"). On one character, 480p 3 s on the API, two clips per sentence: the 2.13
+sentence lifted the knees to the waist in one of two; "walks naturally" swung the arms, kept the
+knees low and kept facing the viewer in both; a third sentence that asked for low heel-to-toe
+steps and a loose arm swing kept the feet low but shuffled. Two clips each is a small sample:
+the default is generic on purpose, because how a character walks (high steps, a stroll, a
+march) is the caller's to say. The front run keeps its sentence.
+
+Since 2.16.0 every walk and run takes that form, from every view: the side walk "walks
+naturally in place, as if on a treadmill, without moving across the screen" (it said "moves in
+place on a treadmill" as a place and asked for "an even left-right or front-back rhythm"), the
+side run "runs naturally in place …", and the front and back runs "runs naturally in place,
+facing (away from) the viewer, as if on a treadmill …" (the front run spelled its strides out
+and said "toward the viewer" and "without coming any closer" in one clause). On one character,
+480p 3 s on the API: the front run kept facing in 2 of 2, the side run ran in 2 of 2, the back
+run kept facing away in the one clip whose frames passed; the side walk walked in 2 of 2.
+
+Since 2.17.0 there are two three-quarter views, `front_diagonal` and `back_diagonal`: turned to the
+right, the way an isometric game's character walks down and up to the right (turned over, they face
+left; a character with an item on one side has them drawn facing left instead, see
+[handedness](#handedness--an-item-on-one-side)). A walk or run in one says where it heads on the screen in those words: "walks naturally in
+place, as if on a treadmill, heading diagonally away from the viewer toward the upper right, like a
+character walking up and to the right in an isometric game, without moving across the screen. It
+keeps the exact three-quarter back angle of the image the whole time: its back stays turned toward
+the viewer at that angle and its face stays hidden. It never turns into a side view." (and "toward
+the viewer and to the right … three-quarter front angle" for the front one). It is filmed pinned to
+its first frame (`PINNED_GAIT_VIEWS`, `pins_last_frame`) with the return sentence, and cut as any
+walk (`--anchor motion-auto`). The clip's view sentence points at the image ("seen from a
+three-quarter back angle, turned exactly as in the image"); a still drawn at a diagonal from another
+picture takes `STILL_VIEW_TEXT` instead (`still_view_text`), which says the whole body and head turn
+about 45 degrees and which way the feet point — told less, a three-quarter back view came out as a
+side view or looking back over the shoulder. Measured on the API, 480p 3 s, pinned, five humanoid
+characters twice each, judged on frame sheets: the front and the back diagonal walk kept their angle
+in 10 of 10 each; "toward the way its body faces in the image" kept the front one in 4 to 5 of 5 and,
+on another character, the back one in 0 of 2. Idle and attack keep their angle in a diagonal (4 of
+4). A diagonal run is weaker: 2 of 4 kept the angle, the others turned toward a side view.
+
+A front or back still redrawn from a picture seen from another side has its own still sentence too:
+with the clip's one line ("seen from the front, facing the viewer directly"),
+a front still redrawn from a side picture could keep part of the picture's turn, the feet frontal
+and the head and chest turned a little toward the side the picture faces. `still_view_text("front")`
+says the whole body and head face the viewer squarely, the chest, hips and toes point straight at
+the viewer, the face is centred between both ears, and it is not turned toward either side even
+when a reference picture shows the character from another angle; `still_view_text("back")` says the
+same from behind, with the face hidden and not looking back over the shoulder. The sentence is used
+whatever the reference's view: a caller does not always know it (an uploaded picture), and on a
+front reference it changed nothing. The clip keeps its one line, since a clip starts from a still
+already drawn at its view. Measured on codex `image_gen` (subscription), five humanoid characters,
+three takes per arm, layout guide on, judged blind on full-resolution crops and with an eye-offset
+metric: from a side reference the old line already drew a frontal face in 15 of 15 by eye (the turn
+did not reproduce on this model), the new sentence in 15 of 15; from behind, both drew a straight
+back in 15 of 15; from a front reference, the old line 14 of 15 and the new 15 of 15.
+
 An attack is one timed strike, not a repeat. `MOTION_TEXT["attack"]` asks for one attack: a windup
 (about 0.5 s), one strike in front (about 0.25 s), a held impact pose (about 0.3 s) and a recovery
 to the exact starting stance (about 0.5 s), then `HOLD_TEXT["attack"]`:
@@ -117,7 +214,314 @@ it for a repeat.
 `build_prompt(direction, state, character, facing, motion=...)` takes a caller's own motion
 paragraph — whole sentences about the subject, such as a request interpreter writes per
 request — in place of the built-in state sentence. The frame, camera, background and design
-rules stay the engine's, and an attack keeps its `HOLD_TEXT` sentence after the paragraph.
+rules stay the engine's, and an attack keeps its `HOLD_TEXT` sentence after the paragraph. A
+walk or run gets `GAIT_HOLD_TEXT` for its view after the paragraph instead: it stays in place as
+if on a treadmill and keeps facing the viewer, away from the viewer or `{facing}` the whole time,
+so a caller describes the gait (a sneak, a march, a lazy stroll) and the engine keeps it on the
+spot. On one character, one clip each: a march lifted the knees high as asked and stayed in
+place, a lazy stroll seen from behind kept facing away, and a tiptoe sneak kept facing the viewer
+but read only as a slightly hunched walk.
+
+`build_prompt(..., pinned=True)` says the clip is pinned to end on its first frame, so any state
+gets `PINNED_LOOP_TEXT` (the return to the first pose) instead of the evenly paced repeat; left
+out, only `PINNED_LOOP_STATES` do. A caller that retries a walk pinned after no cycle was found
+says True; two such front-walk clips closed on their first frame (seam 0.12 and 0.24 of an
+ordinary step).
+
+`build_prompt(..., model=...)` names the clip model. **A Lite walk is calmed**: for
+`grok-imagine-video-1.5-lite` (`LITE_VIDEO_MODELS`) the built-in walk sentence is followed by
+`LITE_WALK_TEXT` — a slow, relaxed walk, small low steps, a gentle arm swing close to the body, no
+bounce, never running. Lite read "walks naturally" bigger than Pro: long, bouncy steps and a wide
+arm swing, a run more than a walk (2026-10-03, one SD character in five views, two takes each);
+with the clause every view walked. A caller's own walk paragraph is left as written. **A Lite
+back-diagonal walk also holds its head** (`LITE_HEAD_TEXT`, after the calm clause): its head swayed
+2.7–3.8 % of the body height side to side against Pro's 0.88 %, and with the sentence four takes
+swayed 1.7–3.1 % (best 1.84 %). It was measured in that view only, so it is said in that view only.
+The measured sentence ended "only the legs, arms and the end of the ponytail move"; the engine's
+says "the ends of the hair", since most characters have no ponytail. Pro prompts are unchanged.
+
+**A front or back walk starts mid-step.** From a standing still the clip model makes the first
+step itself and walks askew — the feet drawn to one line under the body, or the body turned
+three-quarters: 1 of 14 front clips walked straight from a standing still, 14 of 16 from the same
+characters redrawn mid-step (2026-10-02, four characters, blind judged; three rewordings of the walk
+sentence kept 0 of 14 from a standing SD still). `WALK_START_TEXT[direction]` is the redraw sentence for the front and the
+back — the same 2D sprite, same design, caught mid-step with one foot planted under its hip and
+the other lifted a little under its own, hips and shoulders square, arms swinging gently — and
+`walk_start_prompt(direction, key)` adds the background line for a green or magenta key
+(`starts_mid_step(state, direction)` says which clips need it). The design is the reference
+image's to keep: the sentence is drawn with the base still attached. `video-set` does this before
+the canvas (`--walk-start redraw`, the default): one `sprite-gen gen --ref <base>` call per front or
+back walk, on the base's own key, kept as `walk-start.png` with its report and reused while the
+prompt and base are the same; a base on no chroma key is refused with `--walk-start as-given`, which
+films from the base itself. Side and diagonal walks, and every other state, film from the base.
+
+### A body that is not a person — `--body-plan`
+
+The measured sentences above were measured on people, and five of them name what only a person has:
+the Lite walk calm swings the arms (`LITE_WALK_TEXT`), the Lite back-diagonal head hold moves the
+arms (`LITE_HEAD_TEXT`), the idle plants both feet and settles the chest, shoulders and arms
+(`MOTION_TEXT["idle"]`), the front or back mid-step redraw puts one foot under each hip with the
+arms swinging (`WALK_START_TEXT`), and the view sentence the still is drawn with points the chest,
+hips and the toes or heels of both feet at the viewer, or the backs of the shoes (`STILL_VIEW_TEXT`). Said of a horse, a pig or a dog, they walk it on a person's legs or
+stand it up on two. The walk and run sentences themselves name no limb (since 2.0.0's "`video-set`
+motion templates no longer assume a biped"); these came later and were said to every body.
+
+`video-set --body-plan`, `video-prompt --body-plan`, `gen --direction --body-plan`, `prepare
+--body-plan` and
+`build_prompt(body_plan=...)`, `walk_start_prompt(body_plan=...)`, `still_view_text(body_plan=...)`,
+`gen.still_prompt(body_plan=...)` name what the subject stands on (`sprite_gen/video/body_plan.py`):
+`biped` (the default), `quadruped` or `legless` for the character, or one `<figure>=<plan>` per figure
+of a scene (`--body-plan "the man=biped" --body-plan "the horse=quadruped"`). No body plan, or one
+biped, keeps every prompt byte for byte. Any other body gets:
+
+| Sentence | for a body that is not one biped |
+|---|---|
+| after the motion sentence (or the caller's `--motion`) | what it stands on (`body_plan.text`): "It stays on all four legs, as in the image, and never rises onto its hind legs." / "It has no legs, as in the image, and never grows legs or feet." / "Each figure keeps the body it has in the image: the man on two legs; the horse on all four legs, never rising onto its hind legs." |
+| idle | `IDLE_TEXT_ANY_BODY`: the same stillness, standing or resting as in the image, no feet counted, no chest, shoulders or arms |
+| attack | `ATTACK_TEXT_ANY_BODY`: the same timed strike "with what it is already holding, or with its own body if it holds nothing", then `HOLD_TEXT_ANY_BODY["attack"]`: anything it holds stays held the same way, a part the strike does not use stays where it is drawn, no hand counted. Which part strikes (a bite, a head-butt, a forefoot) is not guessed: a caller who knows says it with `--motion`, which gets `HOLD_TEXT_ANY_BODY` after it |
+| Lite walk calm | `LITE_WALK_TEXT_LEGGED` (no arm swing; never trotting or galloping) or, with a figure without legs, `LITE_WALK_TEXT_LEGLESS` (no steps or feet) |
+| Lite back-diagonal head hold | `LITE_HEAD_TEXT_ANY_BODY`: what moves is what it moves on and its loose ends (a tail, a mane, hair) |
+| the still's view sentence (`still_view_text`, `gen --direction`) | `STILL_VIEW_TEXT_ANY_BODY` for the front, back and diagonal views (where the body and head point; no feet, chest, hips, shoulders or shoes), the side view's `VIEW_TEXT` as it is, each ending in what it stands on (`body_plan.still_text`): ", standing on all four legs, not rearing onto its hind legs" / ", resting on its base without legs, never growing any" / ", each figure with the body it has: the man on two legs; the horse on all four legs, never rising onto its hind legs" |
+| front or back mid-step redraw | `WALK_START_TEXT_ANY_BODY`: one leg lifted, the others planted, then what it stands on; a body without legs has no step to catch and films from its base (`starts_mid_step` is false, `video-prompt` gives no `start_still`) |
+
+Only the biped sentences were measured on clips; the others say no part the body lacks and are not
+yet measured. `--handed` keeps its own sentences (its arm sentences are for an item on an arm).
+`video-set`, `video-prompt --json` and `gen`'s `extra.view` record the plan as `body_plan`. An app
+that draws the still itself with `still_view_text` and films with `build_prompt` passes the same
+`body_plan` to both: the clip starts from that still.
+
+#### The sheet rows — `prepare --body-plan`
+
+The rows `prepare` writes for an image model (`prompts/<state>.txt`, [atlas workflow](atlas-workflow.md))
+were measured on people too. The walk and run rows moved "body, arm, leg, hair, and prop", the front and
+three-quarter-front walks "alternating leg, arm, shoulder", the diagonal runs traded "foot-contact phases"
+of "the left and right legs", the wave was "arm pose only: arm down, arm raised, hand tilted" (its default
+action "friendly hand wave gesture"), every row's anchor lock spent its motion on "arm counter-swing" and
+turned "the body, feet, shoulders", and a diagonal row read its facing by "shoulder overlap, hand/foot
+placement". `prepare --body-plan` (the same plans and scene form; repeatable; over the request's
+`body_plan`) gives a body that is not one biped:
+
+| Row sentence | for a body that is not one biped |
+|---|---|
+| walk, run, `running-right` / `-left` (`STATE_REQUIREMENTS`) | `STATE_REQUIREMENTS_ANY_BODY`: locomotion through "the movement of the body, whatever it moves on, loose parts such as hair, a mane or a tail, and props only" |
+| `frontwalk`, `45_frontwalk` | "alternating steps of whatever it walks on and body-height changes"; "the contact and passing poses" |
+| the diagonal runs | "alternating contact phases of whatever it moves on so the two sides clearly trade forward reach" |
+| wave | the one side that lifts, as the clip's wave does (`MOTION_TEXT["wave"]`): "lowered, lifted, swaying, returning", the body planted where it stands or rests; the default action `DEFAULT_ACTIONS_ANY_BODY["wave"]` where the request names none |
+| anchor lock (`ANCHOR_LOCK`) | `ANCHOR_LOCK_ANY_BODY`: "the contacts of whatever it moves on, body height, body lean, head bob, the bounce of hair, a mane or a tail"; rotate "the body, face angle, and gaze"; "step phase", "contacts" |
+| a diagonal row's facing | "the silhouette of hair, a mane or a tail, the overlap of near and far parts" |
+| every row, last state requirement | what it stands on (`body_plan.text`), as after a clip's motion sentence |
+
+The run records the plan in `sprite-request.json` as `body_plan` (absent without one), and a run
+prepared again from that request keeps it. No body plan, or one biped, writes every row prompt as
+2.32.0 did, byte for byte (`tests/fixtures/prepare-rows-v2.32.0.json.gz`, `tests/gen/test_prompt_freeze.py`).
+The new rows are not yet measured on an image model. A request's own `action` is its own words and is
+never rewritten.
+
+### A clip from a video MCP on your agent — ZCRE
+
+sprite-gen never calls a video MCP. When your own agent (Claude, Codex) has one connected — ZCRE's
+remote MCP (`https://mcp.zcre.ai/mcp`, signed in with your own ZCRE account, paid from your own
+credits, under ZCRE's terms) — the agent makes the clip with that MCP's tools and sprite-gen does the
+rest, stage by stage, with the verbs `video-set` runs: `video-prompt` prints the prompt `video-set`
+would send, `video-frames` and `video-loop` cut each mp4 the agent saved, and for a walk or run cut in
+two or more directions `video-cycle-align` gives them one cycle length, each turned to start on a
+foot strike ([loop repair](loop-repair.md) section 4). `video-set` itself is not run on this route, so
+what it does for a set happens only when you run it. What crosses the boundary is a PNG, a prompt and
+an mp4.
+
+```bash
+sprite-gen video-canvas --still still.png --state walk --facing right --out item/canvas.png --report item/canvas.report.json
+sprite-gen video-prompt --direction side --state walk --facing right --no-last-frame --json > item/prompt.json
+# the agent, with its ZCRE tools and grok-imagine-video-1.5: prepare_upload for item/canvas.png and the
+# transfer it describes, query_zcre upload to confirm it, query_zcre quote with prompt.json's prompt and
+# duration, the credits shown to the user and approved, create_generation with that quote, query_zcre
+# status until it succeeds, the output saved as item/clip.mp4
+sprite-gen video-frames --clip item/clip.mp4 --out-dir item/frames --spill auto --reference item/canvas.png
+sprite-gen video-loop --frames-dir item/frames/keyed --out-dir item/loop --fps <fps in item/frames/frames.report.json> --state walk --cycle auto --anchor motion-auto --facing right --name side-walk
+# a set, once the walk is cut in every direction (each as above, in its own folder):
+sprite-gen video-cycle-align --loop-dir front/loop --loop-dir side/loop --loop-dir back/loop --view front --view side@right --view back --report walk.cycle-align.json
+```
+
+A walk or run is cut with `--anchor motion-auto`. A clip on this route has no end frame to bring it
+back to its first frame's size, and `motion-auto` is the anchor that measures the size over the clip
+and holds it before the cycle search
+([section 4](#4-loop--period-first-seam-second-then-the-gait-floor)); `video-loop`'s own default for a
+walk or run, `body`, does not. A jump takes no `--anchor`: `motion-auto` is refused for a state that
+is not a walk or run. `--fps` is the frames report's own, never a number written in by hand.
+
+The set stage is the same step `video-set` runs after its loops are cut (`--align-cycles auto`, its
+default): one `--loop-dir` per direction of the same walk or run, one `--view` each in the same
+order, so that every loop starts as the same own foot lands wherever its view can tell the feet
+apart. A frame that falls between two source frames is made by RIFE, and the command fails where one
+is needed and RIFE is not installed; `--between nearest` makes none. A frame RIFE made that melted
+(lost its outline where legs crossed too far) is replaced by the nearer source frame and named
+(`--between auto`, the default; [loop repair](loop-repair.md) section 4). A loop whose view cannot
+tell its feet apart — or tells them apart by too small a margin (`foot_why` `low-margin`) — starts
+on its larger strike and is listed under the report's `unnamed_feet` with its two strike frames in
+`cycle/`: look at the first, say which own foot lands there, and run the same alignment again with
+`--foot <loop>=left|right` — that loop alone turns to start on the set's foot
+(`start_foot_source: "given"`).
+
+`--character` or `--motion` words that turn the subject another way than `--facing`, or put a
+`--handed` item on its other side, come back in `warnings`; the prompt is the same either way
+([prompt-assembly](prompt-assembly.md)).
+
+`video-prompt --json` also gives the duration (the state's own, as `video-set`), whether the clip
+ends on the canvas (`last_frame`), the loop cut (`cycle`) and the canvas, clip, frames and loop
+commands with placeholders; a front or back walk adds `start_still`, the mid-step redraw `video-set`
+makes before its canvas (`sprite-gen gen --ref`, your image provider). Its `loop` command names no
+`--anchor` and it lists no set command: add `--anchor motion-auto` for a walk or run, and run
+`video-cycle-align` for a set, as above. `--character`, `--motion`, `--model` and `--body-plan` reach the
+prompt as they reach `build_prompt`. What the ZCRE route supports:
+
+| | Through ZCRE's MCP |
+|---|---|
+| Model | `grok-imagine-video-1.5` (Grok Imagine Pro), image-to-video only. There is no Lite model there, so `LITE_WALK_TEXT` never applies. |
+| End frame | None. `--no-last-frame` refuses what `video-set` films pinned — idle, attack, a walk or run in a diagonal (`pins_last_frame`). `--unpinned` films one anyway, with a warning: the prompt asks for an evenly paced repeat (an attack for one strike), the loop is searched instead of cut whole, and it may not close. Walk, run and jump from the side, front and back are the route. |
+| Resolution | 480p, 720p, 1080p. The clip keeps the canvas's ratio (a 1024² canvas came back 544² at 480p and 960² at 720p). |
+| Audio | Always an AAC track; there is no option to leave it out. `video-frames` reads the picture alone, records `audio_streams`, and the loop outputs carry no sound. |
+| Cover image | The mp4 also holds a one-frame mjpeg cover (`attached_pic`); `video-frames` skips it (`cover_streams`) and reads the first video stream that is not one (`stream_index`). |
+| Picture | H.264 `yuv420p` (4:2:0), 24 fps, as a `sprite-gen video` clip; the frames report records `codec` and `pix_fmt`. |
+| Side facing | `video-set`'s facing observation is not run on this route; check the still faces `--facing`. |
+| Set | `video-set`'s cycle alignment (`--align-cycles auto`) is not run on this route: once a walk or run is cut in two or more directions, run `video-cycle-align` on their loop directories, with each one's `--view`. |
+| Size | A clip here has no end frame, so a walk or run may grow or shrink as it plays: cut it with `--anchor motion-auto`, which holds the size before the search (section 4). `video-loop`'s default anchor for a walk or run, `body`, does not hold it. |
+
+Measured 2026-10-04, one side walk end to end on that route: a 1024² still, `video-canvas` (square,
+1.8 s), 720p 3 s, quoted and charged 52 credits, 33.6 s from submission to `succeeded`; the clip was
+960×960, 24 fps, 73 frames, H.264 `yuv420p` with an AAC track and a cover image; `video-frames` kept
+73 frames and no edge contact, and `video-loop --cycle auto`, at its default anchor (`body`), cut a periodic 20-frame walk (seam 0.72)
+with three frames remade by RIFE and a jolt warning (index 0.85), as a Pro walk can carry.
+
+### Handedness — an item on one side
+
+A watch on one wrist, a pin on one side of the head, a bag on one shoulder: a right-facing view turned
+over puts the item on the other side. Mirroring stays the default — five views make eight directions —
+because drawing the left-facing views costs as much again. For a character whose item must stay put,
+draw them instead, and say where the item is.
+
+**The item, once.** `--handed "<item>=<left|right> [body part]"` names an item and the character's own
+side it is on (`handedness.parse`; repeatable): `"the black smartwatch=left wrist"`. The engine works
+out where that side is in each view (`handedness.placement`):
+
+| view | own left side, turned right | own left side, turned left |
+|---|---|---|
+| `front` | the picture's right | (not turned) |
+| `back` | the picture's left | (not turned) |
+| `side` | the far side, behind the body | the near side, toward the viewer |
+| `front_diagonal` | the picture's right, far side | the picture's right, near side |
+| `back_diagonal` | the picture's left, far side | the picture's left, near side |
+
+The own right side is the mirror of every row. A side view has no picture side — both arms cross the
+middle of the body — only near and far.
+
+**The still.** `sprite-gen gen --direction <view> [--facing right|left] --handed …` adds the engine's
+view sentence (`still_view_text`, the one a diagonal or front still is drawn with) and, per item, the
+handedness sentence (`handedness.text`): the item is on the own left wrist only and the right wrist has
+none; where that wrist is in this view (at the picture's right, on the far side); and that these
+sentences decide the side whatever an attached picture shows. A side or diagonal view needs `--facing`,
+a front or back view takes none. With `--handed`, `--facing-fix mirror` is refused and `regen` never
+falls back to mirroring a still-opposite retry: a mirror moves the item. Do not attach a picture whose
+item is on the other side — a mirrored still, or a side picture drawn the wrong way: check it with
+`handed-check` first. A front or back picture, where the item's side is plain, is the safe reference.
+
+**The far arm of a side view.** A side view hides the far side behind the body, except for what swings
+out from behind it. A walking character's far arm comes forward of the body with every step, and what
+its wrist or hand wears shows then. So an item on a wrist, a hand, a forearm or an elbow
+(`handedness.limb`, the one table: `SWINGING_ARM_PARTS`) is said, on the far arm, to show wherever that
+arm is out in front of the body and to be hidden where the body covers it. Every other far item — on an
+ear, the head, a tail, the body, a leg, a shoulder, the upper arm — is said hidden, as in 2.22.0, and
+gets no arm sentence: a far shoulder stays behind the body as the character walks, and a leg's item
+showing as it steps forward was never filmed. 2.22.0 said every far item hidden and never named it in
+the clip, and a watch on the far wrist was then in no frame of the side walk.
+
+A clip keeps what its first frame shows and makes up what it hides. For a walk or run with an item on
+the far arm, draw the side still **mid-stride with both arms in view**, and say the pose in your
+prompt — the engine's sentence says where the item shows, not how the character stands:
+
+> caught in the middle of a walking stride: the far arm swings forward, its forearm and hand out in
+> front of the chest, clear of the body's outline, with the watch on that wrist in plain sight; the
+> near arm swings back past the body and shows whole
+
+`video-prompt --json` names this under `still_needs` (and on stderr), and `video-set` under each
+item's `still_needs`, whenever a walk or run has an item on the far wrist or hand of a side view.
+
+**The clip.** `video-prompt --handed …` and `video-set --handed …` end the clip prompt with where the
+item stays (`build_prompt(handed=...)`). The clip starts from a still already drawn with the item in
+place, so the sentence anchors to the image and names the item once, positively, where it shows: "The
+black smartwatch stays on the wrist at the right of the picture, nearer the viewer, for the whole clip,
+exactly as in the image, and on no other wrist." In a side view's walk or run with an item on a wrist,
+a hand, a forearm or an elbow, the arms are said to swing (`handedness.ARMS_SWING_TEXT`: "Both arms
+swing back and forth with each step, opposite to the legs."), and then:
+
+- on the far arm: "The black smartwatch stays on the wrist that wears it in the image, on the arm on
+  the far side of the body, and shows each time that arm swings forward; the arm nearer the viewer
+  stays bare, exactly as in the image."
+- on the near arm: "The black smartwatch stays on the wrist that wears it in the image, on the arm
+  nearer the viewer; the other arm, on the far side of the body, stays bare both where it shows behind
+  the body and where it swings out in front of it."
+
+No sentence holds an arm still: the arms swing with the walk. The other arm is said bare, never as a
+list of what it must not wear — a clip prompt that lists that draws it there. Where nothing brings the
+far side into view — any other part, or a state that does not step (idle, attack) — the
+item is not named at all: "The wrist nearer the viewer stays bare, exactly as in the image, for the
+whole clip." A side view names the near part "nearer the viewer", not "in front of the body": in a
+mid-stride still the far arm is the one in front of the body. Items on the same wrist share one sentence, and with an item on each wrist neither is
+called bare. `handed-check --strap` finds a bare band that a clip still grows on the other arm. A front
+or back walk's mid-step redraw (`walk_start_prompt`, `video-prompt`'s `start_still`) ends with the
+still's handedness sentences too: redrawn from the base alone, the model may put the item on the other
+wrist.
+
+**Left-facing views, drawn.** `video-set --facing right,left` films every side and diagonal view both
+ways, each from its own still: `--base side@right=E.png --base side@left=W.png --base
+front_diagonal@right=SE.png --base front_diagonal@left=SW.png …` (front and back once, as before). A
+turned view with no still for one facing is refused, naming the `gen --direction … --facing …` call
+that draws it — the engine never turns one over for the other. Items are named `side-left-walk`, the
+table reads `side (left)`, each side still is inspected for its own facing into its own copy
+(`side-left.facing.png`), every gait is aligned across all eight (`--align-cycles auto`), and a
+left-facing diagonal is canvassed, prompted ("heading diagonally toward the viewer and to the left")
+and cut (`video-loop --facing left`) as a left one. One facing keeps the item names and table as before.
+
+**The check.** `sprite-gen handed-check --strip <loop>.strip.png --direction <view> [--facing …]
+[--state walk] --handed … --marker '#RRGGBB'` (or `--image`, `--frames-dir`) finds the item by a saturated colour
+nothing else on the character has — a watch's screen — and checks every frame:
+
+- a view with a picture side: every blob of that hue is on that side of the body's centre (the mean x
+  of its opaque pixels);
+- every view: the item in at most one place (blobs within 2 % of the body height are one; one smaller
+  than a quarter of the largest is a speck — a clip's colour blocks tint outlines toward the item's
+  hue — recorded and drawn, not judged);
+- the near side of a diagonal view: the item shows in at least half the frames; of a side view, in at
+  least three quarters — a near arm is in view the whole walk, a far arm's item for the half of it the
+  arm is forward, and in a side view that share is what tells the two apart. Against `--reference` a
+  frame counts only when the item is more than a sliver (its largest blob larger than half the item
+  seen whole);
+- the far side of a side view, an item on a wrist, a hand, a forearm or an elbow (`handedness.limb`):
+  every blob is out in front of the body — on the facing side of the body's centre by at least a tenth
+  of the body's height (`far_in_front`). An item that shows at or behind the centre is on the near arm,
+  the wrong one. With `--state walk` or `run` it must also show in at least a quarter of the frames
+  (`far_shown`); without `--state`, or for a state that does not step, that is reported unchecked.
+  Against `--reference` a sliver is not judged for where it is;
+- the far side of a side view, any other item (an anklet, a shoulder piece, a pin on the head): no
+  blob larger than half the item seen whole on `--reference` (a keyed front or back picture;
+  `far_hidden`).
+
+Without `--reference` the size rules are not checked; the report says so (`far_hidden` /
+`near_whole`: `checked: false`) and a frame counts as shown by any blob.
+
+`--strap '#RRGGBB' --zone TOP,BOTTOM` adds the item's band seen without its marker: pixels of that
+colour in those rows of the body (fractions of its height), eroded so outlines drop out, wider and
+taller than 1.6 % of the body height and away from every marker blob, are another place the item
+shows. It is opt-in because dark colours are common — outlines, a hat, motion smear on the legs — and
+the zone is the character's wrist height. `--board` draws every frame with its blobs ringed (green as
+expected, red not) and bands boxed, for what pixels cannot judge: an unmarked item, an item hidden on
+the wrong hand. The exit code is 1 on a failure.
+
+A set that made its left-facing views by mirroring fails: a front view turned over puts the item on
+the wrong side; a side walk facing right (the item on the far arm, in view while that arm is forward)
+turned over shows it in too few frames for a near arm; one facing left (the item on the near arm,
+crossing the body) turned over shows it behind the body's centre; a diagonal turned over moves it
+across the picture. `tests/qa/test_handed_check.py` draws each view as it should look, passes it, and
+fails it turned over.
 
 ## 3. Frames — extract, key, check the edges
 
@@ -247,7 +651,9 @@ anything one or two pixels wide, and despilling what is left turns thin red stra
 orange. `video-frames --decontam palette` (also `video-set --decontam palette`) re-explains
 each edge pixel as a blend of the local key background with one colour the subject owns,
 and writes that colour at the pixel's observed luma. It uses the video fit and one palette
-per clip, learned on the first frame, so edge colours cannot flicker between palettes. The
+per clip, learned on the first frame, so edge colours cannot flicker between palettes. Within
+the edge band the edge gate reads, it gives no coverage to a pixel the matte left transparent,
+so it adds no edge contact: a clip with none under `off` has none under `palette`. The
 default `off` keeps frames byte-identical. Method, guards and measurements:
 [chroma-alpha.md](chroma-alpha.md#decontam--give-the-edge-the-subjects-own-colour-back).
 
@@ -259,7 +665,9 @@ wider than the body (a skirt, a veil, a held object). Both fail `video-frames`'s
 edge-contact check — the clip was made, the frames were cut, and the run stops at the
 gate. The state table now routes `cheer`, `wave` and `celebrate` to the wide canvas, and
 `video-set --shape wide` forces it for every state of a batch when the costume is the
-reason. The same `--shape` is what `video-canvas` already took for a single still.
+reason. The same `--shape` is what `video-canvas` already took for a single still. The
+forced canvas is the forced-wide row (35 % above), so a jump in that batch keeps its
+head-room; an attack in it gets that row too, not its own 20 %.
 
 ## 4. Loop — period first, seam second, then the gait floor
 
@@ -322,9 +730,122 @@ anatomical left/right contacts. The report records `half_period_guard.reason =
 "ambiguous-harmonic"` and `cycle.review_recommended = true`. See [loop review](loop-review.md)
 for the visual review contract and manual overrides.
 
+**The fundamental period: recorded, never cut on the pixels' word.** A motion that repeats every
+P frames repeats every 2P as well, and 2P can be the better repeat: a clip drawn on twos (a new
+drawing every other frame) whose cycle is an odd number of frames shows each cycle half a drawing
+off the one before, so the profile dips deeper two cycles on than one, and the minimum taken above
+is two cycles. Played alone that loop is clean; resampled to the length of a set whose other loops
+hold one cycle ([loop repair](loop-repair.md) section 4) it walks at twice their speed.
+
+The engine does not cut it shorter. Half a gait cycle on, the legs are back in place with near and
+far swapped; where the two legs are drawn alike (one colour of trousers, white fur) that one step
+and a true cycle half a drawing late are **the same picture**. Every rule tried that took the half
+as a cycle — an absolute pixel distance, the legs' step count, the pose on the motion's path — cut
+some one-stride walk or run to its half step, and the leg signal fails both ways (a heel kick
+swings the stride twice a step; a diagonal view's two steps open the feet unequally). So
+`video-loop` cuts the period it always cut, and only **records** what a half or a third of it shows
+(`cycle.fundamental`, `sprite_gen/video/period.py`):
+
+- each candidate is the profile's own minimum within a frame of P/2 and P/3 (`checked`: `period`,
+  `of`, `divisor`, `cycles`), no shorter than the gait floor (walk 0.6 s, run 0.35 s; other states
+  the window's floor — under the floor a repeat is one step, the half-period guard's case);
+- it is measured: `periodicity` (its dip below the profile's mean), `pose` (how far the frame one
+  candidate on lies off the motion's own path — over the short spans (a, b) around a frame, the
+  least `D[a][x] + D[x][b] − D[a][b]` — over that frame's own distance, both in playback steps;
+  `off_path`, `distance`), and, for the record only, the legs' `steps` and `follow`
+  (`sprite_gen/video/legs.py`, the signal the foot-strike turn reads);
+- one rule, `period.verdict`, decides (`verdict`, `why`): a candidate that repeats — dips 0.15 or
+  more below the profile's mean — is a `suspect`, and the suspects are listed (`suspects`). That is
+  the whole rule. Nothing says "this is a cycle", and nothing says "this is not one": the pose and
+  the legs are evidence for whoever looks, never a reason to refuse. A rule that refused "another
+  pose" (pose 0.8 or over) missed most two-stride loops whose second stride was redrawn a little
+  differently — moved a pixel, a few per cent lighter, the foot kicked higher — because in pixels
+  that is off the motion's path just as a step with the legs swapped is.
+
+`review_recommended` keeps its meaning (the ambiguous-harmonic retention above). The record is for
+the set stage: `video-cycle-align` screens every loop by the same rule, stops a set on a suspect,
+and takes one cycle out of a loop only when told how many it holds (`--cycles`, [loop
+repair](loop-repair.md) section 4). The local search of `--anchor motion-auto` records the same.
+The rule leans one way on purpose: a suspect costs a look, a miss a loop that plays twice as fast.
+A run's half step repeats as well as most of its strides do, so a run set is suspected nearly
+every time and stops until its loops are counted; a walk's half step is under its floor more
+often. What still escapes it is a second stride that drifts across the picture in steps of four
+pixels or more without the body anchor's ramp, and any loop whose half is under the gait floor
+(a walk faster than 0.6 s a step).
+
+**The size is held before the search** (`--anchor motion-auto`, `--size-hold auto`, the default).
+A walk or run filmed from its first frame only (no end frame) often grows or shrinks as it plays:
+a front walk comes a little closer with every step, a back walk goes away. The loop is then cut on
+frames that change size, so the frame one cycle after the first is not the first's size and the
+loop pops at the wrap. The change is read one cycle on (`gait_fallback.cycle_drift`): the lag at
+which the pose, cut out about its feet, matches itself best (in the state's window, at most half
+the clip), and each frame's height (to a fraction of a pixel: the rows' coverage summed) against
+the frames one, two, … of those lags later. The median of those changes per frame, carried over
+the clip, is the `drift`. At 1 % or more (`SIZE_HOLD_MIN`) every frame is scaled back to the
+first frame's size about its fitted foot point before the cycle search, so the search, the seam
+and the cells all read frames of one size. Below 1 % the frames are searched as filmed.
+
+Why one cycle on, and not a line through the clip (2.24.0): a clip that starts from a standing
+pose and settles into the walk over its first steps (knees bending, the body leaning in) is a few
+pixels shorter from then on, and a line through every frame reads that one change of pose as a
+body that shrinks the whole way, and held it. The same pose a cycle later is the same size
+unless the body really changes, and the few frames of the first pose do not move a median of the
+rest. The other way round, a settle can
+pull the line flat over a walk that does grow; one cycle on, that growth is still read and held.
+On a synthetic walker that stands 6 px taller for its first frames and then walks at one size,
+the line read −2.2 % and the hold, so scaled, then found no cycle at all; one cycle on reads 0
+and the clip is cut as filmed (`tests/video/test_gait_fallback.py`).
+
+The report says what was measured and done (`size_hold`: `drift`, `applied`, `padding_ltrb`, and
+the evidence: `method: one-cycle-on`, `lag`, `pose_match` — the pose's mismatch at that lag over
+its mean across the window, 0 for an exact repeat — `pairs`, `per_lag`, the change over one lag,
+and `drift_fitted_line`, what a line through the clip would have read). `--size-hold off` searches
+the frames as filmed, as before 2.24.0. When the hold came in (2.24.0, read off the line) it was
+measured on one front catwalk filmed from its first frame (+2.0 % over 3 s): the engine's seam
+ratio of the cut went from 1.44 to 1.19.
+
+**Nothing is cut when a frame is scaled up.** A clip that shrinks is scaled up about its feet,
+and when the feet also rose in the frame (a back walk going away toward the horizon) the crown
+lands above the frame. Every frame is first widened by the room the furthest one reaches past
+each edge (`gait_fallback.undo_padding`, the same for every frame; `padding_ltrb` in the
+report), so no part is lost. A frame that needs no room keeps its size and bytes. The gait
+fallback's own scale-back (below) widens the same way.
+
 Gates, all fail-loud: no period (profile flat, below the recorded `periodicity_min`), loop seam ratio
 above `--seam-max` (2.0), GIF/WebP re-opened and checked (frame count, `loop=0`,
 transparent corners, no RGB under alpha 0 in the WebP).
+
+A walk or run loop then has its jump frames repaired before the strip is built: a frame that
+breaks a step 1.4× the loop's median (whole body, or the hair behind it) is replaced by RIFE's
+frame between its two neighbours, at most three and never two side by side (`--repair auto`,
+the default; `--repair off` cuts as filmed). The report's `jump_repair` names the frames. RIFE
+is installed once with `sprite-gen rife install`; without it a loop that needs a frame is cut as
+filmed with a warning (`--repair on` fails instead). See [loop repair](loop-repair.md). The repaired loop's jolt index and the head's frame-to-frame
+moves are reported (`jolt`); beyond the reference bounds that is a warning line, and a gate
+(`video-loop: loop jolts — …`) only when `--jolt-max` / `--head-step-max` are passed.
+
+**Held drawings: recorded on every loop.** A video model may film a walk at 12 drawings a second
+inside a 24 fps clip, each drawing shown for two frames ("on twos", or three: "on threes"). The
+report's `drawings` says so, read over the whole clip as keyed, before any cut
+(`sprite_gen/video/held.py`): `hold` (1 every frame a drawing, 2 or 3; `null` with a `why` for a
+clip too short or still), `drawings` and `drawings_per_second`, `held_steps`, and `contrast` per
+hold — the held steps over the change steps, the evidence. `cycle_drawings` is the same reading over
+the cut alone, on the clip's steps from the cut's first frame into the frame after its last (`start`,
+`length`, `steps`; `null` with a `why` under 12 steps, one window). `strip.json` carries both
+(`drawings`: `hold`, `drawings_per_second`, `contrast`, `frames`; `cycle_drawings`: `start`,
+`length`, `steps`, `hold`, `drawings_per_second`, `contrast`, `why`) for `video-cycle-align`, which
+reads the cut's: a clip may hold its drawings for only part of its length. The second frame of a pair is rarely a
+byte copy: the model redraws it a little, so its step is small, not zero, and a rule that calls a
+step held under a fraction of the median step misses it (with half the steps held the median falls
+between the two kinds). So the judgement reads the rhythm: for a hold of 2 or 3, in windows of 12
+steps, the phase whose every second (or third) step is the change, its held steps' median over its
+change steps' median; under 0.3 the clip is held, and each step is then held when it is under the
+geometric midpoint of the two kinds' means. A motion filmed every frame has no such rhythm — its
+steps swell and shrink with the stride over a dozen frames — and a clip whose steps alternate long
+and short but move every frame reads above it; so does a frame repeated now and then (a 20 fps
+clip carried at 24). Nothing is refused here: played at its own rate a held loop is ordinary
+limited animation. It matters when `video-cycle-align` stretches it ([loop repair](loop-repair.md)
+section 4, "Held drawings").
 
 ### One-shot actions — `--cycle auto|periodic|one-shot`
 
@@ -390,6 +911,35 @@ Outputs:
   which (`body_ref`: `first-frame` or `tallest-grounded`) and records `body_src_h` and `scale`. `delay_ms = cycle_seconds / frames`, so a
   24 fps clip yields 41.67 ms cells; render at 24 fps to keep one cell per frame
   (a 30 fps render of 24 fps cells is a 5:4 pulldown and judders).
+- **Cells** are scaled with their coverage and their colour taken apart (`resize_cell`; a cell
+  at its own size is copied as it is). Coverage keeps LANCZOS's edge, held between the least and
+  the most coverage of the source pixels the colour mixes from, so nothing spills outside the
+  silhouette and nothing opens inside it. Colour is a Hamming mix of premultiplied colour, a
+  filter with no negative lobe, so every pixel's colour is a mix of the colours under it. The
+  strip used LANCZOS over premultiplied RGBA before, which weighs the colours across an edge
+  against each other and divides by the edge's low coverage: on a keyed frame, whose edge holds
+  a light rim and ink with a little of the key's green, it drew a lighter rim and greener ink
+  than the frame had. On the synthetic outlined figure in `tests/video/test_strip_resample.py`
+  (a light rim, green-tinted ink, strands 0.5-1.4 px wide), LANCZOS left 1,462 pixels at 0.97x
+  and 1,750 at 1.03x with a colour none of the source pixels under them had; the split leaves
+  none, and the strands keep LANCZOS's coverage. Colour is no longer sharpened, so a 1 px line
+  inside the body comes out a little softer than LANCZOS drew it when a cell is enlarged. The
+  GIF and WebP are cut from these cells. The function lives in `sprite_gen/util/resample.py`
+  and is the resample of every place that scaled a keyed picture with LANCZOS: a row frame fitted to its cell and the twin
+  beside a pixel-unfake frame (`extract`), a sliced sheet's figures (`slice-sheet`) and a
+  scene's layers (`scene-render`) go through it too. Its twin for an affine map,
+  `transform_cell`, does the same for the places that moved, scaled, rotated or sheared a keyed
+  picture with BICUBIC: the gait fallback's scaled-back frames (`video-loop`, "The gait
+  fallback" in [loop-review.md](loop-review.md)) and a curated transform on a smooth row
+  (`curation.apply_transform`). Coverage keeps BICUBIC's edge, held to the coverage of the
+  2 x 2 source pixels the colour mixes from, and colour is a BILINEAR mix of premultiplied
+  colour. BICUBIC has the same negative lobe, smaller: on the synthetic figure it left 1,088 to
+  1,864 pixels with a colour none of the four source pixels under them had when a frame was
+  scaled back by 0.84x to 1.19x, and 840 to 2,102 for a half-pixel move, a 10° rotation, a
+  0.75x shrink, a shear and a 1.3x grow with a 15° rotation; `transform_cell` leaves none. The
+  same cost applies: colour is not sharpened. A pixel row's curated transform samples NEAREST
+  and is untouched. The scene GIF's ffmpeg downscale stays LANCZOS: it scales opaque composited
+  frames, where nothing is divided by a low coverage.
 - `<name>.gif` — `n_out` frames evenly across the cycle, 1-bit alpha, disposal 2, `loop=0`.
   `n_out` is a **playback density, not a fixed count**: `round(cycle_seconds × --gif-fps)`
   (default 24 fps = the source rate, so every cycle frame is kept; floor 4, never more than
@@ -415,6 +965,76 @@ scaling down rather than up, and lets the subject reach the frame edge. Items
 are idempotent (an existing clip is reused unless `--force`); one failure stops only
 its item and is listed in `table.md` with its stage and error. Exit code is non-zero
 when any item failed.
+
+A front or back walk films from its base redrawn mid-step (`--walk-start redraw`, default; one
+image generation each, `--still-provider` picks the provider; see §2). After the loops are cut,
+every walk or run filmed in two or more directions is given one cycle
+length: each loop is resampled to the set's median length (only the frames that fall between two
+source frames are made, by RIFE, and one that melted takes the nearer source frame instead (`--align-between
+auto`, the default; `rife` keeps every made frame, `nearest` makes none))
+and turned to start as the same own foot lands in every view — read off the legs, never off an
+ear or a hat's point, and the foot told apart by the item's own view and facing (`--align-cycles
+auto`, the default; `off` keeps each loop's own length). The same step stands alone as
+`sprite-gen video-cycle-align --loop-dir … --view …`. `set.report.json` carries `cycle_align`
+per state (with `start_foot` and `start_foot_source` per item, and the loops whose foot nobody named
+under `unnamed_feet`, told back with `--align-foot <item>=left|right`), a failed alignment is listed as `cycle-align:<state>`,
+and a made frame with a smear, one that melted and was replaced, or a loop whose foot could not be named is a line under
+`warnings`. A held loop stretched past what an interpolator bridges is named for a new take: the
+state's `retake` (reason `held-drawings`, with its numbers; per item under `cycle_align.retake`) and
+a warning line ([loop repair](loop-repair.md) section 4, "Held drawings"). Two cases skip the alignment with a warning instead of failing it (`applied: false`,
+`reason`, and a line under the report's `warnings`): no RIFE (`rife-not-installed`), and a loop
+that may hold more than one cycle (`cycle-suspects`, the loops under `suspects`; count them, then
+`video-cycle-align --cycles <loop>=<k>`). See [loop repair](loop-repair.md) section 4.
+
+## 6. Follow-through — `video-follow`
+
+A clip model draws a walk's body moving, but a soft part hanging off it (a chest, a belly, a
+pouch on a strap) mostly moves with the body as one piece, even when the prompt asks it to
+bounce. `video-follow` puts that follow-through back on a cut loop:
+
+```bash
+sprite-gen video-follow --loop-dir set/front-walk/loop --region 136,164,60,50 [--region …] \
+  [--gain 2.5] [--on-fold refuse|lower] [--freq 2.4] [--zeta 0.6] [--board follow.png]
+```
+
+- **The region** is an ellipse over the part in the strip's first cell, in cell pixels
+  (`cx,cy,rx,ry`; repeatable). It is carried with the body's bob from cell to cell. Somebody has
+  to say where it is — the engine does not find it: look at the first cell (or ask a vision model
+  for the four numbers once per direction; a mirrored direction takes the mirror's region).
+- **The motion** is the body's own: the crown's row (up and down) and the middle of the head
+  (side to side), read off the cells. The part is a damped mass on the body — its offset x from
+  where the body carries it answers x'' + 2ζωx' + ω²x = −body'' — solved in the loop's periodic
+  steady state per harmonic of the cycle (the first six), so it lags the bob and settles, with no
+  kick at a foot strike, and the last frame leads into the first. `--freq` (2.4 Hz) and `--zeta`
+  (0.6) set the part; `--gain` (2.5) scales the physical answer and nothing else. On a front
+  walk with a 12 px bob in a 600 px body that is a move of about ±5 px; `--gain 1` is the mass as
+  measured, `0` gives back the strip as it was.
+- **Only the region moves.** Inside it every pixel is moved by the offset times a weight that is 1
+  at the centre and 0 at the rim (cos²), sampled as premultiplied bilinear colour; outside it no
+  pixel changes. A move so large that the weight's slope folds the picture over
+  (offset × π / (2 · radius) ≥ 1) is refused: lower `--gain` or give the region larger radii.
+- **`--on-fold lower`** lowers the gain for you instead of refusing. The move is the gain times
+  the move at gain 1, so the gain at which a region folds is 2 · radius / (π · move at gain 1),
+  and the strip takes the largest gain under it, in steps of 0.01 and no more than `--gain`. One
+  gain for the strip, set by the region with the smallest radius: every part hangs on the same
+  body and answers the same motion, and the recorded `gain` is then the `--gain` that gives this
+  strip by itself. It does not go under 1, the mass as measured: a region too small for that is
+  refused (the message names the largest gain that would not fold), so a follow-through is never
+  quietly weaker than the motion it answers. The default stays `refuse`, with the same output and
+  the same message as 2.24.0; a strip that does not fold is the same under either.
+- **What it writes**: the strip, GIF and WebP over the loop's own (both animations re-opened and
+  checked as `video-loop` checks them), and `follow` in `<name>.strip.json` (the regions, the
+  settings, the body's bob, `dx_px`/`dy_px` per cell, `reach_px`; `gain` is the gain used and
+  `gain_requested` the one asked for, and `fold` says whether it was lowered, the move asked for,
+  the move at gain 1, and per region its smaller radius, how near the used move is to folding it
+  (`ratio`, under 1) and the gain at which it folds). A lowered gain is also named on stderr.
+  `cycle/` is left as cut. The strip as it was is kept as `follow.source.png`; running
+  `video-follow` again reads from it, so a second run never moves a moved strip. `--board` writes the cells before and after where the part
+  sits lowest and highest, on white.
+- **Order**: after `video-cycle-align`. An alignment rebuilds the strip from the cut, removes
+  `follow.source.png` and the `follow` record, and says so (`follow_cleared` in its loop row); a
+  new cut with `video-loop` removes them too. Run `video-follow` again after either.
+- A one-shot (`kind: one-shot`) is refused: the follow-through is a loop's steady state.
 
 ## What the rules were measured on
 

@@ -25,6 +25,8 @@ export function assetProvenanceLabel(asset:Asset,assets:ReadonlyMap<string,Asset
   switch(provenance.kind){
     case 'real-provider':label=`AI 생성 원본 · ${providerLabel[provenance.providerId||'']||provenance.providerId||'제공자 미기록'}`;break;
     case 'cutout':label='배경 제거 결과';break;
+    case 'clip-follow':label='동작 부위 흔들림 결과';break;
+    case 'clip-render':label='저장된 동작 렌더 결과';break;
     case 'raw-crop':label='추출 프레임';break;
     case 'video-frame-raw':label='영상 원본 프레임';break;
     case 'video-frame':label=provenance.processing==='video-finish'?(provenance.interpolated?`${interpolatedLabel}·색상 마무리 프레임`:'영상 색상 마무리 프레임'):provenance.interpolated?`${interpolatedLabel} 프레임`:provenance.processing==='video-normalization'?'영상 크기 정규화 프레임':provenance.processing==='chroma-key'||readProvenance(assets.get(provenance.parentAssetId||'')?.provenance).kind==='video-frame-raw'?'영상 배경 제거 프레임':'영상 추출 프레임';break;

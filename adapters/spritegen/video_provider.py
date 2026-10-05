@@ -7,19 +7,27 @@ from services.api.edits import number
 from .provider import _engine, ProviderError
 
 MODELS=('grok-imagine-video-1.5','grok-imagine-video-1.5-lite')
-DEFAULTS=dict(state='walk',direction='side',facing='right',motionPrompt='',model=MODELS[0],durationSeconds=3,resolution='480p',key='auto',loopMode='auto',maxFrames=32,bodyHeight=94,cellWidth=64,cellHeight=128,finishMode='gif',repairMode='off')
+DEFAULTS=dict(state='walk',direction='side',facing='right',motionPrompt='',model=MODELS[0],durationSeconds=3,resolution='480p',key='auto',loopMode='auto',maxFrames=8,bodyHeight=94,cellWidth=64,cellHeight=128,finishMode='gif',repairMode='off',between='auto',startFoot='auto',bodyPlan='',equipment='')
 
 def validate_params(params,*,generation):
-    allowed=set(DEFAULTS)|{'referenceRevisionId','videoId','startFrame','endFrame','spillReferenceAssetId','matchClipId'}
+    allowed=set(DEFAULTS)|{'referenceRevisionId','videoId','startFrame','endFrame','spillReferenceAssetId','matchClipId','startIndex'}
     if set(params)-allowed: raise s.AppError('VIDEO_FIELDS','지원하지 않는 영상 설정입니다.',details={'fields':sorted(set(params)-allowed)})
     value={**DEFAULTS,**params}
-    enums={'state':('idle','walk','run','jump','attack','dance','wave','cheer'),'direction':('side','front','back','front_diagonal','back_diagonal'),'facing':('right','left'),'model':MODELS,'resolution':('480p','720p'),'key':('auto','green','magenta','cyan','white'),'loopMode':('auto','full','manual'),'finishMode':('gif','rgba'),'repairMode':('off','auto','on')}
+    # Only new walks adopt the game-sized cycle; explicit saved requests keep
+    # their count, and other motions keep their previous extraction default.
+    if 'maxFrames' not in params and value['state']!='walk': value['maxFrames']=32
+    enums={'state':('idle','walk','run','jump','attack','dance','wave','cheer'),'direction':('side','front','back','front_diagonal','back_diagonal'),'facing':('right','left'),'model':MODELS,'resolution':('480p','720p'),'key':('auto','green','magenta','cyan','white'),'loopMode':('auto','full','manual'),'finishMode':('gif','rgba'),'repairMode':('off','auto','on'),'between':('auto','on','off'),'startFoot':('auto','left','right')}
     for k,values in enums.items():
         if value[k] not in values: raise s.AppError('VIDEO_SETTING',f'영상 {k} 설정을 확인하세요.')
     for k,lo,hi in [('durationSeconds',2,6),('maxFrames',4,64),('bodyHeight',16,512),('cellWidth',32,1024),('cellHeight',32,1024)]:
         number(value[k],lo,hi,k,True);value[k]=int(value[k])
     if value['bodyHeight']>value['cellHeight']-4: raise s.AppError('VIDEO_CELL','셀 높이를 몸 높이보다 4px 이상 크게 지정하세요.')
     if not isinstance(value['motionPrompt'],str) or len(value['motionPrompt'])>2000: raise s.AppError('VIDEO_PROMPT','동작 설명은 2,000자 이하로 입력하세요.')
+    from .video_prompt import parse_structured_params
+    parse_structured_params(value)
+    if 'startIndex' in value:
+        if generation: raise s.AppError('VIDEO_SETTING','시작 위상 직접 선택은 생성 완료된 영상에서 사용할 수 있습니다.')
+        number(value['startIndex'],0,63,'시작 위상',True);value['startIndex']=int(value['startIndex'])
     if value['loopMode']=='manual':
         if generation: raise s.AppError('VIDEO_RANGE','구간 직접 선택은 생성 완료된 영상에서 사용할 수 있습니다.')
         number(value.get('startFrame'),0,599,'시작 프레임',True);number(value.get('endFrame'),1,600,'끝 프레임',True)

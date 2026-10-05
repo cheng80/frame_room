@@ -1,6 +1,7 @@
 import {useState,useEffect,useRef,useId} from 'react';
 import {api,downloadJson} from './api';
 import {isVideoJob,videoJobStep,videoRetryLabel} from './videoWorkflow';
+import {VideoDiagnostics} from './VideoDiagnostics';
 import type {Studio} from './useStudio';
 import {exportGates} from './draft';
 import {InspectionPanel} from './WorkflowPanel';
@@ -9,7 +10,7 @@ import {RuntimePlayer} from './Canvas';
 import './export-workspace.css';
 import {Panel,Input,Select,Num,Check,Empty,short,date} from './ui';
 import {uid,type Runtime,type Job,type Artifact,type ExportRecord} from './types';
-const jobNames:Record<string,string>={generate:'이미지 생성',generate_video:'영상 생성·후보 추출',process_video:'기존 영상 후보 추출',extract:'프레임 추출',cutout:'배경 제거',align:'공통 정렬',inspect:'자동 검사',bake:'확정 미리보기',export:'게임용 출력',backup:'프로젝트 백업',restore:'백업 복원'};
+const jobNames:Record<string,string>={preview_follow:'부위 흔들림 미리보기',apply_follow:'부위 흔들림 새 동작 저장',check_handed:'장비 좌우 검사',generate:'이미지 생성',generate_video:'영상 생성·후보 추출',process_video:'기존 영상 후보 추출',extract:'프레임 추출',cutout:'배경 제거',align:'공통 정렬',inspect:'자동 검사',bake:'확정 미리보기',export:'게임용 출력',backup:'프로젝트 백업',restore:'백업 복원'};
 const statuses:Record<string,string>={queued:'대기 중',running:'처리 중',needs_review:'처리 완료 · 직접 확인 필요',succeeded:'완료',completed:'완료',failed:'실패',cancel_requested:'취소 요청됨',canceled:'취소됨',interrupted:'중단됨',provider_outcome_unknown:'외부 접수 결과 불명'};
 export function JobCard({job,s,onSelectClip}:{job:Job;s:Studio;onSelectClip?:(clipId:string)=>void}){
  const progress=typeof job.progress==='number'?job.progress:job.progress?.percent;
@@ -27,6 +28,7 @@ export function JobCard({job,s,onSelectClip}:{job:Job;s:Studio;onSelectClip?:(cl
   {job.errors?.map((e,i)=><p className="error" key={i}>{e.message}</p>)}
   {job.error?<p className="error">{job.error.message}</p>:null}
   {job.status==='provider_outcome_unknown'?<p className="warning">외부 생성이 접수되었을 수 있습니다. 접수 결과가 확인되지 않아 요청을 다시 보내지 않습니다.</p>:null}
+  {videoJob?<VideoDiagnostics processing={job.result?.processing}/>:null}
   {videoJob&&retryLabel?<p className="caption">저장된 영상 또는 접수한 요청을 이어서 처리합니다. 새 영상 생성 요청은 보내지 않습니다.</p>:null}
   <div className="row">
    {['queued','running'].includes(job.status)?<button disabled={s.busy} onClick={()=>s.run(async()=>{await api(`/jobs/${job.jobId}/cancel`,'POST',{expectedStatus:job.status});if(s.base)await s.refreshDetails(s.base.projectId);})}>작업 취소 요청</button>:null}

@@ -1,0 +1,98 @@
+{
+  "scope": "Two manually selected glove ROIs and one sleeve ROI; not a temporal or semantic color score.",
+  "gloves": {
+    "existing": {
+      "sourceIndex": 41,
+      "roi": [
+        343,
+        279,
+        369,
+        307
+      ],
+      "opaquePixels": 683,
+      "changedOpaqueRGB": 16,
+      "warmRangePixels": 209,
+      "unchangedWarmRangePixels": 209,
+      "sample": {
+        "xy": [
+          360,
+          295
+        ],
+        "raw": [
+          193,
+          173,
+          87,
+          255
+        ],
+        "keyed": [
+          193,
+          173,
+          87,
+          255
+        ]
+      }
+    },
+    "new": {
+      "sourceIndex": 17,
+      "roi": [
+        362,
+        268,
+        385,
+        293
+      ],
+      "opaquePixels": 509,
+      "changedOpaqueRGB": 13,
+      "warmRangePixels": 68,
+      "unchangedWarmRangePixels": 68,
+      "sample": {
+        "xy": [
+          374,
+          278
+        ],
+        "raw": [
+          94,
+          82,
+          15,
+          255
+        ],
+        "keyed": [
+          94,
+          82,
+          15,
+          255
+        ]
+      }
+    }
+  },
+  "newSleeve": {
+    "sourceIndex": 25,
+    "roi": [
+      238,
+      214,
+      260,
+      245
+    ],
+    "opaquePixels": 682,
+    "changedOpaqueRGB": 0,
+    "warmRangePixels": 682,
+    "unchangedWarmRangePixels": 682,
+    "sample": {
+      "xy": [
+        249,
+        229
+      ],
+      "raw": [
+        189,
+        175,
+        124,
+        255
+      ],
+      "keyed": [
+        189,
+        175,
+        124,
+        255
+      ]
+    }
+  }
+}

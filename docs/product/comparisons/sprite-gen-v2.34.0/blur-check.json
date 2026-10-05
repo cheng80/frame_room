@@ -1,0 +1,60 @@
+{
+  "existing": {
+    "default": {
+      "frames": 28,
+      "partialAlphaPixels": 0,
+      "meanPartialAlphaPixels": 0.0,
+      "visiblePixels": 60712,
+      "partialAlphaShare": 0.0
+    },
+    "rgba": {
+      "frames": 28,
+      "partialAlphaPixels": 16392,
+      "meanPartialAlphaPixels": 585.4,
+      "visiblePixels": 68623,
+      "partialAlphaShare": 0.2389
+    },
+    "latest-fixed": {
+      "frames": 28,
+      "partialAlphaPixels": 16348,
+      "meanPartialAlphaPixels": 583.9,
+      "visiblePixels": 68581,
+      "partialAlphaShare": 0.2384
+    },
+    "rgbaVsLatest": {
+      "changedForegroundPixels": 880,
+      "foregroundPixels": 68626,
+      "equalForegroundFraction": 0.9871768717395739,
+      "note": "Before placement, same selected interval; upstream fixed includes existing speck removal. Not a perceptual sharpness score."
+    }
+  },
+  "new": {
+    "default": {
+      "frames": 24,
+      "partialAlphaPixels": 0,
+      "meanPartialAlphaPixels": 0.0,
+      "visiblePixels": 41805,
+      "partialAlphaShare": 0.0
+    },
+    "rgba": {
+      "frames": 24,
+      "partialAlphaPixels": 13370,
+      "meanPartialAlphaPixels": 557.1,
+      "visiblePixels": 48094,
+      "partialAlphaShare": 0.278
+    },
+    "latest-fixed": {
+      "frames": 24,
+      "partialAlphaPixels": 13318,
+      "meanPartialAlphaPixels": 554.9,
+      "visiblePixels": 48044,
+      "partialAlphaShare": 0.2772
+    },
+    "rgbaVsLatest": {
+      "changedForegroundPixels": 840,
+      "foregroundPixels": 48097,
+      "equalForegroundFraction": 0.982535293261534,
+      "note": "Before placement, same selected interval; upstream fixed includes existing speck removal. Not a perceptual sharpness score."
+    }
+  }
+}

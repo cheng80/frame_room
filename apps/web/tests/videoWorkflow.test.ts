@@ -7,7 +7,7 @@ import {
   videoProcessingRequest, videoProvenanceLabel, videoRetryLabel, type VideoGenerationSettings,
   videoBeforeFinishSnapshot, videoClipColorLabel, videoJobStep, videoRangeBoundary,
   videoBatchItem, videoBatchRequest, VIDEO_BATCH_LIMIT,
-  videoMatchClips,
+  videoMatchClips, videoHasExactTimes, videoRangeSource,
 } from '../src/videoWorkflow';
 
 const video = {videoId: 'v', frameCount: 73, fps: 24, durationMs: 3042, provenance: {kind: 'imported-video'}} as Video;
@@ -16,9 +16,35 @@ const snapshot = {
   references: [{referenceRevisionId: 'draft', identityAssetId: 'unreviewed', approval: 'draft'},
     {referenceRevisionId: 'ref', identityAssetId: 'approved', approval: 'approved'}],
 } as Snapshot;
-const generation = (): VideoGenerationSettings => ({assetId: 'approved', model: 'grok-imagine-video-1.5', durationSeconds: '3', resolution: '480p', direction: 'side', facing: 'right', motionPrompt: ''});
+const generation = (): VideoGenerationSettings => ({assetId: 'approved', model: 'grok-imagine-video-1.5', durationSeconds: '3', resolution: '480p', direction: 'side', facing: 'right', motionPrompt: '', bodyPlan: '', equipment: ''});
 
 describe('video request boundaries', () => {
+  it('defaults to game eight while preserving twelve and explicit legacy frame counts', () => {
+    expect(defaultVideoProcessing()).toMatchObject({maxFrames: '8', finishMode: 'gif', repairMode: 'off', between: 'auto', startFoot: 'auto', startIndex: ''});
+    for (const n of [4, 8, 12, 32, 64]) expect(videoProcessingParams({...defaultVideoProcessing(), maxFrames: String(n)}).maxFrames).toBe(n);
+  });
+  it('sends phase and interpolation controls independently of jump repair', () => {
+    const params = videoProcessingParams({...defaultVideoProcessing(), between: 'off', startFoot: 'left', startIndex: '0'});
+    expect(params).toMatchObject({repairMode: 'off', between: 'off', startFoot: 'left', startIndex: 0});
+    expect(videoProcessingParams(defaultVideoProcessing())).not.toHaveProperty('startIndex');
+  });
+  it.each(['-1', '1.5', '64', 'NaN', 'Infinity', '9007199254740992'])('rejects invalid phase %s before enqueue', startIndex => {
+    expect(() => videoProcessingParams({...defaultVideoProcessing(), startIndex})).toThrow('수동 시작 위치');
+  });
+  it('restricts manual phase to existing video and rejects positions outside the requested output', () => {
+    const settings = {...defaultVideoProcessing(), startIndex: '7'};
+    expect(() => videoGenerationRequest(snapshot, generation(), settings)).toThrow('기존 영상 처리');
+    expect(videoProcessingRequest(snapshot, 'v', settings).params.startIndex).toBe(7);
+    expect(() => videoProcessingRequest(snapshot, 'v', {...settings, startIndex: '8'})).toThrow('0~7');
+    const manual = {...settings, loopMode: 'manual', startFrame: '0', endFrame: '4'};
+    expect(() => videoProcessingRequest(snapshot, 'v', manual)).toThrow('0~3');
+  });
+  it('rejects unsupported enums and preserves structured prompts for backend validation', () => {
+    expect(() => videoProcessingParams({...defaultVideoProcessing(), between: 'rife' as any})).toThrow('주기 보간');
+    expect(() => videoProcessingParams({...defaultVideoProcessing(), startFoot: 'near' as any})).toThrow('시작 발');
+    expect(videoGenerationRequest(snapshot, {...generation(), bodyPlan: ' the rider=biped; the horse=quadruped ', equipment: ' sword:right; shield:left '}, defaultVideoProcessing()).params)
+      .toMatchObject({bodyPlan: 'the rider=biped; the horse=quadruped', equipment: 'sword:right; shield:left'});
+  });
   it('defaults to an approved identity even when the active reference is a draft', () => {
     expect(defaultVideoAssetId(snapshot)).toBe('approved');
     expect(approvedVideoReference(snapshot)?.referenceRevisionId).toBe('ref');
@@ -26,9 +52,9 @@ describe('video request boundaries', () => {
   it('builds exactly one generation operation with an approved reference and low default settings', () => {
     expect(videoGenerationRequest(snapshot, generation(), defaultVideoProcessing())).toEqual({
       operation: 'generate_video', assetIds: ['approved'], params: {
-        state: 'walk', key: 'auto', loopMode: 'auto', maxFrames: 32, bodyHeight: 94, cellWidth: 64, cellHeight: 128, finishMode: 'gif', repairMode: 'off',
+        state: 'walk', key: 'auto', loopMode: 'auto', maxFrames: 8, bodyHeight: 94, cellWidth: 64, cellHeight: 128, finishMode: 'gif', repairMode: 'off', between: 'auto', startFoot: 'auto',
         model: 'grok-imagine-video-1.5', durationSeconds: 3, resolution: '480p', direction: 'side', facing: 'right',
-        motionPrompt: '', referenceRevisionId: 'ref',
+        motionPrompt: '', bodyPlan: '', equipment: '', referenceRevisionId: 'ref',
       },
     });
   });
@@ -121,12 +147,13 @@ describe('atomic video batch planning', () => {
     const first = videoBatchItem(snapshot, g, processing);
     const expected = videoGenerationRequest(snapshot, g, processing);
     expect(first).toEqual({assetId: expected.assetIds[0], params: expected.params});
-    g.direction = 'back_diagonal'; processing.finishMode = 'rgba';
+    g.direction = 'back_diagonal'; g.bodyPlan = 'quadruped'; g.equipment = 'sword:right'; processing.finishMode = 'rgba'; processing.maxFrames = '12';
     const second = videoBatchItem(snapshot, g, processing);
     const body = videoBatchRequest({...snapshot, revision: 12}, [first, second], 'stable-key');
     expect(body).toMatchObject({inputRevision: 12, idempotencyKey: 'stable-key'});
-    expect(body.items[0].params).toMatchObject({direction: 'side', finishMode: 'gif'});
-    expect(body.items[1].params).toMatchObject({direction: 'back_diagonal', finishMode: 'rgba'});
+    expect(body.items[0].params).toMatchObject({direction: 'side', finishMode: 'gif', bodyPlan: '', equipment: '', maxFrames: 8});
+    expect(body.items[0].params).not.toHaveProperty('startIndex');
+    expect(body.items[1].params).toMatchObject({direction: 'back_diagonal', finishMode: 'rgba', bodyPlan: 'quadruped', equipment: 'sword:right', maxFrames: 12});
     expect(body.items[0].params).not.toHaveProperty('spillReferenceAssetId');
   });
   it('accepts at most 16 coherent items and rejects an empty plan', () => {
@@ -200,6 +227,20 @@ describe('safe resume and source provenance', () => {
 });
 
 describe('actual PNG comparison and range controls', () => {
+  it('uses exact VFR boundaries when available and takes them only from the selected video', () => {
+    const vfr = {...video, frameCount: 3, fps: 30, durationMs: 400};
+    const job = {result: {videoId: 'v', processing: {source: {timesMs: [0, 100, 125, 400], streamIndex: 1}}}} as Job;
+    const timed = videoRangeSource(vfr, [job]);
+    expect(videoHasExactTimes(timed)).toBe(true);
+    expect(videoRangeBoundary(timed, .12, 'start')).toBe('1');
+    expect(videoRangeBoundary(timed, .125, 'start')).toBe('2');
+    expect(videoRangeBoundary(timed, .4, 'end')).toBe('3');
+    expect(videoRangeSource({...vfr, videoId: 'other'}, [job]).timesMs).toBeUndefined();
+    expect(vfr).not.toHaveProperty('timesMs');
+    expect(videoHasExactTimes({...vfr, timesMs: [0, 100, 100, 400]})).toBe(false);
+    expect(videoHasExactTimes({...vfr, timesMs: [0, 100, 125]})).toBe(false);
+    expect(videoRangeBoundary({...timed, fps: 0}, .1, 'start')).toBe('1');
+  });
   const clip = {clipId: 'clip', occurrences: [{occurrenceId: 'slot', frameVersionId: 'frame', durationMs: 42, pixelEdits: [{x: 1, y: 2, color: [255, 0, 0, 255]}]}]} as unknown as Clip;
   const stored = {...snapshot,
     assets: [{assetId: 'finished', width: 60, height: 100, provenance: {processing: 'video-finish', parentAssetId: 'normalized', finish: {mode: 'gif'}}}, {assetId: 'normalized', width: 60, height: 100}],
@@ -235,4 +276,13 @@ describe('actual PNG comparison and range controls', () => {
     expect(videoRangeBoundary(video, NaN, 'start')).toBeNull();
     expect(videoRangeBoundary({...video, fps: 0}, 1, 'end')).toBeNull();
   });
+});
+
+it('keeps stored imported-video direction unless explicitly overridden for foot analysis', () => {
+  const defaults = defaultVideoProcessing();
+  const old = videoProcessingParams(defaults);
+  expect(old).not.toHaveProperty('direction');
+  expect(old).not.toHaveProperty('facing');
+  const explicit = videoProcessingParams({...defaults, direction: 'back_diagonal', facing: 'left'});
+  expect(explicit).toMatchObject({direction: 'back_diagonal', facing: 'left'});
 });

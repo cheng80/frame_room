@@ -1,2 +1,4 @@
 # 고정된 외부 엔진은 원본 해시 검증을 위해 줄바꿈·공백을 보존한다.
 engine/sprite-gen/** -text -whitespace
+# 코드 비교 증거의 빈 context 줄은 unified diff 문법상 공백 하나를 포함한다.
+docs/product/comparisons/sprite-gen-v2.34.0/engine.diff whitespace=-blank-at-eol

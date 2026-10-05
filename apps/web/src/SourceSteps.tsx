@@ -187,7 +187,7 @@ export function GenerationStep({ s, onSelectClip }: { s: Studio; onSelectClip?: 
       {mode === 'video' ? <VideoStep key={s.snapshot!.projectId} s={s} onSelectClip={onSelectClip}/> : <ImageGenerationStep key={s.snapshot!.projectId} s={s}/>}
     </div>;
 }
-function ImageGenerationStep({ s }: {
+export function ImageGenerationStep({ s }: {
     s: Studio;
 }) {
     const p = s.snapshot!;
@@ -200,12 +200,14 @@ function ImageGenerationStep({ s }: {
     const [resolution, setResolution] = useState(String(settings.resolution || '1024x1024'));
     const [quality, setQuality] = useState(String(settings.quality || 'medium'));
     const [background, setBackground] = useState(String(settings.background || 'green'));
+    const [layoutGuide, setLayoutGuide] = useState(settings.layoutGuide === true);
     const [scope, setScope] = useState('states');
     const [frameVersionId, setFrame] = useState('');
     const provider = providers.find(p => p.providerId === providerId);
     const models = provider?.models || [];
     const approved = p.references.some(r => r.referenceRevisionId === p.activeReferenceRevisionId && r.approval === 'approved');
     const available = provider?.available !== false && provider?.loginReady !== false && !!provider;
+    const singleFrame = scope === 'frame' || frameCount === 1;
     useEffect(() => {
         if (!model && models.length) {
             setModel(typeof models[0] === 'string' ? models[0] : models[0].id);
@@ -217,6 +219,7 @@ function ImageGenerationStep({ s }: {
         prompt,
         background,
         frameCount: scope === 'frame' ? 1 : frameCount,
+        layoutGuide: !!provider?.capabilities?.layoutGuide && singleFrame && layoutGuide,
         ...(provider?.capabilities?.resolution ? {resolution} : {}),
         ...(provider?.capabilities?.quality ? {quality} : {}),
         scope,
@@ -241,6 +244,12 @@ function ImageGenerationStep({ s }: {
     <VideoBasePreset onApply={text => { setPrompt(previous => [previous.trim(), text].filter(Boolean).join('\n\n')); setScope('states'); setCount(1); }}/>
     <Select label="생성 범위" value={scope} onChange={e => setScope(e.target.value)}><option value="states">새 동작 후보</option><option value="sheet">스프라이트 시트</option><option value="frame">한 프레임 재생성</option></Select>
     {scope === 'frame' ? <Select label="재생성할 프레임" value={frameVersionId} onChange={e => setFrame(e.target.value)}><option value="">후보 선택</option>{p.frames.map((f, i) => <option key={f.frameVersionId} value={f.frameVersionId}>후보 {i + 1} · {short(f.frameVersionId)}</option>)}</Select> : <Num label="요청 프레임 수" value={frameCount} onChange={setCount} min={1} max={provider?.capabilities?.frameCount?.max || 24}/>}
+    {provider?.capabilities?.layoutGuide && <>
+      <fieldset disabled={!singleFrame} style={{border: 0, padding: 0, margin: 0}}>
+        <Check label="구도 가이드 사용" checked={singleFrame && layoutGuide} onChange={setLayoutGuide}/>
+      </fieldset>
+      <p className="caption">{singleFrame ? '머리 높이·발 위치·여백을 안내하는 보조 이미지를 함께 보냅니다. 로컬에서 만든 가이드이며 추가 생성 비용은 없습니다.' : '구도 가이드는 요청 프레임 수가 1장일 때 사용할 수 있습니다.'}</p>
+    </>}
     <Select label="생성 배경" value={background} onChange={e => setBackground(e.target.value)}><option value="green">녹색 · 배경 제거용</option><option value="white">흰색</option><option value="magenta">마젠타</option><option value="transparent" disabled={!provider?.capabilities?.nativeAlphaRequest}>투명 배경 요청</option></Select>
     <p className="caption">{background === 'transparent' ? '투명 배경 요청 후에도 응답 알파를 검수합니다. 투명도를 보장하지 않습니다.' : '단색 배경은 배경 정리 도구에서 제거할 수 있습니다.'}</p>
     <details className="source-tool-details" open={!available}>
