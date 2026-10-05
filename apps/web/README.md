@@ -124,8 +124,9 @@ node --check scripts/ego-smoke-page.mjs
 
 - 퀵스타트: `/guide/` · 상세 설명서: `/guide/manual.html`
 - 프로젝트 목록과 에디터의 `사용 설명서`에서 새 탭으로 엽니다.
-- `public/guide/content.json`: 기능별 본문, FAQ, 단축키. `scripts/generate-guide.mjs`: 6단계 퀵스타트와 정적 HTML 생성.
-- `public/guide/screens/`: 실제 에고 화면 9장. `media/`: 실제 예제 출력 atlas와 재생 좌표. 별도 API 호출 없이 설명서에서만 재생합니다.
+- `public/guide/content.json`: 기능별 본문, FAQ, 단축키. `scripts/generate-guide.mjs`: 6단계 퀵스타트와 13개 장의 상세 설명서 HTML 생성.
+- `public/guide/screens/`: 실제 에고 캡처·화면 스타일 PDF 렌더 12장. `media/`: 이전 6장 예제 atlas와 실제 8장 목도리 흔들림 전후 PNG/WebP. 별도 API 호출 없이 설명서에서만 재생합니다.
+- `/guide/manual.html#clip-tools`: 동작 보완·검사의 위치, 영역 지정·전후 비교·새 동작 저장, 장비 표식·의심 슬롯 이동 안내. 목도리 예제는 재생 버튼으로 시작하며 `media/clip-tools-source.json`에 출처·설정·파일 해시를 기록합니다.
 - `npm run guide:build`는 HTML을 갱신하며 `npm run build`에도 포함됩니다. 이후 저장소 루트에서 `python3 scripts/package-guide.py`를 실행하면 오프라인 ZIP을 갱신합니다.
 - `frame-room-guide.zip`을 풀고 `index.html` 또는 `manual.html`을 열면 서버 없이 본문·이미지·예제가 동작합니다. 에디터로 이동할 때만 로컬 앱이 필요합니다. 인쇄/PDF 버튼은 브라우저의 인쇄 기능을 사용합니다.
 - 설명서 체크리스트는 현재 문서 세션에서만 유지하며 프로젝트 승인과 연결하지 않습니다. ‘수동 승인됨’은 승인 버튼으로 기록된 상태이고, 자동 품질 판정이나 자동 후보 추천을 뜻하지 않습니다.

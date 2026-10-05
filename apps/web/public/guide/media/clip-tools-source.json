@@ -1,0 +1,38 @@
+{
+  "source": "기존 GPT 기준 그림과 Grok 영상에서 만든 하늘 해적 8장 동작의 로컬 부위 흔들림 전후. 설명서 제작 중 신규 AI 생성 없음.",
+  "date": "2026-10-06",
+  "previewJobId": "b8d25752-42fc-44bc-9144-b1522b9af6b3",
+  "sourceProjectRevision": 8,
+  "width": 96,
+  "height": 128,
+  "durationsMs": [
+    125,
+    125,
+    125,
+    125,
+    125,
+    125,
+    125,
+    125
+  ],
+  "settings": {
+    "clipId": "78281a77-6a09-446a-a9f6-33cea9938bfa",
+    "clipRevisionId": "d18dc93c-0553-477c-928f-b54264de8937",
+    "region": [
+      27.00003795997722,
+      47.99999850647113,
+      14.99999981300504,
+      10.000000186691107
+    ],
+    "gain": 2.5,
+    "freq": 2.4,
+    "damping": 0.6,
+    "onFold": "lower"
+  },
+  "sha256": {
+    "clip-follow-before.png": "839fa760bef2305fbca8e1adfa24216eedff27e3dfb73788eb4c687ae7e08be0",
+    "clip-follow-before.webp": "acb13de72367e42e47a7837b24ad2cd31f1775b3a6fb01ba5629fe6f72ec329a",
+    "clip-follow-after.png": "0b202f89419d393d7e09e9b41588abcdcf6c28a0401e316b9ea4ef062775c013",
+    "clip-follow-after.webp": "85a9c30635d3a6fa3b011513c71a29f768cf6565584ca5435676123d7f7b14f9"
+  }
+}

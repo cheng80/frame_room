@@ -13,6 +13,8 @@ for name in required:
 files = [base / name for name in ['index.html', 'manual.html', 'guide.css', 'guide.js']]
 files += sorted((base / 'screens').glob('*.png'))
 files += [base / 'media/atlas.png', base / 'media/reference.png']
+files += sorted((base / 'media').glob('clip-follow-*'))
+files += [base / 'media/clip-tools-source.json']
 with ZipFile(archive, 'w', ZIP_DEFLATED) as out:
     for path in files:
         # An offline copy does not offer a link to download itself.

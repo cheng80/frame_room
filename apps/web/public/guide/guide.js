@@ -39,7 +39,7 @@ if(search){const result=$('.search-results');const index=chapters.map(c=>({id:c.
 }
 const done=new Set();$$('input[data-step]').forEach(input=>input.addEventListener('change',()=>{input.checked?done.add(input.dataset.step):done.delete(input.dataset.step);$$('input[data-step]').forEach(i=>i.checked=done.has(i.dataset.step));$('#completion-count').textContent=done.size+' / 6';$('#completion-progress').value=done.size;$('#completion-title').textContent=done.size===6?'첫 동작, 끝까지 따라왔습니다.':'한 단계씩 확인하며 마무리하세요.';}));
 const recipes={
- walk:'승인한 기준 캐릭터의 오른쪽 방향 걷기 동작을 6프레임으로 만들어 주세요. 한 PNG 시트에 3열×2행으로 배치하고 왼쪽 위부터 순서대로 읽습니다. 왼발 접지·내려감·통과, 오른발 접지·내려감·통과를 서로 다른 자세로 표현하세요. 얼굴·의상·장비·색과 몸 크기, 카메라를 유지하세요. 발과 장비 전체가 셀 안에 들어오도록 여백을 두고, 프레임끼리 겹치지 않게 하세요. 실제 알파가 있는 투명 배경, 글자·격자선·바닥 그림자 없음.',
+ walk:'승인한 기준 캐릭터의 오른쪽 방향 걷기 한 사이클을 8프레임으로 만들어 주세요. 한 PNG 시트에 4열×2행으로 배치하고 왼쪽 위부터 순서대로 읽습니다. 왼발 접지·내려감·통과·올라감, 오른발 접지·내려감·통과·올라감을 서로 다른 자세로 표현하세요. 처음과 끝에 같은 그림을 중복하지 마세요. 얼굴·의상·장비·색과 몸 크기, 카메라를 유지하세요. 발과 장비 전체가 셀 안에 들어오도록 여백을 두고, 프레임끼리 겹치지 않게 하세요. 실제 알파가 있는 투명 배경, 글자·격자선·바닥 그림자 없음.',
  idle:'승인한 기준 캐릭터의 대기 동작을 4프레임으로 만들어 주세요. 한 PNG 시트에 4열×1행으로 왼쪽부터 순서대로 배치합니다. 제자리에서 미세한 호흡과 스카프 움직임이 보이게 하세요. 얼굴·의상·장비·팔레트·몸 크기와 발 위치는 유지합니다. 각 프레임에 전신과 장비가 잘리지 않도록 여백을 두세요. 실제 알파가 있는 투명 배경, 글자·격자·다른 인물 없음.',
  jump:'승인한 기준 캐릭터의 점프 동작을 6프레임으로 만들어 주세요. 한 PNG 시트에 3열×2행으로 준비·도약·상승·정점·하강·착지 순서로 배치합니다. 얼굴·의상·장비·카메라·몸 크기를 유지하고 팔다리 자세만 바꾸세요. 몸을 셀마다 다른 크기로 확대하지 마세요. 전신과 장비 주변에 넉넉한 여백을 두세요. 실제 알파가 있는 투명 배경, 글자·격자선 없음. 실제 점프 높이와 루트 궤적은 에디터에서 별도로 확인합니다.'
 };
@@ -60,4 +60,12 @@ if(timing){const input=$('#durations'),fps=$('#fps'),result=$('#timing-result'),
  $('[data-apply-timing]').addEventListener('click',()=>{const parts=input.value.split(',').map(v=>v.trim()),values=parts.map(Number);if(parts.length!==6||parts.some(v=>!v)||values.some(v=>!Number.isInteger(v)||v<1||v>60000)){error.textContent='쉼표로 구분한 1~60000ms 정수 6개를 입력하세요.';return;}update(values);});
  $('[data-hold]').addEventListener('click',()=>update([250,100,100,100,100,250]));update([100,100,100,100,100,100]);
 }
-document.addEventListener('visibilitychange',()=>{if(document.hidden)players.forEach(p=>p.stop());});
+const followStops=[];
+$$('.follow-demo').forEach(demo=>{
+ const button=$('[data-follow-play]',demo),images=$$('img[data-animation]',demo);
+ const show=playing=>{images.forEach(image=>image.src=playing?image.dataset.animation:image.dataset.still);button.setAttribute('aria-pressed',String(playing));button.textContent=playing?'첫 프레임 보기':'전후 비교 재생';};
+ button.addEventListener('click',()=>show(button.getAttribute('aria-pressed')!=='true'));
+ followStops.push(()=>show(false));
+});
+window.addEventListener('beforeprint',()=>followStops.forEach(stop=>stop()));
+document.addEventListener('visibilitychange',()=>{if(document.hidden){players.forEach(p=>p.stop());followStops.forEach(stop=>stop());}});
