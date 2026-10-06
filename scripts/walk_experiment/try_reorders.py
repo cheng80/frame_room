@@ -43,7 +43,7 @@ def main():
         response.raise_for_status();p=response.json()['snapshot']
     result={'status':'in_progress','projectId':info['projectId'],'trials':[],
             'method':'Visual ordering hypotheses; no near/far label required to TRY an edit.',
-            'new_generation_calls':0,'new_jev_calls':0,'source_pixel_edits':False}
+            'new_generation_calls':0,'source_pixel_edits':False}
     record.write_text(json.dumps(result,ensure_ascii=False,indent=2)+'\n')
     for trial in trials:
         state='walk-reorder-'+trial['key']

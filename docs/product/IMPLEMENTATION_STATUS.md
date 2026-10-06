@@ -53,7 +53,7 @@ npm --prefix apps/web test
 npm --prefix apps/web run build
 PYTHONDONTWRITEBYTECODE=1 engine/sprite-gen/.venv/bin/python scripts/package-guide.py
 PYTHONDONTWRITEBYTECODE=1 engine/sprite-gen/.venv/bin/python scripts/doctor.py
-PYTHONDONTWRITEBYTECODE=1 engine/sprite-gen/.venv/bin/python -m pytest scripts/walk_experiment/test_jev_contract.py scripts/walk_experiment/test_selection.py -q -p no:cacheprovider
+PYTHONDONTWRITEBYTECODE=1 engine/sprite-gen/.venv/bin/python -m pytest scripts/walk_experiment/test_selection.py -q -p no:cacheprovider
 # 엔진 시험은 별도 프로세스/디렉터리에서 실행
 (cd engine/sprite-gen && PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest tests/video tests/gen tests/frames/test_cutout_cyan.py -q -p no:cacheprovider)
 # macOS에 설치된 선택 도구의 실제 시험; 다른 기기는 실제 설치 경로로 변경
