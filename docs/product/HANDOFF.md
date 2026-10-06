@@ -30,7 +30,7 @@ git rev-list --left-right --count HEAD...@{upstream}
 
 upstream이 없는 브랜치에서는 마지막 명령에 비교할 원격 브랜치를 직접 지정한다. 미반영 사용자 변경을 먼저 보존한다. 이 문서를 맞추려고 reset/clean/강제 push하지 않는다. 새 작업의 커밋·push·PR·merge·배포는 그때 사용자가 요청한 범위에서 한다.
 
-저장소: `https://github.com/cheng80/copy_spritegen.git`. 기록 당시 작업 브랜치는 `main`이다. 원래 경로는 `/Users/cheng80/Desktop/Current_works/copy_spritegen`이지만 실행에 같은 절대 경로가 필요하지 않다. 이하 명령은 **복제한 저장소 루트** 기준이다.
+저장소: `https://github.com/cheng80/frame_room.git` (공개). 2026-10-06 `copy_spritegen`에서 `frame_room`으로 이름을 변경하고 로컬 `origin`을 새 주소에 연결했다. 기록 당시 작업 브랜치는 `main`이다. 원래 경로는 `/Users/cheng80/Desktop/Current_works/copy_spritegen`이지만 실행에 같은 절대 경로가 필요하지 않다. 이하 명령은 **복제한 저장소 루트** 기준이다.
 
 ## 2. 새 환경에서 실행
 

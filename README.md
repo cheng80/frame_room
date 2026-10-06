@@ -1,8 +1,15 @@
 # 프레임룸 · 캐릭터 스프라이트 에디터
 
+GitHub 프로젝트: [frame_room](https://github.com/cheng80/frame_room) · 공개 저장소
+
 React + Vite + TypeScript, FastAPI, SQLite, 독립 Python worker로 실행하는 로컬 제작 도구입니다. 이미지를 가져오거나 승인한 기준으로 생성한 뒤, 알파·프레임·공통 배율·발 앵커·순서·시간·픽셀을 편집해 게임용 파일로 내보냅니다.
 
 다른 경로·기기에서 이어서 작업할 때는 **[작업 재개 핸드오프](docs/product/HANDOFF.md)**부터 확인하세요. 현재 코드는 `git status`와 `git log`로 확인하며, 사용자 프로젝트 폴더는 Git과 별도로 옮깁니다.
+
+## 가이드 영상
+
+- [퀵스타트](https://youtu.be/yZgaGipvkkg)
+- [전체 가이드](https://youtu.be/MCCSBxyghXQ)
 
 ## 실행
 
@@ -82,4 +89,4 @@ npm --prefix apps/web run build
 - [최종 제품 문서](docs/product/README.md) · [핸드오프 원문](docs/product/HANDOFF.md)
 - [사용자 합의](docs/planning/USER_DECISIONS.md) · [조사→설계→구현 이력](docs/planning/DELIVERY_PLAN.md)
 
-공용 엔진·다른 프로젝트는 변경하지 않습니다. 불필요한 검수 파일·로그·이전 공용 중복 파일은 사용자 요청으로 정리했으므로 과거 보고서의 로컬 증거 경로는 없을 수 있습니다. [보존·정리 범위](docs/product/HANDOFF.md#6-검증과-정리-상태)를 확인하세요. GitHub 비공개 저장소에는 위 저장 범위만 포함합니다.
+공용 엔진·다른 프로젝트는 변경하지 않습니다. 불필요한 검수 파일·로그·이전 공용 중복 파일은 사용자 요청으로 정리했으므로 과거 보고서의 로컬 증거 경로는 없을 수 있습니다. [보존·정리 범위](docs/product/HANDOFF.md#6-검증과-정리-상태)를 확인하세요. GitHub 공개 저장소에는 위 저장 범위만 포함합니다. 사용자 프로젝트·인증·로컬 생성 자료는 포함하지 않습니다.
