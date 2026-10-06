@@ -11,7 +11,7 @@ scripts/setup.sh       # 최초 설치: Python 3.12 전용 venv, 고정 의존�
 scripts/start.sh       # http://127.0.0.1:8765
 ```
 
-macOS에서는 **`프레임룸 실행.command`**를 더블 클릭해도 됩니다. Node.js/npm과 [uv](https://docs.astral.sh/uv/getting-started/installation/)가 필요합니다. 서버·worker가 실행되는 터미널을 닫으면 앱이 종료됩니다. 생성 결과가 불명확한 중단 작업은 재시작 때 자동 재전송하지 않습니다.
+macOS에서는 **`프레임룸 실행.command`**를 더블 클릭해도 됩니다. 실행 시 `apps/web/node_modules`와 필수 npm 의존성을 확인하고, 누락되었거나 불완전하면 `npm install --include=dev` 후 웹 앱을 빌드합니다. 웹 빌드가 없을 때도 자동으로 빌드하며, Python 환경이 없거나 필수 패키지를 불러올 수 없으면 프로젝트 전용 환경을 준비합니다. 설치·검증·빌드가 성공한 뒤 앱을 실행합니다. Node.js/npm과 [uv](https://docs.astral.sh/uv/getting-started/installation/)는 미리 설치해야 합니다(uv는 Python 환경 준비 시 필요). 서버·worker가 실행되는 터미널을 닫으면 앱이 종료됩니다. 생성 결과가 불명확한 중단 작업은 재시작 때 자동 재전송하지 않습니다.
 
 영상 처리에는 PATH에 `ffmpeg`·`ffprobe`가 필요하며 `setup.sh`는 이를 설치하지 않습니다. 새 생성에 필요한 Codex/Grok CLI 로그인과 선택 기능 RIFE도 기기별로 준비합니다. 전체 실행은 macOS에서 검증했습니다. 설치·이전 절차와 다른 OS의 제한은 핸드오프를 참고하세요.
 
