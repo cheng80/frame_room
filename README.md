@@ -75,13 +75,11 @@ npm --prefix apps/web run build
 
 소스 코드·의존성 잠금 파일·합성 시험 자료·설명서용 이미지와 프로젝트 전용 엔진을 저장합니다. 엔진의 원본 360파일과 LICENSE·NOTICE는 무결성 검증을 위해 함께 보존합니다.
 
-`.data/`, `artifacts/`, `output/`, `diagnostics/`, 연구의 원본 다운로드·캡처·외부 자료, `.env`·인증 정보, 설치 의존성·빌드·캐시는 `.gitignore`로 제외합니다. 제외한 파일은 로컬에 그대로 남습니다. 연구 문서의 원본·증거 경로는 로컬 자료를 가리키므로 새 복제본에는 없을 수 있습니다. 연구용 거너 원본이 없는 환경에서는 해당 회귀 검사 1건만 건너뜁니다.
+`.data/`, `artifacts/`, `output/`, `diagnostics/`, 연구 자료, `.env`·인증 정보, 설치 의존성·빌드·캐시는 `.gitignore`로 제외합니다. 2026-10-06 사용자 요청으로 로컬 조사·실험 자료와 전용 비교 스크립트·보고서를 삭제했습니다. 제품 명세·구현 기록과 프로젝트 데이터는 보존했습니다. 연구용 거너 원본에 의존하는 선택 회귀 검사 1건은 자료가 없어 건너뜁니다.
 
 설명서 ZIP은 `scripts/setup.sh`에서 다시 만듭니다. 설명서를 수정한 뒤에는 `npm --prefix apps/web run build`와 `engine/sprite-gen/.venv/bin/python scripts/package-guide.py`로 재생성합니다. 모든 프로젝트 이력·리소스는 프로젝트 폴더 전체로 별도 보관하세요. 앱의 백업 ZIP은 현재 상태를 새 ID로 복원하는 용도입니다.
 
 - [최종 제품 문서](docs/product/README.md) · [핸드오프 원문](docs/product/HANDOFF.md)
-- [mydot 후속 조사·코드 감사·원본 증거](research/hero-inc/2026-10-03-implementation-design/README.md)
-- [초기 조사와 출처](research/hero-inc/RESEARCH.md) · [출처 목록](research/hero-inc/sources/index.json)
 - [사용자 합의](docs/planning/USER_DECISIONS.md) · [조사→설계→구현 이력](docs/planning/DELIVERY_PLAN.md)
 
 공용 엔진·다른 프로젝트는 변경하지 않습니다. 불필요한 검수 파일·로그·이전 공용 중복 파일은 사용자 요청으로 정리했으므로 과거 보고서의 로컬 증거 경로는 없을 수 있습니다. [보존·정리 범위](docs/product/HANDOFF.md#6-검증과-정리-상태)를 확인하세요. GitHub 비공개 저장소에는 위 저장 범위만 포함합니다.

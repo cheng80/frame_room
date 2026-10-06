@@ -10,7 +10,7 @@
     "title": "스프라이트 제작 웹앱 조사",
     "cursor": "888a02e9-8124-456f-8c0c-05729d9b82a0:5"
   },
-  "researchDirectory": "research/hero-inc/2026-10-03-implementation-design",
+  "researchDirectory": null,
   "documentsDirectory": "docs/product",
   "implementationProjectId": "cc864052-7f6b-4d12-892c-20ae83c191ec",
   "implementationThreadId": "01a1008b-21cc-7432-8b2b-4b89b9ef7158",
@@ -51,5 +51,11 @@
     "git diff --stat",
     "git diff --cached --stat"
   ],
-  "historyNote": "기존 채팅·프로젝트·자동화 식별자와 시각은 과거 조정 이력이다. 현재 Git 상태는 위 명령으로, 실행 상태는 현재 환경에서 확인한다."
+  "historyNote": "기존 채팅·프로젝트·자동화 식별자와 시각은 과거 조정 이력이다. 현재 Git 상태는 위 명령으로, 실행 상태는 현재 환경에서 확인한다.",
+  "researchCleanup": {
+    "date": "2026-10-06",
+    "status": "deleted_by_user_request",
+    "scope": "research, .data/research, .data/experiments, research-only scripts and reports",
+    "preserved": "Product specifications, implementation records, project folders, runtime engine and tools"
+  }
 }

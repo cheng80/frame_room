@@ -1,8 +1,10 @@
 # AI 스프라이트 에디터 — 구현 가능성 및 핵심 연결 설계
 
+> 2026-10-06 자료 정리: 아래 조사·실험의 원본, 비교 결과와 전용 스크립트는 사용자 요청으로 삭제했다. 제품 결정·구현 기록은 보존하며 과거 경로를 현재 실행 가능한 자료로 해석하지 않는다.
+
 2026-10-04 KST · 착수 전 설계 기록. 이후 웹 기능 연결은 [영상 에디터 구현 결과](VIDEO_EDITOR_INTEGRATION_2026-10-04.md)를 따른다.
 
-후속 실측: Grok Build 재로그인 후 **실제 영상 1건 → 투명 73프레임 → 28프레임 반복 시트·GIF**까지 확인했다. 인증·요청 횟수·검증 범위는 [Grok 로그인 영상 제작 실측](GROK_LOGIN_VIDEO_PROBE_2026-10-04.md)에 기록했다. 아래 오프라인 테스트 절은 이 실측 이전의 검증 기록이다.
+후속 실측: Grok Build 재로그인 후 **실제 영상 1건 → 투명 73프레임 → 28프레임 반복 시트·GIF**까지 확인했다. 인증·요청 횟수·검증 범위는 Grok 로그인 영상 제작 실측 (리서치 정리로 삭제)에 기록했다. 아래 오프라인 테스트 절은 이 실측 이전의 검증 기록이다.
 
 ## 판단
 
@@ -12,7 +14,7 @@
 
 `기준 그림 → 동작·방향 지정 → Grok 영상 → 투명 프레임 → 구간 선택·정렬 → 편집·검수 → 게임용 출력`
 
-기존 [웹 역기획](SPRITEGEN_WEB_REVERSE_DESIGN_2026-10-04.md)의 인증·과금 분석은 참고 자료로 남긴다. 그 기능의 구현이나 대상 웹사이트 로그인을 에디터 개발의 선행 조건으로 삼지 않는다.
+기존 웹 역기획 (리서치 정리로 삭제)의 인증·과금 분석은 참고 자료로 남긴다. 그 기능의 구현이나 대상 웹사이트 로그인을 에디터 개발의 선행 조건으로 삼지 않는다.
 
 ## Grok을 API로 붙인 서비스인가
 
@@ -149,4 +151,4 @@ Grok의 영상 생성이 성공한 것만으로 이 표를 통과한 것으로 �
 - 현재 [영상 API 코드](../../engine/sprite-gen/sprite_gen/gen/video.py), [xAI 통신](../../engine/sprite-gen/sprite_gen/gen/xai.py), [앱 provider](../../adapters/spritegen/provider.py).
 - 현재 [worker 작업](../../services/worker/task.py), [worker 복구·게시](../../services/worker/main.py), [작업 API](../../services/api/main.py), [파일 저장](../../services/api/store.py), [생성 UI](../../apps/web/src/SourceSteps.tsx).
 - 비교 기준 [v2.19.0 영상 API](https://github.com/aldegad/sprite-gen/blob/v2.19.0/sprite_gen/gen/video.py), [동작 제작](https://github.com/aldegad/sprite-gen/blob/v2.19.0/sprite_gen/video/batch.py), [루프 처리](https://github.com/aldegad/sprite-gen/blob/v2.19.0/sprite_gen/video/loop.py), [영상 파이프라인](https://github.com/aldegad/sprite-gen/blob/v2.19.0/docs/video-pipeline.md).
-- 다운로드 원본·SHA-256: [추가 소스 기록](../../.data/research/spritegen-2026-10-04/implementation-source-manifest.json). 위 비교는 공개 태그의 코드 기준이며 운영 서버의 실제 바이너리를 검사한 것은 아니다.
+- 다운로드 원본·SHA-256: 추가 소스 기록 (리서치 정리로 삭제). 위 비교는 공개 태그의 코드 기준이며 운영 서버의 실제 바이너리를 검사한 것은 아니다.

@@ -4,6 +4,8 @@
 
 다른 환경에서 이어서 작업할 때는 **[HANDOFF.md](HANDOFF.md)**부터 읽는다. 특정 커밋을 최신으로 고정하지 않으며 `git status`와 `git log`로 실제 상태를 확인한다. Git에 포함되지 않는 프로젝트 데이터·인증·선택 도구의 이전 방법도 핸드오프에 있다.
 
+2026-10-06 사용자 요청으로 조사 원본·실험 산출물·비교 보고서·전용 스크립트를 정리했다. 아래에는 제품 요구·화면·계약·구현 기록을 유지한다. 과거 실험 경로는 현재 사용할 수 없다.
+
 ## 현재 상태와 실행 계약
 
 | 문서 | 내용 |
@@ -14,7 +16,6 @@
 | [웹 보완 적용](WEB_QUALITY_COMPLETION_2026-10-04.md) | 영상 마무리·방향/묶음·RIFE·주기·애니메이션 출력 |
 | [색상 회귀](VIDEO_COLOR_REGRESSION_2026-10-04.md) | 손/칼의 색 변화와 검수 GIF·에디터 PNG 처리 차이 |
 | [영상 에디터 통합](VIDEO_EDITOR_INTEGRATION_2026-10-04.md) | Grok 로그인 생성·기존 MP4 처리·접수/재개 |
-| [실제 Grok 생성](GROK_LOGIN_VIDEO_PROBE_2026-10-04.md) | 생성 원본·출처·실제 성공 범위 |
 | [실행 계약](../../packages/contracts/IMPLEMENTATION.md) | 현재 데이터·편집·작업·출력 계약 |
 | [영상 계약](../../packages/contracts/VIDEO.md) | 생성/처리/묶음과 마무리·출력 확장 |
 | [프로젝트 폴더 계약](../../packages/contracts/PROJECT_FOLDERS.md) | 저장 구조·동기화·이전·등록 정리 |
@@ -37,10 +38,7 @@
 | [ACCEPTANCE_TESTS.md](ACCEPTANCE_TESTS.md) | 34개 제품 수용 기준과 시나리오 |
 | [DECISIONS.md](DECISIONS.md) | 초기 명세 정정과 근거 |
 | [사용자 합의](../planning/USER_DECISIONS.md) | 후속 요구·결정 |
-| [웹 역기획](SPRITEGEN_WEB_REVERSE_DESIGN_2026-10-04.md) | 공개 관찰과 미확인 서버 내부의 구분 |
 | [구현 방향](AI_SPRITE_EDITOR_IMPLEMENTATION_2026-10-04.md) | 공개 데이터로 가능한 재구현 범위 |
-| [걷기 실험](WALK_EXPERIMENT_2026-10-04.md) | 정렬 후 판정·후보 실험 기록 |
-| [PXF 비교](PXF_COMPARISON_2026-10-04.md) | 별도 프로젝트와의 범위 비교 |
 
 연구의 19개 관찰 검사, 앱 자동 회귀 수, 34개 수용 기준은 다른 집계다. 실제 provider 생성, 모의 응답, 합성 시험 자료도 구분한다. 불필요한 검수 파일·로그는 사용자 요청으로 정리했으므로 과거 문서에 적힌 로컬 증거가 남아 있다고 가정하지 않는다.
 

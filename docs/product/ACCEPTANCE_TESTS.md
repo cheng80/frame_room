@@ -1,10 +1,12 @@
 # 제품 수용 테스트와 추적성
 
+> 2026-10-06 자료 정리: 아래 조사·실험의 원본, 비교 결과와 전용 스크립트는 사용자 요청으로 삭제했다. 제품 결정·구현 기록은 보존하며 과거 경로를 현재 실행 가능한 자료로 해석하지 않는다.
+
 작성일: 2026-10-03 KST · 최종 MVP 수용 계약 · **TEST-01–TEST-34 전부 `NOT_RUN`**.
 
 ## 1. 검증 범위와 완료 의미
 
-[사용자 합의](../planning/USER_DECISIONS.md), 연구의 [README](../../research/hero-inc/2026-10-03-implementation-design/README.md), [ui-flow](../../research/hero-inc/2026-10-03-implementation-design/ui-flow.md), [data-contract](../../research/hero-inc/2026-10-03-implementation-design/data-contract.md), [acceptance-plan](../../research/hero-inc/2026-10-03-implementation-design/acceptance-plan.md), [validation](../../research/hero-inc/2026-10-03-implementation-design/validation.md)를 통합했다. 화면 동작과 gate는 [UX_DESIGN.md](UX_DESIGN.md)를 따른다. 최신 데이터/API·수치 범위는 [DATA_API_SPEC.md](DATA_API_SPEC.md)가 정본이며 연구 제안보다 우선한다.
+[사용자 합의](../planning/USER_DECISIONS.md), 연구의 README (리서치 정리로 삭제), ui-flow (리서치 정리로 삭제), data-contract (리서치 정리로 삭제), acceptance-plan (리서치 정리로 삭제), validation (리서치 정리로 삭제)를 통합했다. 화면 동작과 gate는 [UX_DESIGN.md](UX_DESIGN.md)를 따른다. 최신 데이터/API·수치 범위는 [DATA_API_SPEC.md](DATA_API_SPEC.md)가 정본이며 연구 제안보다 우선한다.
 
 기준 환경은 React + Vite + TypeScript, FastAPI, SQLite, 로컬 독립 Python worker다. 엔진은 프로젝트 전용 포크 **v2.12.1 / `b058341f7543f3adcbea227bd4e6b7587895b1bc`**로 고정하고 포크 patch revision도 실행 보고서에 남긴다. 공용 `/Users/cheng80/.codex/skills/sprite-gen`은 제품 실행·쓰기 대상이 아니다. `LICENSE`·`NOTICE`를 유지한다.
 
@@ -50,7 +52,7 @@ PXF/effect_editer, 영상, 보간, 자동 다방향 생성, 협업, 공개 배�
 
 ### 3.2 보존된 연구 입력과 후속 제작 입력
 
-아래 경로의 `연구/`는 `research/hero-inc/2026-10-03-implementation-design/`를 뜻한다. 공개 자산의 원본 URL·SHA-256·bytes·변환 이력은 [provenance.json](../../research/hero-inc/2026-10-03-implementation-design/artifacts/source-assets/provenance.json)이 정본이다. 실행 전 해당 파일의 bytes hash를 다시 확인해 보고서에 복사한다. 공개 접근 가능 여부를 재배포 허가로 해석하지 않으며 연구 자산을 제품 기본 에셋에 자동 포함하지 않는다.
+아래 경로의 `연구/`는 `research/hero-inc/2026-10-03-implementation-design/`를 뜻한다. 공개 자산의 원본 URL·SHA-256·bytes·변환 이력은 provenance.json (리서치 정리로 삭제)이 정본이다. 실행 전 해당 파일의 bytes hash를 다시 확인해 보고서에 복사한다. 공개 접근 가능 여부를 재배포 허가로 해석하지 않으며 연구 자산을 제품 기본 에셋에 자동 포함하지 않는다.
 
 | fixture ID | 분류·확보 상태 | 정확한 입력·기대값·제약 |
 | --- | --- | --- |

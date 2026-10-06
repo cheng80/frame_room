@@ -1,16 +1,18 @@
 # 결정과 근거
 
+> 2026-10-06 자료 정리: 아래 조사·실험의 원본, 비교 결과와 전용 스크립트는 사용자 요청으로 삭제했다. 제품 결정·구현 기록은 보존하며 과거 경로를 현재 실행 가능한 자료로 해석하지 않는다.
+
 2026-10-03 KST · 최종 제품 명세 v1.0. 직접 관찰·사용자 요구·새 설계를 구분한다.
 
 | ID | 결정 | 근거와 영향 |
 | --- | --- | --- |
 | D01 | 캐릭터 제작 전체를 React 웹앱으로 구현 | 사용자 요구. 큐레이션만 보여주는 UI로는 완료되지 않음. PXF는 별도 |
-| D02 | React+Vite + FastAPI + SQLite + 독립 worker | [아키텍처 조사](../../research/hero-inc/2026-10-03-implementation-design/architecture.md). 로컬 canvas·Python 처리가 중심이며 SSR/BFF가 필요하지 않음 |
-| D03 | engine2.12.1 commit `b058341f7543f3adcbea227bd4e6b7587895b1bc` 고정 | [소스 비교](../../research/hero-inc/2026-10-03-implementation-design/baseline.json): 릴리스 파일360개 일치. main2.18.0은 버전만 확인했으므로 회귀 전 업그레이드하지 않음 |
-| D04 | 애니메이션은 pre-fit crop + 공통 scale | [실험](../../research/hero-inc/2026-10-03-implementation-design/validation.md): 실제 자산 재조합 입력에서 웅크림320→471, 조준378→471로 확대. alpha 밴드 중심도 이동. `slice-sheet` 기본 사용 금지 |
+| D02 | React+Vite + FastAPI + SQLite + 독립 worker | 아키텍처 조사 (리서치 정리로 삭제). 로컬 canvas·Python 처리가 중심이며 SSR/BFF가 필요하지 않음 |
+| D03 | engine2.12.1 commit `b058341f7543f3adcbea227bd4e6b7587895b1bc` 고정 | 소스 비교 (리서치 정리로 삭제): 릴리스 파일360개 일치. main2.18.0은 버전만 확인했으므로 회귀 전 업그레이드하지 않음 |
+| D04 | 애니메이션은 pre-fit crop + 공통 scale | 실험 (리서치 정리로 삭제): 실제 자산 재조합 입력에서 웅크림320→471, 조준378→471로 확대. alpha 밴드 중심도 이동. `slice-sheet` 기본 사용 금지 |
 | D05 | overflow를 별도로 차단 | 같은 실험의 합성650px 무기는 정상 종료했으나 알파2070픽셀 유실. exit code와 시각적 성공은 다름 |
 | D06 | bbox와 몸 체고, 자동 발 후보와 수동 승인 분리 | 실제/합성 측정 및 공개 노트. 장비가 bbox/하단 밴드를 바꾸고 공중 자세는 바닥 고정하면 안 됨 |
-| D07 | immutable asset + working base + revision | [엔진 감사](../../research/hero-inc/2026-10-03-implementation-design/engine-audit.md): 일부 기준 이미지 편집은 working base를 직접 바꿈. 앞선 조사에서 모든 편집을 비파괴로 뭉뚱그린 표현을 정정 |
+| D07 | immutable asset + working base + revision | 엔진 감사 (리서치 정리로 삭제): 일부 기준 이미지 편집은 working base를 직접 바꿈. 앞선 조사에서 모든 편집을 비파괴로 뭉뚱그린 표현을 정정 |
 | D08 | occurrence ID와 최종 가변 duration 구현 | engine selected 중복 제거, 임의 duration 필드 무시를 실험으로 확인. clone mapping과 composer/serializer 명시 지원 필요 |
 | D09 | 한 번의 확정 bake가 모든 최종 출력의 근거 | export-pngs 기본 전체 후보·호흡 효과 차이, 저장 실패 후 출력 흐름의 위험을 감사. 앱 PNG는 확정 atlas에서 추출 |
 | D10 | 빈 타임라인 차단·save ACK 검사 | engine 빈 selected는 전체로 해석될 수 있음. 새 API 정본에서 빈 상태/저장 실패를 숨기지 않음 |

@@ -1,5 +1,7 @@
 # 웹 에디터 영상 제작 연결
 
+> 2026-10-06 자료 정리: 아래 조사·실험의 원본, 비교 결과와 전용 스크립트는 사용자 요청으로 삭제했다. 제품 결정·구현 기록은 보존하며 과거 경로를 현재 실행 가능한 자료로 해석하지 않는다.
+
 2026-10-04 KST. Grok 영상 생성·기존 MP4 가져오기·후처리·편집 후보 등록을 로컬 에디터에 연결했다. 앞서 생성한 실제 Grok MP4를 재사용했으며 **이번 구현의 추가 원격 생성 호출은 0회**다.
 
 이후 칼·손 색 번짐 회귀를 수정했다. **아래 최초 검증 기록보다 [색 번짐 수정 기록](VIDEO_COLOR_REGRESSION_2026-10-04.md)이 최신**이다. 기준 연결과 영상용 Lanczos 축소를 복구했고, 기존 28프레임·14프레임 동작도 수정했다.
@@ -49,11 +51,11 @@ Starlette TestClient의 기존 httpx 사용 중단 예고 경고 1건이 남아 
 ## 증거와 계약
 
 - [영상 API·저장 계약](../../packages/contracts/VIDEO.md)
-- [첫 Grok 생성 실측](GROK_LOGIN_VIDEO_PROBE_2026-10-04.md)
-- [실제 앱 작업 결과](../../.data/experiments/grok-editor-integration-20261004/editor-result.json)
-- [실제 bake 검증](../../.data/experiments/grok-editor-integration-20261004/bake-verification.json)
-- [에디터가 렌더링한 GIF](../../.data/experiments/grok-editor-integration-20261004/editor-bake.gif)
-- [ego 화면 검증 기록](../../.data/experiments/grok-editor-integration-20261004/browser-verification.json)
-- [원본 계보를 포함한 runtime](../../.data/experiments/grok-editor-integration-20261004/runtime.json)
+- 첫 Grok 생성 실측 (리서치 정리로 삭제)
+- 실제 앱 작업 결과 (리서치 정리로 삭제)
+- 실제 bake 검증 (리서치 정리로 삭제)
+- 에디터가 렌더링한 GIF (리서치 정리로 삭제)
+- ego 화면 검증 기록 (리서치 정리로 삭제)
+- 원본 계보를 포함한 runtime (리서치 정리로 삭제)
 
 실험 파일은 `.data`에 로컬로 보존된다. 기존 사용자 프로젝트·원본은 유지했으며 커밋·push·배포는 하지 않았다.

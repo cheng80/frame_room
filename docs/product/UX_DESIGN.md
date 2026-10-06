@@ -1,10 +1,12 @@
 # 캐릭터 스프라이트 제작 앱 UX 설계
 
+> 2026-10-06 자료 정리: 아래 조사·실험의 원본, 비교 결과와 전용 스크립트는 사용자 요청으로 삭제했다. 제품 결정·구현 기록은 보존하며 과거 경로를 현재 실행 가능한 자료로 해석하지 않는다.
+
 작성일: 2026-10-03 KST · 구현 기준 문서 · 앱 구현·수용 시험·실제 provider 호출 완료를 뜻하지 않는다.
 
 ## 1. 적용 범위와 고정 결정
 
-이 문서는 [사용자 합의](../planning/USER_DECISIONS.md)와 연구의 [README](../../research/hero-inc/2026-10-03-implementation-design/README.md), [화면 흐름](../../research/hero-inc/2026-10-03-implementation-design/ui-flow.md), [데이터 계약](../../research/hero-inc/2026-10-03-implementation-design/data-contract.md), [수용 계획](../../research/hero-inc/2026-10-03-implementation-design/acceptance-plan.md), [실험 결과](../../research/hero-inc/2026-10-03-implementation-design/validation.md)를 제품 화면 계약으로 확정한다. 연구의 제안 화면이나 19개 관찰 검사를 구현된 제품으로 표시하지 않는다. 위험 재현을 포함한 연구 19개 pass와 [앱 수용 시험 34개](ACCEPTANCE_TESTS.md)의 `NOT_RUN`은 별개다.
+이 문서는 [사용자 합의](../planning/USER_DECISIONS.md)와 연구의 README (리서치 정리로 삭제), 화면 흐름 (리서치 정리로 삭제), 데이터 계약 (리서치 정리로 삭제), 수용 계획 (리서치 정리로 삭제), 실험 결과 (리서치 정리로 삭제)를 제품 화면 계약으로 확정한다. 연구의 제안 화면이나 19개 관찰 검사를 구현된 제품으로 표시하지 않는다. 위험 재현을 포함한 연구 19개 pass와 [앱 수용 시험 34개](ACCEPTANCE_TESTS.md)의 `NOT_RUN`은 별개다.
 
 - 구성은 **React + Vite + TypeScript / FastAPI / SQLite / 로컬 독립 Python worker**다. 브라우저 탭의 수명과 작업 실행을 분리한다. 사용자 배포본은 정적 UI와 로컬 API를 한 origin에서 제공한다.
 - 엔진은 프로젝트 내부의 전용 포크를 사용한다. 기준은 **v2.12.1 / `b058341f7543f3adcbea227bd4e6b7587895b1bc`**이며 `LICENSE`·`NOTICE`를 보존한다. `/Users/cheng80/.codex/skills/sprite-gen` 공용 설치본을 수정하거나 제품 실행 의존 경로로 사용하지 않는다.

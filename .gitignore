@@ -4,11 +4,8 @@
 /output/
 /diagnostics/
 
-# 연구 원본·캡처·외부 다운로드는 로컬 보존, 출처 목록은 포함
-/research/**/artifacts/
-/research/**/sources/*
-!/research/**/sources/index.json
-/research/**/excluded/
+# 정리한 연구 자료를 다시 저장하지 않음
+/research/
 
 # 환경 설정·인증 정보·개인 키 (값 없는 예제는 포함)
 .env
