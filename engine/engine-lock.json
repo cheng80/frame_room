@@ -431,12 +431,11 @@
       "annotated-doc": "0.0.5",
       "annotated-types": "0.8.0",
       "anyio": "4.15.1",
-      "certifi": "2026.7.22",
       "click": "8.5.0",
       "fastapi": "0.142.2",
       "h11": "0.16.0",
-      "httpcore": "1.0.9",
-      "httpx": "0.28.1",
+      "httpcore2": "2.13.1",
+      "httpx2": "2.13.1",
       "idna": "3.20",
       "iniconfig": "2.3.0",
       "numpy": "2.5.3",
@@ -453,6 +452,7 @@
       "setuptools": "84.0.0",
       "sprite-gen": "2.12.1",
       "starlette": "1.7.0",
+      "truststore": "0.10.4",
       "typing-inspection": "0.4.4",
       "typing_extensions": "4.16.0",
       "uvicorn": "0.54.0"
@@ -460,7 +460,7 @@
   },
   "dependencyLock": {
     "file": "requirements.lock.txt",
-    "sha256": "645c1dec7c8ca1143958a7a0a36bc98211f7e489da268f0d11cffdd1586e0f60"
+    "sha256": "893b341ee4bfee7a2f63f88cf41fc7002b7c27b3239f94f513fa3c3caa7acc0e"
   },
   "adapter": {
     "version": "1.3.0",
