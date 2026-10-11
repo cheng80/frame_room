@@ -1,0 +1,11 @@
+{
+  "name": "cleric-pixi-demo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "verify": "node verify.mjs"
+  },
+  "dependencies": {
+    "pixi.js": "8.20.1"
+  }
+}
