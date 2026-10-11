@@ -83,10 +83,11 @@ function ZoomControls({width,mode,zoom,setZoom}:{width:number;mode:Zoom;zoom:num
 
 export function EditorCanvas({snapshot,clip,selected,onSelect,onPixel,tool='select',onion=false}:{snapshot:Snapshot;clip?:Clip;selected:string;onSelect:(id:string)=>void;onPixel?:(p:Point)=>void;tool?:string;onion?:boolean}){
  const canvas=useRef<HTMLCanvasElement>(null);
- const [playing,setPlaying]=useState(false),[background,setBackground]=useState('checker'),[speed,setSpeed]=useState(1),[showOutline,setShowOutline]=useState(true),[error,setError]=useState('');
+ const [playing,setPlaying]=useState(false),[background,setBackground]=useState('checker'),[speed,setSpeed]=useState(1),[showOutline,setShowOutline]=useState(true),[showBounds,setShowBounds]=useState(true),[error,setError]=useState('');
  const occurrences=clip?.occurrences||[],index=Math.max(0,occurrences.findIndex(o=>o.occurrenceId===selected)),occ=occurrences[index];
  const frame=snapshot.frames.find(f=>f.frameVersionId===occ?.frameVersionId),group=snapshot.alignmentGroups.find(g=>g.alignmentGroupId===frame?.nativeScaleGroupId);
  const width=group?.cell.width||512,height=group?.cell.height||512,viewport=useCanvasViewport(width,height);
+ const edge=group?.cell.edge??0;
  const timelineKey=canvasTimelineKey({id:clip?.clipId||'',loop:clip?.loop??true,slots:occurrences.map(o=>({id:o.occurrenceId,durationMs:o.durationMs}))});
  usePlayback(playing,timelineKey,index,speed,i=>{if(occurrences[i])onSelect(occurrences[i].occurrenceId);},()=>setPlaying(false));
  useEffect(()=>{
@@ -104,7 +105,7 @@ export function EditorCanvas({snapshot,clip,selected,onSelect,onPixel,tool='sele
   return()=>{active=false;};
  },[snapshot,occ,onion,showOutline]);
  const step=(delta:number)=>{setPlaying(false);if(occurrences.length)onSelect(occurrences[Math.max(0,Math.min(occurrences.length-1,index+delta))].occurrenceId);};
- return <div className="canvas-shell">
+ return <div className="canvas-shell editor-canvas-shell">
   <div className="canvas-toolbar">
    <span className="badge">편집 미리보기</span>
    <Select label="보기 배경" value={background} onChange={e=>setBackground(e.target.value)}><option value="checker">투명 격자</option><option value="dark">어두운 배경</option><option value="light">밝은 배경</option><option value="green">게임 배경</option></Select>
@@ -118,13 +119,19 @@ export function EditorCanvas({snapshot,clip,selected,onSelect,onPixel,tool='sele
    if(e.key==='Home'){e.preventDefault();step(-occurrences.length);}
    if(e.key==='End'){e.preventDefault();step(occurrences.length);}
   }}>
-   {occ?<canvas ref={canvas} style={{width:width*viewport.zoom,height:height*viewport.zoom,cursor:tool==='select'?'default':'crosshair'}} aria-label={`선택 슬롯 ${index+1}, ${width}×${height}, ${occ.durationMs}밀리초`} onPointerDown={e=>{
+   {occ?<div className="canvas-frame" style={{width:width*viewport.zoom,height:height*viewport.zoom}}><canvas ref={canvas} style={{width:width*viewport.zoom,height:height*viewport.zoom,cursor:tool==='select'?'default':'crosshair'}} aria-label={`선택 슬롯 ${index+1}, ${width}×${height}, ${occ.durationMs}밀리초`} onPointerDown={e=>{
     if(tool==='select'||!onPixel)return;e.currentTarget.setPointerCapture(e.pointerId);
     const r=e.currentTarget.getBoundingClientRect();if(r.width&&r.height)onPixel({x:Math.floor((e.clientX-r.left)/r.width*width),y:Math.floor((e.clientY-r.top)/r.height*height)});
    }} onPointerMove={e=>{
     if(!e.buttons||tool==='select'||!onPixel)return;
     const r=e.currentTarget.getBoundingClientRect();if(r.width&&r.height)onPixel({x:Math.floor((e.clientX-r.left)/r.width*width),y:Math.floor((e.clientY-r.top)/r.height*height)});
-   }}/>:<Empty title="재생할 프레임이 없습니다"><p>아래 후보를 재생 순서에 추가해 주세요.</p></Empty>}
+   }}/>{showBounds&&<svg className="canvas-bounds" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`셀 경계 ${width}×${height}, 안전 여백 사방 ${edge}px`}>
+    <rect className="canvas-cell-boundary" x={0} y={0} width={width} height={height} vectorEffect="non-scaling-stroke"/>
+    {edge>0&&<>
+     <path className="canvas-margin" fillRule="evenodd" d={`M0 0H${width}V${height}H0Z M${edge} ${edge}V${height-edge}H${width-edge}V${edge}Z`}/>
+     <rect className="canvas-safe-boundary" x={edge} y={edge} width={width-2*edge} height={height-2*edge} vectorEffect="non-scaling-stroke"/>
+    </>}
+   </svg>}</div>:<Empty title="재생할 프레임이 없습니다"><p>아래 후보를 재생 순서에 추가해 주세요.</p></Empty>}
   </div>
   {error&&<p role="alert" className="error">{error}</p>}
   <div className="playbar">
@@ -133,8 +140,11 @@ export function EditorCanvas({snapshot,clip,selected,onSelect,onPixel,tool='sele
    <button aria-label="다음 프레임" disabled={!occ} onClick={()=>step(1)}><ChevronRight size={17}/></button>
    <span className="mono">{occ?index+1:0} / {occurrences.length}</span>
    <Select label="미리보기 속도" value={speed} onChange={e=>setSpeed(Number(e.target.value))}>{[.25,.5,1,2].map(v=><option key={v} value={v}>{v}×</option>)}</Select>
-   <Check label="테두리 보기" checked={showOutline} onChange={setShowOutline}/>
+   <Check label="셀 경계·안전 여백" checked={showBounds} onChange={setShowBounds}/>
+   <Check label="팀 테두리 보기" checked={snapshot.outline.enabled&&showOutline} onChange={setShowOutline} disabled={!snapshot.outline.enabled}/>
   </div>
+  {occ&&showBounds&&<p className="caption">민트 실선: 셀 경계{edge>0?` · 노란 점선 안쪽: 안전 영역 · 노란 띠: 사방 ${edge}px 여백`:' · 안전 여백 0px'}. 경계 표시는 출력 이미지에 포함되지 않습니다.</p>}
+  {!snapshot.outline.enabled&&<p className="caption">팀 테두리 사용이 꺼져 있습니다. 속성의 수동 승인 탭에서 팀 테두리를 설정하세요.</p>}
   <p className="caption">빠른 편집 화면입니다. 최종 픽셀·경계 검수는 출력 결과에서 확인하세요.</p>
  </div>;
 }

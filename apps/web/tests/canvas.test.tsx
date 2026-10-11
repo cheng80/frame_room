@@ -20,6 +20,8 @@ vi.mock('../src/render',async importOriginal=>({
  drawOccurrence:vi.fn(()=>new Promise(()=>{})),loadImage:vi.fn(()=>new Promise(()=>{})),
 }));
 import {EditorCanvas,RuntimePlayer,canvasTimelineKey,fitCanvasZoom,startCanvasPlayback} from '../src/Canvas';
+import {drawOccurrence} from '../src/render';
+import {Check} from '../src/ui';
 
 type Node=ReactElement<any>;
 function nodes(tree:any):Node[]{
@@ -74,13 +76,14 @@ function tick(time:number){now=time;const callbacks=[...queue.values()];queue.cl
 const timeline={id:'idle',loop:true,slots:[{id:'a',durationMs:80},{id:'b',durationMs:120},{id:'c',durationMs:200}]};
 function editorProps(){
  const clip={clipId:'idle',loop:true,occurrences:timeline.slots.map(s=>({occurrenceId:s.id,durationMs:s.durationMs,frameVersionId:'frame'}))} as Clip;
- const snapshot={frames:[{frameVersionId:'frame',nativeScaleGroupId:'group'}],alignmentGroups:[{alignmentGroupId:'group',cell:{width:512,height:512}}]} as Snapshot;
+ const snapshot={frames:[{frameVersionId:'frame',nativeScaleGroupId:'group'}],alignmentGroups:[{alignmentGroupId:'group',cell:{width:512,height:512,edge:2}}],outline:{enabled:false}} as Snapshot;
  return {snapshot,clip,selected:'a',onSelect:vi.fn()};
 }
 function runtimeData():Runtime{return {schemaVersion:1,exportId:'export',projectRevision:1,atlas:{file:'atlas.png',width:1536,height:512},frames:timeline.slots.map((s,i)=>({id:s.id,rect:{x:i*512,y:0,width:512,height:512},anchor:[256,494]})),clips:[{id:'idle',loop:true,endBehavior:'hold-last',occurrences:timeline.slots.map(s=>({id:s.id,renderedFrameId:s.id,durationMs:s.durationMs}))}]};}
 
 beforeEach(()=>{
  now=0;nextRaf=1;queue=new Map();observers=[];
+ vi.mocked(drawOccurrence).mockClear();
  vi.spyOn(performance,'now').mockImplementation(()=>now);
  vi.stubGlobal('requestAnimationFrame',vi.fn((fn:FrameRequestCallback)=>{const id=nextRaf++;queue.set(id,fn);return id;}));
  vi.stubGlobal('cancelAnimationFrame',vi.fn((id:number)=>queue.delete(id)));
@@ -127,9 +130,54 @@ describe('canvas viewport and dock',()=>{
   const css=readFileSync(new URL('../src/canvas-dock.css',import.meta.url),'utf8').replace(/\/\*[\s\S]*?\*\//g,'');
   const rules=[...css.matchAll(/([^{}]+)\{([^{}]+)\}/g)];
   expect(rules.length).toBeGreaterThan(3);
-  for(const [,selector] of rules)for(const part of selector.split(','))expect(part.trim()).toMatch(/^\.animation-workspace \.canvas-shell(?:\s|$)/);
+  for(const [,selector] of rules)for(const part of selector.split(','))expect(part.trim()).toMatch(/^(?:\.animation-workspace \.canvas-shell(?:\s|$)|\.editor-canvas-shell \.canvas-)/);
   const stageRule=rules.find(([,selector])=>selector.includes('> .stage'))![2];
   expect(stageRule).toContain('flex: 1 1 0');expect(stageRule).toContain('min-height: 0');expect(stageRule).toContain('overflow: auto');
+ });
+});
+
+describe('cell guides and team outline controls',()=>{
+ it('uses the cell edge for visible safe bounds in a rectangular cell',()=>{
+  const props=editorProps();props.snapshot.alignmentGroups[0].cell={width:64,height:128,edge:2};
+  const host=new Harness(EditorCanvas,props);
+  const guide=host.all('svg').find(n=>n.props.className==='canvas-bounds')!;
+  expect(guide.props.viewBox).toBe('0 0 64 128');
+  expect(guide.props['aria-label']).toBe('셀 경계 64×128, 안전 여백 사방 2px');
+  expect(host.all('rect').find(n=>n.props.className==='canvas-safe-boundary')?.props).toMatchObject({x:2,y:2,width:60,height:124,vectorEffect:'non-scaling-stroke'});
+  expect(host.all('path').find(n=>n.props.className==='canvas-margin')?.props).toMatchObject({fillRule:'evenodd',d:'M0 0H64V128H0Z M2 2V126H62V2Z'});
+  expect(text(host.tree)).toContain('사방 2px 여백');
+  const css=readFileSync(new URL('../src/canvas-dock.css',import.meta.url),'utf8');
+  expect(css.match(/\.editor-canvas-shell \.canvas-bounds\s*\{([^}]+)\}/)?.[1]).toContain('pointer-events: none');
+  expect(css.match(/\.editor-canvas-shell \.canvas-frame\s*\{([^}]+)\}/)?.[1]).toContain('margin: auto');
+ });
+ it('can hide guides without redrawing sprite pixels or touching project settings',()=>{
+  const props=editorProps(),before=structuredClone(props.snapshot),host=new Harness(EditorCanvas,props),calls=vi.mocked(drawOccurrence).mock.calls.length;
+  const check=nodes(host.tree).find(n=>n.type===Check&&n.props.label==='셀 경계·안전 여백')!;
+  check.props.onChange(false);host.render();
+  expect(host.all('svg').find(n=>n.props.className==='canvas-bounds')).toBeUndefined();
+  expect(vi.mocked(drawOccurrence).mock.calls.length).toBe(calls);expect(props.snapshot).toEqual(before);
+ });
+ it('shows only the cell boundary when no safety margin is configured',()=>{
+  const props=editorProps();props.snapshot.alignmentGroups[0].cell.edge=0;const host=new Harness(EditorCanvas,props);
+  expect(host.all('rect').filter(n=>n.props.className==='canvas-cell-boundary')).toHaveLength(1);
+  expect(host.all('rect').find(n=>n.props.className==='canvas-safe-boundary')).toBeUndefined();
+  expect(text(host.tree)).toContain('안전 여백 0px');expect(text(host.tree)).not.toContain('노란 점선');
+ });
+ it('explains disabled team outline and renders an unchecked disabled checkbox',()=>{
+  const host=new Harness(EditorCanvas,editorProps());
+  const check=nodes(host.tree).find(n=>n.type===Check&&n.props.label==='팀 테두리 보기')!;
+  expect(check.props).toMatchObject({checked:false,disabled:true});
+  expect(nodes(Check(check.props)).find(n=>n.type==='input')?.props).toMatchObject({checked:false,disabled:true});
+  expect(text(host.tree)).toContain('팀 테두리 사용이 꺼져 있습니다');
+ });
+ it('keeps enabled team outline preview independent from the cell guides',()=>{
+  const props=editorProps();props.snapshot.outline.enabled=true;const host=new Harness(EditorCanvas,props);
+  const check=nodes(host.tree).find(n=>n.type===Check&&n.props.label==='팀 테두리 보기')!;
+  expect(check.props).toMatchObject({checked:true,disabled:false});
+  check.props.onChange(false);host.render();
+  expect(vi.mocked(drawOccurrence).mock.calls.at(-1)?.[2]).toBe(false);
+  expect(host.all('svg').find(n=>n.props.className==='canvas-bounds')).toBeDefined();
+  expect(props.snapshot.outline.enabled).toBe(true);
  });
 });
 
