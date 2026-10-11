@@ -9,6 +9,8 @@ class SetSettings(Strict):
     type:Literal['setGenerationSettings']; settings:dict
 class CreateClip(Strict):
     type:Literal['createClip']; clip:dict
+class DeleteClip(Strict):
+    type:Literal['deleteClip']; clipId:str
 class UpdateClip(Strict):
     type:Literal['updateClip']; clipId:str; changes:dict
 class AddOccurrence(Strict):
@@ -36,7 +38,7 @@ class Outline(Strict):
     type:Literal['setOutline']; outline:dict
 class Character(Strict):
     type:Literal['updateCharacter']; name:str=Field(min_length=1,max_length=200)
-Operation=Annotated[Union[SetSettings,CreateClip,UpdateClip,AddOccurrence,RemoveOccurrence,Reorder,Timing,Transform,Pixels,Replace,Review,Group,Alignment,Outline,Character],Field(discriminator='type')]
+Operation=Annotated[Union[SetSettings,CreateClip,DeleteClip,UpdateClip,AddOccurrence,RemoveOccurrence,Reorder,Timing,Transform,Pixels,Replace,Review,Group,Alignment,Outline,Character],Field(discriminator='type')]
 class EditRequest(Strict):
     expectedRevision:int; operations:list[Operation]=Field(min_length=1,max_length=500)
 
@@ -87,6 +89,7 @@ def apply(p,ops):
             d=op['clip']; fields(d,['name','stateId','facing','referenceRevisionId','loop','defaultFps'])
             fps=d.get('defaultFps',10); number(fps,1,60,'FPS',True)
             cid=uid(); p['clips'].append(dict(clipId=cid,clipRevisionId=uid(),name=d.get('name','새 동작'),stateId=d.get('stateId',cid),facing=d.get('facing','right'),referenceRevisionId=d.get('referenceRevisionId',p['activeReferenceRevisionId']),loop=d.get('loop',True),endBehavior='hold-last',defaultFps=fps,occurrences=[],review='pending'))
+        elif t=='deleteClip': p['clips'].remove(clip)
         elif t=='updateClip':
             d=op['changes']; fields(d,['name','loop','defaultFps','facing','referenceRevisionId','review'])
             if 'review' in d and d['review'] not in ('approved','pending'): raise AppError('REVIEW_INVALID','검수 상태가 잘못되었습니다.')
@@ -189,7 +192,7 @@ def apply(p,ops):
                 for v in d['colorRGBA']: number(v,0,255,'색',True)
             p['outline'].update(d)
         elif t=='updateCharacter': p['characterName']=op['name']
-        if clip is not None:
+        if clip is not None and t!='deleteClip':
             clip['clipRevisionId']=uid()
             if t=='updateClip' and set(op['changes'])=={'review'}:
                 if clip['review']=='approved': clip.pop('reviewInvalidatedReason',None)

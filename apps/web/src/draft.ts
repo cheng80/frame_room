@@ -27,6 +27,7 @@ export function applyDraft(base:Snapshot,commands:DraftCommand[]):Snapshot {
  case 'updateCharacter':s.characterName=o.name;break;
  case 'setGenerationSettings':s.generationSettings={...o.settings};break;
  case 'createClip':s.clips.push({clipId:localId!,clipRevisionId:localId!,stateId:localId!,facing:'right',referenceRevisionId:s.activeReferenceRevisionId,loop:true,endBehavior:'hold-last',defaultFps:10,occurrences:[],review:'pending',...o.clip} as Clip);break;
+ case 'deleteClip':s.clips=s.clips.filter(x=>x.clipId!==o.clipId);break;
  case 'updateClip':if(c){Object.assign(c,o.changes);if(o.changes.defaultFps)c.occurrences.forEach(x=>{if(x.timingMode==='fps')x.durationMs=Math.round(1000/c.defaultFps);});}break;
  case 'addOccurrence':if(c){const n:Occurrence={occurrenceId:localId!,frameVersionId:o.frameVersionId,durationMs:Math.round(1000/c.defaultFps),timingMode:'fps',transform:defaultTransform(pivot),pixelEdits:[]};c.occurrences.splice(o.index??c.occurrences.length,0,n);}break;
  case 'duplicateOccurrence':if(c&&occ){c.occurrences.splice(c.occurrences.indexOf(occ)+1,0,{...structuredClone(occ),occurrenceId:localId!});}break;
@@ -52,7 +53,7 @@ export function applyDraft(base:Snapshot,commands:DraftCommand[]):Snapshot {
  const affected=o.type==='setAlignmentGroup'?(s.alignmentGroups.find(g=>g.alignmentGroupId===o.alignmentGroupId)?.frameVersionIds||[]):[o.frameVersionId];
  s.clips.forEach(clip=>{if(o.type==='setOutline'||clip.occurrences.some(x=>affected.includes(x.frameVersionId)))invalidateReview(clip,'review',reviewReasons[o.type]);});
  }
- if(c){
+ if(c&&o.type!=='deleteClip'){
  if(o.type==='updateClip'&&Object.keys(o.changes).length===1&&'review' in o.changes){
  if(c.review==='approved')delete c.reviewInvalidatedReason;
  else if(clipWasApproved)invalidateReview(c,'review','동작 승인이 해제되었습니다.',true);

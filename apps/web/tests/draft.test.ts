@@ -7,6 +7,20 @@ describe('independent occurrences and saving',()=>{
  it('preserves [A,A] as separate slots and durations',()=>{const s=applyDraft(base,[{operation:{type:'addOccurrence',clipId:'c',frameVersionId:'f'},localId:'o1'},{operation:{type:'duplicateOccurrence',clipId:'c',occurrenceId:'o1'},localId:'o2'},{operation:{type:'setTiming',clipId:'c',occurrenceId:'o2',durationMs:240,timingMode:'explicit'}}]);expect(s.clips[0].occurrences.map(o=>o.durationMs)).toEqual([100,240]);expect(s.clips[0].occurrences.map(o=>o.occurrenceId)).toEqual(['o1','o2']);expect(base.clips[0].occurrences).toEqual([]);});
  it('remaps draft identifiers before dependent server operations',()=>{expect(remapCommand({operation:{type:'reorderOccurrences',clipId:'draft-c',occurrenceIds:['draft-o']}},{'draft-c':'c','draft-o':'o'}).operation).toEqual({type:'reorderOccurrences',clipId:'c',occurrenceIds:['o']});});
  it('keeps empty timeline empty after removing final occurrence',()=>{const s=applyDraft(base,[{operation:{type:'addOccurrence',clipId:'c',frameVersionId:'f'},localId:'o'},{operation:{type:'removeOccurrence',clipId:'c',occurrenceId:'o'}}]);expect(s.clips[0].occurrences).toHaveLength(0);});
+ it('deletes only the chosen clip and restores it when the delete command is undone',()=>{
+  const fixture=structuredClone(transitions.snapshot) as unknown as Snapshot,before=structuredClone(fixture);
+  const commands=[{operation:{type:'deleteClip',clipId:'c'}}];
+  const result=applyDraft(fixture,commands);
+  expect(result.clips).toEqual([before.clips[1]]);
+  expect({...result,clips:before.clips}).toEqual(before);expect(fixture).toEqual(before);
+  expect(applyDraft(fixture,commands.slice(0,-1))).toEqual(before);
+  expect(applyDraft(result,[{operation:{type:'deleteClip',clipId:'unrelated'}}]).clips).toEqual([]);
+ });
+ it('remaps deletion of a newly created draft clip for saving',()=>{
+  const create={operation:{type:'createClip',clip:{name:'삭제할 초안'}},localId:'draft-c'},remove={operation:{type:'deleteClip',clipId:'draft-c'}};
+  expect(applyDraft(base,[create,remove])).toEqual(base);
+  expect(remapCommand(remove,{'draft-c':'saved-c'}).operation).toEqual({type:'deleteClip',clipId:'saved-c'});
+ });
  it('invalidates clip and anchors on group edits',()=>{const fixture=structuredClone(base);fixture.clips[0].occurrences=[{frameVersionId:'f'}] as any;fixture.clips.push({...fixture.clips[0],clipId:'unrelated',occurrences:[{frameVersionId:'other'} as any]});const s=applyDraft(fixture,[{operation:{type:'setAlignmentGroup',alignmentGroupId:'g',changes:{sharedScale:1}}}]);expect(s.clips[0].review).toBe('pending');expect(s.clips[1].review).toBe('approved');expect(s.alignments.f.approval).toBe('pending');});
  it('FPS updates preserve explicit durations',()=>{const s=applyDraft(base,[{operation:{type:'addOccurrence',clipId:'c',frameVersionId:'f'},localId:'o1'},{operation:{type:'addOccurrence',clipId:'c',frameVersionId:'f'},localId:'o2'},{operation:{type:'setTiming',clipId:'c',occurrenceId:'o2',durationMs:123,timingMode:'explicit'}},{operation:{type:'updateClip',clipId:'c',changes:{defaultFps:20}}}]);expect(s.clips[0].occurrences.map(o=>o.durationMs)).toEqual([50,123]);});
 });

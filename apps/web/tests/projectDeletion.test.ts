@@ -94,6 +94,34 @@ describe('project detachment state',()=>{
  });
 });
 
+describe('clip deletion save lifecycle',()=>{
+ async function openClip(){
+  const p={...a,clips:[{clipId:'clip',name:'걷기',review:'approved',occurrences:[]}]};
+  await h.value.load('a');h.value.setBase(p as unknown as Snapshot);h.render();
+  h.value.edit({type:'deleteClip',clipId:'clip'});h.render();return p;
+ }
+ it('persists the local deletion and supports undo/redo without deleting source data',async()=>{
+  const p=await openClip();expect(h.value.snapshot!.clips).toEqual([]);
+  expect(JSON.parse(storage.get('frame-room-draft:a')!).commands[0].operation).toEqual({type:'deleteClip',clipId:'clip'});
+  h.value.undo();h.render();expect(h.value.snapshot!.clips).toEqual(p.clips);expect(storage.has('frame-room-draft:a')).toBe(false);
+  h.value.redo();h.render();expect(h.value.snapshot!.clips).toEqual([]);expect(h.value.base!.clips).toEqual(p.clips);
+ });
+ it('waits for the save ACK before changing the saved snapshot',async()=>{
+  const p=await openClip(),ack=deferred<any>(),original=mockApi.getMockImplementation()!;
+  mockApi.mockImplementation((path,method,body)=>path.endsWith('/edits')?ack.promise:original(path,method,body));
+  const pending=h.value.save();h.render();expect(h.value.base!.clips).toEqual(p.clips);expect(h.value.commands).toHaveLength(1);
+  expect(mockApi).toHaveBeenCalledWith('/projects/a/edits','PATCH',{expectedRevision:3,operations:[{type:'deleteClip',clipId:'clip'}]});
+  ack.resolve({savedRevision:4,snapshot:{...p,revision:4,clips:[]}});expect(await pending).toBe(true);h.render();
+  expect(h.value.base!.clips).toEqual([]);expect(h.value.commands).toEqual([]);expect(storage.has('frame-room-draft:a')).toBe(false);
+ });
+ it('keeps the saved clip and deletion draft when save fails',async()=>{
+  const p=await openClip(),original=mockApi.getMockImplementation()!;
+  mockApi.mockImplementation((path,method,body)=>path.endsWith('/edits')?Promise.reject(new ApiError(500,'SERVER_ERROR','저장 실패')):original(path,method,body));
+  expect(await h.value.save()).toBe(false);h.render();expect(h.value.base!.clips).toEqual(p.clips);
+  expect(h.value.commands).toHaveLength(1);expect(storage.has('frame-room-draft:a')).toBe(true);expect(h.value.error).toBe('저장 실패');
+ });
+});
+
 describe('project storage location',()=>{
  it.each(['finder','explorer'] as const)('opens %s without switching projects or saving the current draft',async fileManager=>{
   await openWithDraft();const draft=storage.get('frame-room-draft:a');

@@ -2,6 +2,7 @@ import {useEffect,useId,useRef,useState,type KeyboardEvent} from 'react';
 import {ArrowLeft,ArrowLeftRight,ArrowRight,CheckCircle2,Copy,ImagePlus,Layers,PanelLeft,PanelRight,Plus,Scissors,SlidersHorizontal,Sparkles,Trash2,X} from 'lucide-react';
 import type {Studio} from './useStudio';
 import {EditorCanvas} from './Canvas';
+import {EditorDialog} from './EditorDialog';
 import {CandidateReview} from './CandidateReview';
 import {ClipTools} from './ClipToolsPanel';
 import {CandidateLibrary} from './CandidateLibrary';
@@ -34,6 +35,7 @@ export function EditStep({s,clipId,onClip,onAction,onSelectionChange}:Props){
   const id=useId();
   const [name,setName]=useState('대기');
   const [newClipOpen,setNewClipOpen]=useState(false);
+  const [deleteClipId,setDeleteClipId]=useState('');
   const [selected,setSelected]=useState('');
   const [candidate,setCandidate]=useState('');
   const [includeHidden,setIncludeHidden]=useState(false);
@@ -51,6 +53,7 @@ export function EditStep({s,clipId,onClip,onAction,onSelectionChange}:Props){
   const libraryToggle=useRef<HTMLButtonElement>(null);
   const inspectorToggle=useRef<HTMLButtonElement>(null);
   const clip=p.clips.find(c=>c.clipId===s.resolveId(clipId))||p.clips[0];
+  const deleteTarget=p.clips.find(c=>c.clipId===s.resolveId(deleteClipId));
   const occurrence=clip?.occurrences.find(o=>o.occurrenceId===s.resolveId(selected))||clip?.occurrences[0];
   const index=clip&&occurrence?clip.occurrences.indexOf(occurrence):-1;
   const occurrenceFrame=p.frames.find(f=>f.frameVersionId===occurrence?.frameVersionId);
@@ -89,6 +92,11 @@ export function EditStep({s,clipId,onClip,onAction,onSelectionChange}:Props){
     if(!name.trim()||blocked)return;
     const next=s.edit({type:'createClip',clip:{name:name.trim(),referenceRevisionId:p.activeReferenceRevisionId}});
     if(next){selectClip(next);setNewClipOpen(false);}
+  }
+  function deleteClip(){
+    if(blocked||s.conflict||!deleteTarget)return;
+    s.edit({type:'deleteClip',clipId:deleteTarget.clipId});
+    setDeleteClipId('');
   }
   function addCandidate(){
     if(!clip||!selectedFrame)return;
@@ -183,6 +191,7 @@ export function EditStep({s,clipId,onClip,onAction,onSelectionChange}:Props){
           </div>
           <div className="aw-pane-footer">
             <button type="button" className="aw-wide" aria-expanded={newClipOpen} onClick={()=>setNewClipOpen(v=>!v)}><Plus size={14}/>새 동작</button>
+            <button type="button" className="aw-wide danger-text" disabled={blocked||!!s.conflict||!clip} onClick={()=>clip&&setDeleteClipId(clip.clipId)}><Trash2 size={14}/>선택 동작 삭제</button>
             {newClipOpen&&<form className="aw-create-clip" onSubmit={e=>{e.preventDefault();createClip();}}><Input label="새 동작 이름" value={name} required maxLength={200} onChange={e=>setName(e.target.value)} autoFocus/><button type="submit" className="primary aw-wide" disabled={blocked||!name.trim()}>동작 만들기</button></form>}
           </div>
         </div>
@@ -244,5 +253,12 @@ export function EditStep({s,clipId,onClip,onAction,onSelectionChange}:Props){
         <div id={`${id}-inspector-next`} className="aw-inspector-content aw-scroll" role="tabpanel" aria-labelledby={`${id}-inspector-tab-next`} hidden={inspectorTab!=='next'}><NextWorkPanel s={s} clip={clip} onNavigate={navigateWork}/></div>
       </aside>
     </div>
+    <EditorDialog open={!!deleteTarget} title="동작 삭제" onClose={()=>setDeleteClipId('')} className="project-delete-dialog" closeDisabled={blocked}>
+      <div className="project-delete-content">
+        <p><strong>“{deleteTarget?.name}”</strong> · {deleteTarget?.occurrences.length}슬롯을 삭제할까요?</p>
+        <p>후보·원본은 유지됩니다. 상단 저장으로 확정하며, 저장 전 되돌릴 수 있습니다.</p>
+        <div className="project-delete-actions"><button type="button" autoFocus disabled={blocked} onClick={()=>setDeleteClipId('')}>취소</button><button type="button" className="danger" disabled={blocked||!!s.conflict||!deleteTarget} onClick={deleteClip}>삭제 초안에 적용</button></div>
+      </div>
+    </EditorDialog>
   </div>;
 }

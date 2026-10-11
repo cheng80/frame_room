@@ -13,7 +13,7 @@ Outline: {enabled:false,mode:'preview-only'|'bake',teamLabel,colorRGBA:[66,190,2
 GET /projects -> {projects:[snapshot summaries]}; POST /projects {name,characterName,cell?:{width,height}} -> snapshot. GET /projects/{id} -> snapshot. Assets multipart files,role,importMode -> {assets,savedRevision}. Reference POST {expectedRevision,reference:{...}} -> {referenceRevisionId,savedRevision}; approve POST {expectedRevision,reviewChecks:{identity:true}} -> ACK.
 PATCH edits {expectedRevision,operations:[{type,...}]} -> {savedRevision,snapshot}. Allowed concrete operations:
 - setGenerationSettings {settings}
-- createClip {clip:{name,...}}; updateClip {clipId,changes:{name,loop,defaultFps,facing,referenceRevisionId,review}}
+- createClip {clip:{name,...}}; deleteClip {clipId} removes that clip and its current occurrences from the snapshot while retaining source data and saved history; updateClip {clipId,changes:{name,loop,defaultFps,facing,referenceRevisionId,review}}
 - addOccurrence {clipId,frameVersionId,index?}; removeOccurrence {clipId,occurrenceId}; reorderOccurrences {clipId,occurrenceIds}; duplicateOccurrence {clipId,occurrenceId}
 - setTiming {clipId,occurrenceId,durationMs,timingMode}; setTransform {clipId,occurrenceId,transform}; setPixelEdits {clipId,occurrenceId,pixelEdits}
 - replaceFrameVersion {clipId,occurrenceId,frameVersionId}; setFrameReview {frameVersionId,review,reason?,hidden?} (rejected requires a reason)

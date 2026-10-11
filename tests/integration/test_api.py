@@ -249,6 +249,49 @@ def test_conflict_and_empty_export(client):
     r=c.post('/v1/projects/'+p['projectId']+'/exports',json={'savedRevision':p2['revision'],'clipRevisionIds':[p2['clips'][0]['clipRevisionId']],'idempotencyKey':s.uid()});assert r.status_code==422;assert r.json()['code']=='EMPTY_TIMELINE'
     assert c.patch('/v1/projects/'+p['projectId']+'/edits',json={'expectedRevision':p2['revision'],'operations':[{'type':'arbitraryPatch','path':'../../'}]}).status_code==422
 
+def test_delete_clip_preserves_sources_other_clips_and_restores_history(client):
+    c=client;p,a=approved(c);target=p['clips'][0]
+    p=edit(c,p,[{'type':'updateClip','clipId':target['clipId'],'changes':{'review':'approved'}}])
+    p=edit(c,p,[{'type':'createClip','clip':{'name':'보존할 동작'}}]);keeper=p['clips'][1]
+    p=edit(c,p,[{'type':'addOccurrence','clipId':keeper['clipId'],'frameVersionId':p['frames'][0]['frameVersionId']},
+                 {'type':'updateClip','clipId':keeper['clipId'],'changes':{'review':'approved'}},
+                 {'type':'setGenerationSettings','settings':{'clipId':target['clipId'],'prompt':'기존 생성 설정'}}])
+    with s.transaction() as db:
+        snapshot=s.get_project(p['projectId'],db);video=s.DATA/'videos'/'fixture.mp4';video.parent.mkdir(parents=True,exist_ok=True);video.write_bytes(b'fixture video')
+        db.execute('INSERT INTO videos VALUES (?,?,?)',('fixture-video',s.dumps({'videoId':'fixture-video','sha256':s.digest(video.read_bytes()),'originalFilename':'fixture.mp4','mediaType':'video/mp4','provenance':{'kind':'test'}}),s.stored_path(video)))
+        snapshot['videos']=[{'videoId':'fixture-video','sha256':s.digest(video.read_bytes()),'originalFilename':'fixture.mp4','mediaType':'video/mp4','provenance':{'kind':'test'}}];s.write_project(db,snapshot,'시험 영상 fixture')
+    p=load(c,p);before=p;target_revision=p['revision'];url='/v1/projects/'+p['projectId']
+    keeper=next(clip for clip in before['clips'] if clip['clipId']!=target['clipId'])
+    target_revision_id=next(clip['clipRevisionId'] for clip in before['clips'] if clip['clipId']==target['clipId'])
+    export=c.post(url+'/exports',json={'savedRevision':p['revision'],'clipRevisionIds':[target_revision_id],'idempotencyKey':s.uid()})
+    assert export.status_code==202,export.text
+    existing_exports=c.get(url+'/exports').json()
+    response=c.patch(url+'/edits',json={'expectedRevision':p['revision'],'operations':[{'type':'deleteClip','clipId':target['clipId']}]})
+    assert response.status_code==200,response.text
+    assert response.json()['snapshot']['clips']==[keeper]
+    reopened=load(c,p)
+    assert reopened==response.json()['snapshot']
+    for key in ('frames','assets','videos','alignments','references','generationSettings'):
+        assert reopened[key]==before[key]
+    assert reopened['generationSettings']['clipId']==target['clipId']
+    assert target_revision in {item['revision'] for item in c.get(url+'/revisions').json()['revisions']}
+    assert c.get(url+'/exports').json()==existing_exports
+    restored=c.post(url+'/restore-revision',json={'expectedRevision':reopened['revision'],'targetRevision':target_revision})
+    assert restored.status_code==200,restored.text
+    assert {clip['clipId'] for clip in restored.json()['snapshot']['clips']}=={target['clipId'],keeper['clipId']}
+    assert s.digest(s.asset_path(a['assetId']).read_bytes())==a['sha256']
+
+def test_delete_last_clip_and_rejects_conflicts_or_unknown_ids_atomically(client):
+    c=client;p=new(c);p=edit(c,p,[{'type':'createClip','clip':{'name':'마지막 동작'}}]);clip=p['clips'][0];url='/v1/projects/'+p['projectId']
+    stale=c.patch(url+'/edits',json={'expectedRevision':p['revision']-1,'operations':[{'type':'deleteClip','clipId':clip['clipId']}]})
+    assert stale.status_code==409
+    missing=c.patch(url+'/edits',json={'expectedRevision':p['revision'],'operations':[{'type':'updateCharacter','name':'변경되면 안 됨'},{'type':'deleteClip','clipId':'missing'}]})
+    assert missing.status_code==404
+    assert load(c,p)==p
+    deleted=c.patch(url+'/edits',json={'expectedRevision':p['revision'],'operations':[{'type':'deleteClip','clipId':clip['clipId']}]})
+    assert deleted.status_code==200 and deleted.json()['snapshot']['clips']==[]
+    assert load(c,p)['clips']==[]
+
 def test_occurrences_timing_restore_and_original(client):
     c=client;p,a=approved(c);cl=p['clips'][0];o=cl['occurrences'][0]
     p=edit(c,p,[{'type':'duplicateOccurrence','clipId':cl['clipId'],'occurrenceId':o['occurrenceId']}]);two=p['clips'][0]['occurrences'];assert two[0]['occurrenceId']!=two[1]['occurrenceId'];assert two[0]['frameVersionId']==two[1]['frameVersionId']

@@ -50,7 +50,7 @@ body{-webkit-font-smoothing:antialiased}
 .studio-shell .project-reveal:hover{background:#263832;border-color:#637e71}
 .studio-shell .project-delete{flex:none;width:120px;white-space:nowrap;background:transparent;border-color:transparent}
 .studio-shell .project-delete:hover{background:#2b343c;border-color:#63717e}
-.editor-tool.project-delete-dialog{width:min(500px,calc(100vw - 24px));height:auto;max-height:calc(100dvh - 24px)}
+.editor-tool.project-delete-dialog{width:min(500px,calc(100vw - 24px));height:fit-content;max-height:calc(100dvh - 24px)}
 .project-delete-content{padding:20px;overflow:auto;font-size:13px;overflow-wrap:anywhere}
 .project-delete-content p{margin-bottom:16px}.project-delete-content p:not(:first-child){color:var(--muted)}
 .project-delete-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}

@@ -1648,6 +1648,26 @@
         ],
         "title": "CreateClip"
       },
+      "DeleteClip": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "deleteClip",
+            "title": "Type"
+          },
+          "clipId": {
+            "type": "string",
+            "title": "Clipid"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "clipId"
+        ],
+        "title": "DeleteClip"
+      },
       "DeleteProject": {
         "properties": {
           "expectedRevision": {
@@ -1714,6 +1734,9 @@
                   "$ref": "#/components/schemas/CreateClip"
                 },
                 {
+                  "$ref": "#/components/schemas/DeleteClip"
+                },
+                {
                   "$ref": "#/components/schemas/UpdateClip"
                 },
                 {
@@ -1758,6 +1781,7 @@
                 "mapping": {
                   "addOccurrence": "#/components/schemas/AddOccurrence",
                   "createClip": "#/components/schemas/CreateClip",
+                  "deleteClip": "#/components/schemas/DeleteClip",
                   "duplicateOccurrence": "#/components/schemas/RemoveOccurrence",
                   "removeOccurrence": "#/components/schemas/RemoveOccurrence",
                   "reorderOccurrences": "#/components/schemas/Reorder",

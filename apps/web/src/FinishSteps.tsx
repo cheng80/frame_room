@@ -62,8 +62,9 @@ export function ExportStep({s}:{s:Studio}){
  const [preview,setPreview]=useState<{runtime:Runtime;url:string;projectId:string}|null|undefined>(undefined);
  const [view,setView]=useState<'preview'|'settings'>('preview');
  const request=useRef(0),viewId=useId();
- const gates=exportGates(p,selected,!!s.commands.length||!!s.conflict);
- const clipRevisionIds=p.clips.filter(c=>selected.includes(c.clipId)).map(c=>c.clipRevisionId);
+ const selectedClipIds=selected.filter(id=>p.clips.some(c=>c.clipId===id));
+ const gates=exportGates(p,selectedClipIds,!!s.commands.length||!!s.conflict);
+ const clipRevisionIds=p.clips.filter(c=>selectedClipIds.includes(c.clipId)).map(c=>c.clipRevisionId);
  const bake=s.jobs.filter(j=>j.operation==='bake'&&j.artifacts?.length).at(-1);
  const latest=s.exports.slice().reverse().find(e=>['succeeded','completed'].includes(e.status)&&e.manifest&&e.files?.some(f=>f.name==='atlas.png'));
  const latestAtlas=latest?.files?.find(f=>f.name==='atlas.png');
@@ -108,7 +109,7 @@ export function ExportStep({s}:{s:Studio}){
     <p className="muted">저장된 버전으로 미리보기와 게임용 파일을 만듭니다.</p>
     <div className="export-clip-selection" role="group" aria-label="출력할 동작">{p.clips.map(c=><Check key={c.clipId} label={`${c.name} · ${c.occurrences.length} 슬롯`} checked={selected.includes(c.clipId)} onChange={v=>setSelected(v?[...selected,c.clipId]:selected.filter(id=>id!==c.clipId))}/>)}</div>
     <div className="export-actions row">
-     <button disabled={s.busy||!!s.commands.length||!selected.length||s.service?.worker!=='ready'} onClick={()=>s.job('bake',[],{clipIds:selected,clipRevisionIds})}>확정 미리보기 만들기</button>
+     <button disabled={s.busy||!!s.commands.length||!selectedClipIds.length||s.service?.worker!=='ready'} onClick={()=>s.job('bake',[],{clipIds:selectedClipIds,clipRevisionIds})}>확정 미리보기 만들기</button>
      <button className="primary" disabled={s.busy||!!gates.length||s.service?.worker!=='ready'} onClick={()=>s.mutation(`/projects/${p.projectId}/exports`,{savedRevision:p.revision,clipRevisionIds,formats:['atlas','pngs','runtime','aseprite'],outlineMode:p.outline.mode,idempotencyKey:uid()})}>게임용 파일 출력</button>
     </div>
     {gates.length?<ul className="gate-list">{gates.map(g=><li key={g}>{g}</li>)}</ul>:<p className="success-text">수동 승인·저장 조건 충족. 출력 시 서버가 픽셀·경계·파일을 검사합니다.</p>}
