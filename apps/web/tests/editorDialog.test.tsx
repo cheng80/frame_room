@@ -21,4 +21,17 @@ describe('nested editor dialogs',()=>{
   EditorDialog({...props,closeDisabled:true}).props.onCancel({target,currentTarget:target,preventDefault});
   expect(onClose).toHaveBeenCalledTimes(2);
  });
+ it('cycles keyboard focus past disabled and hidden controls without intercepting nested dialogs',()=>{
+  const control=(disabled=false,visible=true)=>({tabIndex:0,matches:()=>disabled,getClientRects:()=>visible?[{}]:[],focus:vi.fn()});
+  const first=control(),last=control(),disabled=control(true),hidden=control(false,false);
+  const currentTarget={querySelectorAll:()=>[first,disabled,hidden,last]},target={closest:()=>currentTarget},preventDefault=vi.fn();
+  const dialog=EditorDialog({open:true,title:'비교',children:null,onClose:vi.fn()});
+  const documentState={activeElement:last};vi.stubGlobal('document',documentState);
+  try{
+   dialog.props.onKeyDown({key:'Tab',currentTarget,target,preventDefault});expect(first.focus).toHaveBeenCalledOnce();expect(preventDefault).toHaveBeenCalledOnce();
+   documentState.activeElement=first;
+   dialog.props.onKeyDown({key:'Tab',shiftKey:true,currentTarget,target,preventDefault});expect(last.focus).toHaveBeenCalledOnce();
+   dialog.props.onKeyDown({key:'Tab',shiftKey:true,currentTarget,target:{closest:()=>({})},preventDefault});expect(last.focus).toHaveBeenCalledOnce();
+  }finally{vi.unstubAllGlobals();}
+ });
 });

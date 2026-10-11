@@ -146,7 +146,6 @@
 .aw-reference-full{margin:0}
 .aw-reference-full img{display:block;width:100%;height:min(60dvh,600px);object-fit:contain;image-rendering:pixelated}
 .aw-reference-full figcaption{padding:12px 16px;font-size:12px;line-height:1.6;overflow-wrap:anywhere}
-.candidate-review .comparison-grid figcaption>span{min-width:0;overflow-wrap:anywhere}
 .animation-workspace .aw-button-pair{display:flex;gap:7px;margin-top:12px}
 .animation-workspace .aw-button-pair>button{flex:1}
 .animation-workspace .aw-review-actions{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
@@ -155,14 +154,10 @@
 .animation-workspace .aw-inspector .candidate-review h3{font-size:11px}
 .animation-workspace .aw-inspector .candidate-review>.row:first-child{gap:6px;margin-bottom:10px}
 .animation-workspace .aw-inspector .candidate-review>.row>.field{flex:1 0 100%;margin-bottom:8px;min-width:0}
-.animation-workspace .aw-inspector .comparison-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
-.animation-workspace .aw-inspector .comparison-grid figcaption{font-size:9px;gap:2px;margin-bottom:4px}
-.animation-workspace .aw-inspector .comparison-grid figcaption .mono{font-size:8px}
-.animation-workspace .aw-inspector .comparison-grid figure>small{font-size:9px}
-.animation-workspace .aw-inspector .comparison-image{height:115px;padding:5px;border-radius:3px}
 .animation-workspace .aw-inspector .candidate-review .review-reason{padding:9px;margin:10px 0}
 .animation-workspace .aw-inspector .candidate-review .review-reason p{font-size:11px}
 .animation-workspace .aw-inspector .candidate-review>.row:last-child{display:flex;flex-direction:column;align-items:stretch;gap:6px}
+.editor-tool.candidate-comparison-dialog{width:min(1100px,calc(100vw - 24px));height:fit-content;max-height:calc(100dvh - 24px);overflow:auto}
 .animation-workspace .aw-clip-review{margin:16px 0 0}
 .animation-workspace .aw-clip-review>summary{font-size:11px;color:#d7e6ed;padding:7px 0;border-bottom:1px solid #40505b;min-height:32px}
 .animation-workspace .aw-review-inset{padding-top:12px;min-width:0}

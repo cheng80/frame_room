@@ -4,6 +4,7 @@ import type {Clip, Job, Snapshot} from './types';
 import type {Studio} from './useStudio';
 import {drawOccurrence, loadImage} from './render';
 import {Input, Select} from './ui';
+import {PropertyHelp} from './PropertyHelp';
 import {
   artifactUrl, clipCell, currentJob, defaultFollow, defaultHanded, followParams, frameStartMs, handedParams, handedWarning,
   jobPending, jobSucceeded, previewMatches, readClipToolResult, regionFromDrag, sameSource, settingsKey, sourceOf,
@@ -86,7 +87,7 @@ export function ClipTools({s, clipId, onClip, onSelectOccurrence}: Props) {
   const canNavigate = !!source && !!shownResult && sameSource(shownResult.source, source) && !s.commands.length && !s.conflict && !s.busy;
 
   return <details className="clip-tools aw-property-group" onToggle={event => setOpen(event.currentTarget.open)}>
-    <summary>동작 보완·검사</summary>
+    <summary>동작 보완·검사<PropertyHelp title="동작 보완·검사" description="저장된 동작의 부위 흔들림을 보완하거나 장비 좌우를 검사합니다. 흔들림 결과는 먼저 미리 보고 새 동작으로 저장합니다. 원본은 유지되며 외부 생성 비용은 들지 않습니다."/></summary>
     <p className="caption">저장된 동작의 전체 슬롯을 처리합니다. 외부 이미지 생성이나 생성 과금은 없습니다.</p>
     {block ? <p className="warning" role="status">{block}</p> : null}
     <Select label="보완·검사 도구" value={state.mode} onChange={event => setSession(old => ({...old, mode: event.target.value as Session['mode'], error: ''}))}>

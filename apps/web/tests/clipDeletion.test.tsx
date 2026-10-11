@@ -2,7 +2,8 @@ import {beforeEach,describe,expect,it,vi} from 'vitest';
 import {readFileSync} from 'node:fs';
 import type {ReactElement} from 'react';
 import type {Studio} from '../src/useStudio';
-import type {Snapshot} from '../src/types';
+import {defaultTransform,type Snapshot} from '../src/types';
+import {CandidateLibrary} from '../src/CandidateLibrary';
 
 // Component events; native focus trapping and rendering are checked separately in ego.
 const hooks=vi.hoisted(()=>({current:null as any}));
@@ -14,8 +15,9 @@ import {EditorDialog} from '../src/EditorDialog';
 import {EditorCanvas} from '../src/Canvas';
 import {ExportStep} from '../src/FinishSteps';
 import {applyDraft} from '../src/draft';
-import {Select} from '../src/ui';
-import {CandidateReview} from '../src/CandidateReview';
+import {Check,Select} from '../src/ui';
+import {CandidateReview,CandidateRejection} from '../src/CandidateReview';
+import {CandidateComparison} from '../src/CandidateComparison';
 
 type Node=ReactElement<any>;
 function nodes(tree:any):Node[]{
@@ -68,11 +70,91 @@ describe('clip reference picture',()=>{
  });
  it('lets review comparison change images without changing the clip reference',()=>{
   const frame={frameVersionId:'f',imageAssetId:'a0',review:'pending'};
-  const h=new Harness(s,'c',({s})=>CandidateReview({s,frame:frame as any,clip:s.snapshot!.clips[0]}));
+  const h=new Harness(s,'c',({s})=>CandidateComparison({s,frame:frame as any,clip:s.snapshot!.clips[0]}));
   const select=nodes(h.tree).find(n=>n.type===Select&&n.props.label==='나란히 비교할 승인 기준')!;
   select.props.onChange({target:{value:'r2'}});h.render();
   const image=nodes(h.tree).find(n=>n.type==='img'&&n.props.alt==='승인된 외형 기준')!;
   expect(image.props.src).toBe('/1.png');expect(s.edit).not.toHaveBeenCalled();expect(s.snapshot!.clips[0].referenceRevisionId).toBe('r1');
+ });
+ it('compares both original images in a dialog with shared reference and zoom, without project edits',()=>{
+  const frame={frameVersionId:'f',imageAssetId:'a0',review:'pending'};
+  s.snapshot!.assets=s.snapshot!.assets.map(a=>({...a,width:32,height:48}));
+  const before=structuredClone(s.snapshot);
+  const h=new Harness(s,'c',({s})=>CandidateComparison({s,frame:frame as any,clip:s.snapshot!.clips[0]}));
+  h.click('두 이미지 크게 비교');
+  const dialog=()=>nodes(h.tree).find(n=>n.type===EditorDialog&&n.props.title==='승인 기준과 후보 크게 비교');
+  expect(nodes(dialog()).filter(n=>n.type==='img').map(n=>n.props.src)).toEqual(['/0.png','/0.png']);
+  nodes(dialog()).find(n=>n.type===Select&&n.props.label==='나란히 비교할 승인 기준')!.props.onChange({target:{value:'r2'}});h.render();
+  nodes(dialog()).find(n=>n.type===Select&&n.props.label==='비교 이미지 배율')!.props.onChange({target:{value:'2'}});h.render();
+  const images=nodes(dialog()).filter(n=>n.type==='img');
+  expect(images.map(n=>n.props.src)).toEqual(['/1.png','/0.png']);
+  expect(images.map(n=>n.props.style)).toEqual([{width:64,height:96},{width:64,height:96}]);
+  dialog()!.props.onClose();h.render();expect(dialog()).toBeUndefined();
+  const selects=nodes(h.tree).filter(n=>n.type===Select);
+  expect(selects.find(n=>n.props.label==='나란히 비교할 승인 기준')!.props.value).toBe('r2');
+  expect(selects.find(n=>n.props.label==='비교 이미지 배율')!.props.value).toBe('2');
+  expect(s.edit).not.toHaveBeenCalled();expect(s.snapshot).toEqual(before);
+ });
+ it('keeps the comparison open and its settings while moving frames',()=>{
+  let frame={frameVersionId:'f1',imageAssetId:'a0',review:'pending',reviewReason:'첫 후보 사유'};
+  const navigation={label:'재생 슬롯 1 / 2',next:vi.fn(()=>{frame={...frame,frameVersionId:'f2',imageAssetId:'a1',reviewReason:'두 번째 후보 사유'};navigation.label='재생 슬롯 2 / 2';})};
+  const h=new Harness(s,'c',({s})=>CandidateComparison({s,frame:frame as any,clip:s.snapshot!.clips[0],navigation}));
+  h.click('두 이미지 크게 비교');
+  const select=nodes(h.tree).find(n=>n.type===Select&&n.props.label==='비교 이미지 배율')!;
+  select.props.onChange({target:{value:'2'}});
+  h.render();
+  h.click('다음 프레임');
+  const dialog=nodes(h.tree).find(n=>n.type===EditorDialog&&n.props.title==='승인 기준과 후보 크게 비교')!;
+  expect(dialog).toBeDefined();expect(text(dialog)).toContain('재생 슬롯 2 / 2');
+  expect(nodes(dialog).filter(n=>n.type==='img').map(n=>n.props.src)).toEqual(['/0.png','/1.png']);
+  expect(nodes(dialog).find(n=>n.type===Select&&n.props.label==='비교 이미지 배율')!.props.value).toBe('2');
+  expect(s.edit).not.toHaveBeenCalled();
+ });
+ it('resets review input per candidate while keeping the comparison widget mounted',()=>{
+  const frame1={frameVersionId:'f1',imageAssetId:'a0',review:'pending',reviewReason:'첫 후보 사유'},frame2={...frame1,frameVersionId:'f2',reviewReason:'두 번째 후보 사유'};
+  const render=(frame:any)=>CandidateReview({s,frame,clip:s.snapshot!.clips[0]});
+  const first=render(frame1),second=render(frame2);
+  const reason=(tree:any)=>nodes(tree).find(n=>n.type===CandidateRejection)!;
+  const comparison=(tree:any)=>nodes(tree).find(n=>n.type===CandidateComparison)!;
+  expect(reason(first).key).toBe('f1');expect(reason(second).key).toBe('f2');
+  expect(comparison(first).key).toBe(comparison(second).key);
+  const h=new Harness(s,'c',()=>CandidateRejection({s,frame:frame2 as any}));
+  expect(nodes(h.tree).find(n=>n.type==='textarea')!.props.value).toBe('두 번째 후보 사유');
+  h.click('사유 기록·후보 거절');
+  expect(s.edit).toHaveBeenCalledExactlyOnceWith({type:'setFrameReview',frameVersionId:'f2',review:'rejected',reason:'두 번째 후보 사유'});
+ });
+ it('uses playback slots including repeated candidates and stops at each end without editing the project',()=>{
+  s.snapshot!.frames=[{frameVersionId:'f1',imageAssetId:'a0'},{frameVersionId:'f2',imageAssetId:'a1'}] as any;
+  s.snapshot!.clips[0].occurrences=['f1','f1','f2'].map((frameVersionId,i)=>({occurrenceId:`o${i}`,frameVersionId,durationMs:125,transform:defaultTransform()})) as any;
+  const h=new Harness(s);
+  const review=()=>nodes(h.tree).find(n=>n.type===CandidateReview)!;
+  const key=review().key;expect(review().props.navigation.previous).toBeUndefined();
+  review().props.navigation.next();h.render();expect(review().props.navigation.label).toBe('재생 슬롯 2 / 3');expect(review().props.frame.frameVersionId).toBe('f1');
+  review().props.navigation.next();h.render();expect(review().props.frame.frameVersionId).toBe('f2');expect(review().props.navigation.next).toBeUndefined();
+  review().props.navigation.previous();h.render();expect(review().props.navigation.label).toBe('재생 슬롯 2 / 3');
+  expect(review().key).toBe(key);expect(s.edit).not.toHaveBeenCalled();
+ });
+ it('navigates available library candidates and skips hidden candidates',()=>{
+  s.snapshot!.frames=[{frameVersionId:'f1',imageAssetId:'a0'},{frameVersionId:'hidden',imageAssetId:'a0',hidden:true},{frameVersionId:'f3',imageAssetId:'a1'}] as any;
+  const h=new Harness(s);nodes(h.tree).find(n=>n.type===CandidateLibrary)!.props.onSelect('f1');h.render();
+  const review=()=>nodes(h.tree).find(n=>n.type===CandidateReview)!;
+  expect(review().props.navigation.label).toBe('후보 1 / 2');
+  review().props.navigation.next();h.render();expect(review().props.frame.frameVersionId).toBe('f3');expect(review().props.navigation.next).toBeUndefined();
+  review().props.navigation.previous();h.render();expect(review().props.frame.frameVersionId).toBe('f1');expect(review().props.navigation.previous).toBeUndefined();
+  expect(s.edit).not.toHaveBeenCalled();
+ });
+ it('can leave a selected hidden candidate after turning the hidden filter off',()=>{
+  s.snapshot!.frames=[{frameVersionId:'f1',imageAssetId:'a0'},{frameVersionId:'hidden',imageAssetId:'a0',hidden:true},{frameVersionId:'f3',imageAssetId:'a1'}] as any;
+  const h=new Harness(s),toggle=()=>nodes(h.tree).find(n=>n.type===Check&&n.props.label==='숨긴 후보 포함')!;
+  toggle().props.onChange(true);h.render();
+  nodes(h.tree).find(n=>n.type===CandidateLibrary)!.props.onSelect('hidden');h.render();
+  toggle().props.onChange(false);h.render();
+  const review=()=>nodes(h.tree).find(n=>n.type===CandidateReview)!;
+  expect(review().props.navigation.label).toBe('후보 2 / 3');
+  review().props.navigation.next();h.render();
+  expect(review().props.frame.frameVersionId).toBe('f3');expect(review().props.navigation.label).toBe('후보 2 / 2');
+  review().props.navigation.previous();h.render();expect(review().props.frame.frameVersionId).toBe('f1');
+  expect(s.edit).not.toHaveBeenCalled();
  });
 });
 describe('library clip deletion',()=>{

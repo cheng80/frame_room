@@ -232,7 +232,7 @@ describe('diagnostic output and exact frame navigation', () => {
   });
   it('keeps the panel folded in SSR with Korean labels and keyboard number fields', () => {
     const html = renderToStaticMarkup(<ClipTools s={s} clipId="clip" onClip={vi.fn()} onSelectOccurrence={vi.fn()}/>);
-    expect(html).toContain('<summary>동작 보완·검사</summary>'); expect(html).not.toMatch(/<details[^>]*\bopen/); expect(html).toContain('type="number"'); expect(html).toContain('모든 프레임에서 움직이는 타원');
+    expect(html).toContain('<summary>동작 보완·검사'); expect(html).toContain('aria-label="동작 보완·검사 도움말"'); expect(html).not.toMatch(/<details[^>]*\bopen/); expect(html).toContain('type="number"'); expect(html).toContain('모든 프레임에서 움직이는 타원');
   });
 });
 

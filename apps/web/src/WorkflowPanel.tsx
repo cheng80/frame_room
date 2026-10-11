@@ -1,4 +1,5 @@
 import type {Studio} from './useStudio';
+import {PropertyHeading} from './PropertyHelp';
 import type {Clip} from './types';
 import {inspectionState,nextWork,type WorkTarget} from './workflow';
 import './workflow.css';
@@ -7,7 +8,7 @@ export function InspectionPanel({s,clip,onNavigate}:{s:Studio;clip?:Clip;onNavig
  const p=s.snapshot!,report=inspectionState(p,s.jobs,!!s.commands.length||!!s.conflict,clip?.clipId);
  const unavailable=s.busy||!!s.commands.length||!!s.conflict||!clip?.occurrences.length||s.service?.worker!=='ready'||report.state==='running';
  return <section className="workflow-inspection" aria-label="자동 검사 결과">
-  <h3>자동 검사</h3><p className="caption">픽셀·경계·구조 검사입니다. 외형과 동작의 예술적 품질, 수동 승인을 대신하지 않습니다.</p>
+  <PropertyHeading title="자동 검사" description="저장된 동작의 픽셀·셀 경계·구조 문제를 검사합니다. 초안을 먼저 저장해야 하며, 검사 후 편집하면 이전 보고서는 과거 결과가 됩니다. 외형과 동작의 품질은 직접 확인하세요."/><p className="caption">픽셀·경계·구조 검사입니다. 외형과 동작의 예술적 품질, 수동 승인을 대신하지 않습니다.</p>
   <p role="status" className={`workflow-status ${report.state==='current'&&!report.issues.length?'success-text':''}`}>{report.label}</p>
   {report.job&&<small>검사 입력 v{report.job.inputRevision} · 현재 저장 v{p.revision}{s.commands.length?' + 미저장 초안':''}</small>}
   <button disabled={unavailable} onClick={()=>clip&&s.job('inspect',[],{clipIds:[clip.clipId]})}>선택 동작 자동 검사 실행</button>
@@ -24,5 +25,5 @@ export function InspectionPanel({s,clip,onNavigate}:{s:Studio;clip?:Clip;onNavig
 
 export function NextWorkPanel({s,clip,onNavigate}:{s:Studio;clip?:Clip;onNavigate:(target:WorkTarget)=>void}){
  const items=nextWork(s.snapshot!,clip,!!s.commands.length,s.jobs,!!s.conflict);
- return <section className="next-work-panel" aria-label="다음 작업 안내"><h3>{clip?`${clip.name} · 다음 작업`:'프로젝트 · 다음 작업'}</h3><p className="caption">현재 선택한 동작과 저장 상태를 기준으로 안내합니다.</p><ol className="next-work-list">{items.map(item=><li key={item.id}><button disabled={s.busy} onClick={()=>onNavigate(item)}>{item.label}</button><small>{item.detail}</small></li>)}</ol><InspectionPanel s={s} clip={clip} onNavigate={onNavigate}/></section>;
+ return <section className="next-work-panel" aria-label="다음 작업 안내"><PropertyHeading title={clip?`${clip.name} · 다음 작업`:'프로젝트 · 다음 작업'} description="현재 동작과 저장 상태에서 남은 작업을 안내합니다. 항목을 누르면 해당 후보·슬롯·도구로 이동하며, 안내 순서대로 직접 확인하고 완료할 수 있습니다."/><p className="caption">현재 선택한 동작과 저장 상태를 기준으로 안내합니다.</p><ol className="next-work-list">{items.map(item=><li key={item.id}><button disabled={s.busy} onClick={()=>onNavigate(item)}>{item.label}</button><small>{item.detail}</small></li>)}</ol><InspectionPanel s={s} clip={clip} onNavigate={onNavigate}/></section>;
 }

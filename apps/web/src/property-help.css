@@ -1,0 +1,13 @@
+.property-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;min-width:0}
+.property-heading>h3{margin:0;min-width:0;overflow-wrap:anywhere}
+.property-help{display:inline-flex;margin-left:auto;flex-shrink:0;vertical-align:middle}
+.property-help .property-help-trigger{padding:3px;min-height:24px;width:24px;background:transparent;border-color:transparent;color:#b6c4d0}
+.property-help .property-help-trigger:hover{background:#35414c;color:#e4e9ef}
+.property-help-popover{position:fixed;inset:auto;margin:0;width:300px;max-width:calc(100vw - 16px);max-height:calc(100dvh - 16px);overflow:auto;padding:12px;border:1px solid #53616e;border-radius:7px;background:#202831;color:#e4e9ef;font-size:12px;line-height:1.65;font-weight:400;letter-spacing:normal;box-shadow:0 8px 28px #0006;white-space:normal;text-align:left;cursor:default}
+.property-help-title{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}
+.property-help-title>button{padding:3px;min-height:24px;width:24px;background:transparent;border-color:transparent;flex-shrink:0}
+.property-help-description{display:block;color:#c3ced9}
+.animation-workspace .property-heading>h3{font-size:11px;letter-spacing:.2px;color:#d0dfe8;font-weight:600}
+.animation-workspace .property-help .property-help-trigger,.animation-workspace .property-help-title>button{min-height:24px;padding:3px}
+.aw-property-group>summary .property-help,.aw-clip-review>summary .property-help{float:right}
+.candidate-review>.row:first-child>h3{flex:1;min-width:0}
