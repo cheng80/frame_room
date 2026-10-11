@@ -11,8 +11,6 @@
     header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 20px; background: #192328; border-bottom: 1px solid #34454a; }
     h1 { margin: 0; font-size: 19px; }
     header p { margin: 3px 0 0; color: #a9bbb6; }
-    a { color: #a5e6cb; }
-    nav { display: flex; gap: 14px; }
     main { max-width: 1100px; margin: 0 auto; padding: 16px; }
     #status { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-bottom: 12px; color: #c4d3ce; }
     #stage { height: min(68vh, 640px); min-height: 320px; overflow: hidden; border: 1px solid #40545a; border-radius: 10px; background: #202b2e; }
@@ -24,7 +22,6 @@
 <body>
   <header>
     <div><h1>여성 신관 · 8방향 이동</h1><p>방향키 또는 WASD로 이동 · 대각선 이동 속도 보정 · 키를 놓으면 마지막 방향 idle</p></div>
-    <nav aria-label="리소스 다운로드"><a href="./cleric-atlas.json" download>atlas JSON</a><a href="./cleric-manifest.json" download>manifest JSON</a><a id="atlas-download" href="./cleric-atlas.png" download>atlas PNG</a></nav>
   </header>
   <main>
     <div id="status" aria-live="polite"><span>상태: <b id="load-state">불러오는 중</b></span><span>방향: <b id="direction">—</b></span><span>동작: <b id="action">—</b></span><span>프레임: <b id="frame">—</b></span><span>위치: <b id="position">—</b></span></div>

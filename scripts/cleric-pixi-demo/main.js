@@ -35,9 +35,7 @@ try {
   const app = new PIXI.Application();
   await app.init({ background: '#202b2e', antialias: false, autoDensity: false, resolution: 1, resizeTo: $('stage') });
   $('stage').appendChild(app.canvas);
-  const atlasUrl = new URL(atlasData.meta.image, new URL('./cleric-atlas.json', location.href)).href;
   const sheet = await PIXI.Assets.load(new URL('./cleric-atlas.json', location.href).href);
-  $('atlas-download').href = atlasUrl;
   const input = createInputState();
   const sprite = new PIXI.AnimatedSprite([{ texture: PIXI.Texture.EMPTY, time: 100 }]);
   sprite.anchor.set(manifest.anchor.x, manifest.anchor.y);
