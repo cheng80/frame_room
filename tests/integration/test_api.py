@@ -43,6 +43,87 @@ def approved(c):
     cl=p['clips'][0];p=edit(c,p,[{'type':'addOccurrence','clipId':cl['clipId'],'frameVersionId':f['frameVersionId']}])
     return p,a
 
+def test_reference_name_create_rename_history_and_legacy_round_trip(client):
+    c=client;p,a=approved(c);url='/v1/projects/'+p['projectId']
+    created=c.post(url+'/reference-revisions',json={'expectedRevision':p['revision'],'reference':{'identityAssetId':a['assetId'],'name':'  용사 🐉  '}})
+    assert created.status_code==201,created.text
+    rid=created.json()['referenceRevisionId']
+    approval=c.post('/v1/reference-revisions/'+rid+'/approve',json={'expectedRevision':created.json()['savedRevision'],'reviewChecks':{'identity':True}})
+    assert approval.status_code==200,approval.text
+    p=load(c,p);ref=next(ref for ref in p['references'] if ref['referenceRevisionId']==rid)
+    assert ref['name']=='용사 🐉'
+    clip=p['clips'][0]
+    p=edit(c,p,[{'type':'updateClip','clipId':clip['clipId'],'changes':{'referenceRevisionId':rid}}])
+    p=edit(c,p,[{'type':'updateClip','clipId':clip['clipId'],'changes':{'review':'approved'}}])
+    assert p['references'][1]['approval']=='approved'
+    assert p['clips'][0]['referenceRevisionId']==rid and p['clips'][0]['review']=='approved'
+    before={key:p[key] for key in ('activeReferenceRevisionId','assets','frames','alignmentGroups','alignments','clips','generationSettings')}
+    original_ref=dict(ref)
+    revision=p['revision']
+    p=edit(c,p,[{'type':'renameReference','referenceRevisionId':rid,'name':'  장군  '}])
+    assert next(ref for ref in p['references'] if ref['referenceRevisionId']==rid)['name']=='장군'
+    renamed_ref=next(ref for ref in p['references'] if ref['referenceRevisionId']==rid)
+    assert {key:value for key,value in renamed_ref.items() if key!='name'}=={key:value for key,value in original_ref.items() if key!='name'}
+    assert {key:p[key] for key in before}==before
+    assert load(c,p)['references']==p['references']
+    restored=c.post(url+'/restore-revision',json={'expectedRevision':p['revision'],'targetRevision':revision})
+    assert restored.status_code==200,restored.text
+    assert next(ref for ref in restored.json()['snapshot']['references'] if ref['referenceRevisionId']==rid)['name']=='용사 🐉'
+    legacy=load(c,p)
+    with s.transaction() as db:
+        snapshot=s.get_project(p['projectId'],db);next(ref for ref in snapshot['references'] if ref['referenceRevisionId']==rid).pop('name');s.write_project(db,snapshot,'legacy reference fixture')
+    legacy=load(c,legacy)
+    assert 'name' not in next(ref for ref in legacy['references'] if ref['referenceRevisionId']==rid)
+    renamed=edit(c,legacy,[{'type':'renameReference','referenceRevisionId':rid,'name':'복원 이름'}])
+    assert next(ref for ref in renamed['references'] if ref['referenceRevisionId']==rid)['name']=='복원 이름'
+
+@pytest.mark.parametrize('name',['','   ','중복 🧙'])
+def test_reference_names_allow_blank_duplicates_and_trim(client,name):
+    c=client;p,a=upload(c,new(c));url='/v1/projects/'+p['projectId']
+    response=c.post(url+'/reference-revisions',json={'expectedRevision':p['revision'],'reference':{'identityAssetId':a['assetId'],'name':name}})
+    assert response.status_code==201,response.text
+    p=load(c,p);assert p['references'][0]['name']==name.strip()
+    p=edit(c,p,[{'type':'renameReference','referenceRevisionId':response.json()['referenceRevisionId'],'name':name}])
+    assert p['references'][0]['name']==name.strip()
+    if name=='중복 🧙':
+        second=c.post(url+'/reference-revisions',json={'expectedRevision':p['revision'],'reference':{'identityAssetId':a['assetId'],'name':name}})
+        assert second.status_code==201,second.text
+        assert [ref['name'] for ref in load(c,p)['references']]==[name,name]
+
+@pytest.mark.parametrize('name',[None,False,123,[],{},'x'*201])
+def test_reference_name_create_rejects_invalid_values_atomically(client,name):
+    c=client;p,a=upload(c,new(c));before=load(c,p)
+    response=c.post('/v1/projects/'+p['projectId']+'/reference-revisions',json={'expectedRevision':p['revision'],'reference':{'identityAssetId':a['assetId'],'name':name}})
+    assert response.status_code==422,response.text
+    assert load(c,p)==before
+
+@pytest.mark.parametrize('operation',[
+    {'type':'renameReference','referenceRevisionId':'r','name':None},
+    {'type':'renameReference','referenceRevisionId':'r','name':False},
+    {'type':'renameReference','referenceRevisionId':'r','name':123},
+    {'type':'renameReference','referenceRevisionId':'r','name':[]},
+    {'type':'renameReference','referenceRevisionId':'r','name':'x'*201},
+    {'type':'renameReference','referenceRevisionId':'r','name':'x','extra':True},
+    {'type':'unsupportedReferenceEdit','referenceRevisionId':'r','name':'x'},
+])
+def test_reference_rename_rejects_invalid_operation_before_mutation(client,operation):
+    c=client;p,a=upload(c,new(c));created=c.post('/v1/projects/'+p['projectId']+'/reference-revisions',json={'expectedRevision':p['revision'],'reference':{'identityAssetId':a['assetId']}})
+    p=load(c,p);before=p
+    operation=dict(operation,referenceRevisionId=created.json()['referenceRevisionId'])
+    response=c.patch('/v1/projects/'+p['projectId']+'/edits',json={'expectedRevision':p['revision'],'operations':[{'type':'updateCharacter','name':'변경 불가'},operation]})
+    assert response.status_code==422,response.text
+    assert load(c,p)==before
+
+def test_reference_rename_unknown_id_batch_atomic_and_stale_conflict(client):
+    c=client;p,a=upload(client,new(client));created=c.post('/v1/projects/'+p['projectId']+'/reference-revisions',json={'expectedRevision':p['revision'],'reference':{'identityAssetId':a['assetId'],'name':'기존'}})
+    p=load(c,p);url='/v1/projects/'+p['projectId']
+    missing=c.patch(url+'/edits',json={'expectedRevision':p['revision'],'operations':[{'type':'updateCharacter','name':'변경 불가'},{'type':'renameReference','referenceRevisionId':'unknown','name':'이름'}]})
+    assert missing.status_code==404
+    assert load(c,p)==p
+    stale=c.patch(url+'/edits',json={'expectedRevision':p['revision']-1,'operations':[{'type':'renameReference','referenceRevisionId':created.json()['referenceRevisionId'],'name':'덮어쓰기'}]})
+    assert stale.status_code==409
+    assert load(c,p)==p
+
 def test_upload_batch_atomic_immutable_and_duplicate(client):
     c=client;p=new(c);p,a=upload(c,p);h=a['sha256'];path=s.asset_path(a['assetId'])
     r=c.post('/v1/projects/'+p['projectId']+'/assets',files=[('files',('okay.png',png(),'image/png')),('files',('broken.png',b'not png','image/png'))]);assert r.status_code==422

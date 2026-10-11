@@ -1,8 +1,12 @@
+import {referenceLabel} from './referenceLabel';
+import {ReferenceNameInput} from './ReferenceNameInput';
+import {AssetNameInput} from './AssetNameInput';
+import {EditorDialog} from './EditorDialog';
 import { useState, useEffect, useId, type ReactNode } from 'react';
 import type { Studio } from './useStudio';
-import { assetProvenanceLabel } from './assetProvenance';
+import { assetLabel, assetProvenanceLabel, isVideoProcessingAsset } from './assetProvenance';
 import { Field, Input, Select, Num, Check, Empty, short } from './ui';
-import type { Rect } from './types';
+import type { Asset, Rect } from './types';
 import { VideoStep } from './VideoStep';
 import { VideoBasePreset } from './VideoBasePreset';
 import { imageProviders } from './videoWorkflow';
@@ -50,9 +54,26 @@ export function AssetsStep({ s, onNext }: {
     const [role, setRole] = useState('source');
     const [mode, setMode] = useState('whole');
     const [files, setFiles] = useState<File[]>([]);
+    const [previewAssetId,setPreviewAssetId] = useState('');
     const limit = s.service?.limits?.maxUploadBytes || 32 * 1024 * 1024;
     const assetById = new Map(p.assets.map(a => [a.assetId, a]));
     const videoById = new Map((p.videos ?? []).map(v => [v.videoId, v]));
+    const previewAsset = assetById.get(previewAssetId);
+    const primaryAssets = p.assets.filter(a => !isVideoProcessingAsset(a));
+    const videoAssets = p.assets.filter(isVideoProcessingAsset);
+    const renderAsset = (a:Asset) => {
+        const source = assetProvenanceLabel(a, assetById, videoById);
+        return <article className="source-tool-asset" key={a.assetId} data-asset-id={a.assetId}>
+          <button type="button" className="source-tool-thumb source-tool-asset-preview checker" aria-label={`자료 이미지 크게 보기 · ${assetLabel(a)}`} onClick={()=>setPreviewAssetId(a.assetId)}><img src={a.url} alt={assetLabel(a)} loading="lazy"/><span>크게 보기</span></button>
+          <strong>{assetLabel(a)}</strong>
+          <AssetNameInput s={s} asset={a}/>
+          <span>{a.width} × {a.height} · {source.roleLabel}</span>
+          <span className="badge">{source.label}</span>
+          {source.originLabel && <span className="badge">{source.originLabel}</span>}
+          <small>투명 {a.alphaStats?.transparent ?? 0} / 반투명 {a.alphaStats?.partial ?? 0} / 불투명 {a.alphaStats?.opaque ?? 0}</small>
+          <span className={`badge ${a.alphaStats?.transparent ? 'success' : 'warn'}`}>{a.alphaStats?.transparent ? '실제 알파 포함' : '불투명 · 배경 검수 필요'}</span>
+        </article>;
+    };
     async function upload() {
         if (!files.length) {
             s.setError('가져올 PNG 또는 WebP를 선택해 주세요.');
@@ -79,21 +100,19 @@ export function AssetsStep({ s, onNext }: {
       <span className="badge" aria-live="polite">{files.length}개 선택</span>
       <button type="button" onClick={onNext}>기준 정하기 →</button>
     </div>} preview={<SourcePane title={`등록된 자료 ${p.assets.length}개`}>
-      <div className="source-tool-asset-grid">
-        {p.assets.map(a => {
-                const source = assetProvenanceLabel(a, assetById, videoById);
-                return <article className="source-tool-asset" key={a.assetId}>
-            <div className="source-tool-thumb checker"><img src={a.url} alt={a.originalFilename} loading="lazy"/></div>
-            <strong>{a.originalFilename}</strong>
-            <span>{a.width} × {a.height} · {source.roleLabel}</span>
-            <span className="badge">{source.label}</span>
-            {source.originLabel && <span className="badge">{source.originLabel}</span>}
-            <small>투명 {a.alphaStats?.transparent ?? 0} / 반투명 {a.alphaStats?.partial ?? 0} / 불투명 {a.alphaStats?.opaque ?? 0}</small>
-            <span className={`badge ${a.alphaStats?.transparent ? 'success' : 'warn'}`}>{a.alphaStats?.transparent ? '실제 알파 포함' : '불투명 · 배경 검수 필요'}</span>
-          </article>;
-            })}
-      </div>
+      {!!p.assets.length && <p className="caption">그림을 누르면 크게 볼 수 있습니다. 자료 이름은 Enter 또는 다른 곳을 눌러 초안에 적용하고 상단 저장으로 확정합니다. 비우면 원본 파일명을 표시합니다.</p>}
+      {!!p.assets.length && <h3>자료 이미지 {primaryAssets.length}개</h3>}
+      <div className="source-tool-asset-grid source-tool-primary-assets">{primaryAssets.map(renderAsset)}</div>
+      {!primaryAssets.length && !!videoAssets.length && <p className="caption">직접 가져오거나 생성한 자료 이미지가 없습니다. 영상 처리 결과를 펼쳐 보세요.</p>}
+      {!!videoAssets.length && <details className="source-tool-details source-tool-video-results">
+        <summary>영상 처리 결과 {videoAssets.length}개</summary>
+        <p className="caption">영상 기준 캔버스, 원본 프레임과 배경 제거·크기·색상 처리 결과입니다.</p>
+        <div className="source-tool-asset-grid">{videoAssets.map(renderAsset)}</div>
+      </details>}
       {!p.assets.length && <Empty title="등록한 이미지가 없습니다"><p>파일을 선택해 가져오세요. 완성 PNG는 생성 없이 편집할 수 있습니다.</p></Empty>}
+      <EditorDialog open={!!previewAsset} title="자료 이미지 크게 보기" onClose={()=>setPreviewAssetId('')} className="asset-image-dialog" actions={<button type="button" disabled={s.busy||!s.commands.length||!!s.conflict} onClick={()=>s.save()}>저장</button>}>
+        {previewAsset&&<figure className="asset-image-full"><div className="checker"><img src={previewAsset.url} alt={assetLabel(previewAsset)}/></div><figcaption><AssetNameInput s={s} asset={previewAsset}/><strong>{assetLabel(previewAsset)}</strong><p>원본 파일: {previewAsset.originalFilename} · {previewAsset.width} × {previewAsset.height}</p><p>{assetProvenanceLabel(previewAsset,assetById,videoById).label}</p><p>이름을 바꾼 뒤 상단 저장으로 확정합니다. 원본 파일명과 이미지는 유지됩니다.</p></figcaption></figure>}
+      </EditorDialog>
     </SourcePane>} settings={<SourcePane title="가져오기 설정" footer={<>
       {!!s.commands.length && <p className="warning">현재 초안을 저장한 뒤 파일을 가져와 주세요.</p>}
       <button className="primary full" disabled={s.busy || !files.length || !!s.commands.length} onClick={upload}>선택한 {files.length}개 가져오기</button>
@@ -114,6 +133,7 @@ export function ReferenceStep({ s }: {
 }) {
     const p = s.snapshot!;
     const active = p.references.find(r => r.referenceRevisionId === p.activeReferenceRevisionId);
+    const [name,setName] = useState(active?.name || '');
     const [identity, setIdentity] = useState(active?.identityAssetId || p.assets[0]?.assetId || '');
     const [styles, setStyles] = useState<string[]>(active?.styleAssetIds || []);
     const [poses, setPoses] = useState<string[]>(active?.poseAssetIds || []);
@@ -125,6 +145,7 @@ export function ReferenceStep({ s }: {
     const toggle = (ids: string[], id: string) => ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id];
     async function saveReference() {
         const reference = {
+            name: name.trim(),
             identityAssetId: identity,
             styleAssetIds: styles,
             poseAssetIds: poses,
@@ -142,17 +163,18 @@ export function ReferenceStep({ s }: {
     }
     const [tab, setTab] = useState<'identity' | 'roles' | 'approval'>('identity');
     const identityAsset = p.assets.find(a => a.assetId === identity);
-    return (<SourceTool name="캐릭터 기준" preview={<SourcePane title="외형 기준 이미지" className="source-tool-visual-pane" footer={<span>{identityAsset ? `${identityAsset.originalFilename} · ${identityAsset.width} × ${identityAsset.height}` : '외형 기준을 선택해 주세요'}</span>}>
+    return (<SourceTool name="캐릭터 기준" preview={<SourcePane title="외형 기준 이미지" className="source-tool-visual-pane" footer={<span>{identityAsset ? `${assetLabel(identityAsset)} · ${identityAsset.width} × ${identityAsset.height}` : '외형 기준을 선택해 주세요'}</span>}>
     <div className="source-tool-canvas checker">{identityAsset ? <img src={identityAsset.url} alt="선택한 외형 기준"/> : <Empty title="외형 기준 이미지가 없습니다"/>}</div>
-  </SourcePane>} settings={<SourcePane title="기준 편집" footer={tab !== 'approval' ? <button className="primary full" disabled={!identity || s.busy || !!s.commands.length} onClick={saveReference}>새 기준 초안 저장</button> : <p className="caption">승인한 기준은 고정됩니다. 변경은 새 초안으로 저장하세요.</p>}>
+  </SourcePane>} settings={<SourcePane title="기준 편집" footer={tab !== 'approval' ? <button className="primary full" disabled={!identity || s.busy || !!s.commands.length} onClick={saveReference}>새 기준 초안 저장</button> : <p className="caption">이름은 Enter 또는 다른 곳을 눌러 초안에 적용하고 상단 저장으로 확정합니다. 이름만 바꾸면 승인은 유지됩니다. 외형 변경은 새 초안으로 저장하세요.</p>}>
     <div className="source-tool-segments" role="group" aria-label="기준 설정 분류">
       <button aria-pressed={tab === 'identity'} onClick={() => setTab('identity')}>외형</button>
       <button aria-pressed={tab === 'roles'} onClick={() => setTab('roles')}>참조</button>
       <button aria-pressed={tab === 'approval'} onClick={() => setTab('approval')}>승인</button>
     </div>
     {tab === 'identity' && <>
+      <Input label="새 기준 그림 이름" value={name} maxLength={200} onChange={e=>setName(e.target.value)} placeholder="예: 효과 없는 오른쪽 측면"/>
       <Select label="외형 기준 이미지" value={identity} onChange={e => setIdentity(e.target.value)}>
-        <option value="">이미지 선택</option>{p.assets.map(a => <option key={a.assetId} value={a.assetId}>{a.originalFilename}</option>)}
+        <option value="">이미지 선택</option>{p.assets.map(a => <option key={a.assetId} value={a.assetId}>{assetLabel(a)}</option>)}
       </Select>
       <Field label="고정 특징 · 얼굴 / 의상 / 장비 / 팔레트"><textarea value={fixed} onChange={e => setFixed(e.target.value)} placeholder="예: 짧은 은색 머리, 오른팔의 청색 장갑, 붉은 목도리"/></Field>
       <Field label="변경해도 되는 특징"><textarea value={allowed} onChange={e => setAllowed(e.target.value)} placeholder="예: 자세와 표정, 무기의 각도"/></Field>
@@ -162,14 +184,15 @@ export function ReferenceStep({ s }: {
     {tab === 'roles' && <>
       <p className="caption">스타일과 자세는 보조 참조입니다. 외형 기준은 유지됩니다.</p>
       {p.assets.map(a => <article className="source-tool-reference" key={a.assetId}>
-        <img className="checker" src={a.url} alt="" loading="lazy"/><strong>{a.originalFilename}</strong>
+        <img className="checker" src={a.url} alt="" loading="lazy"/><strong>{assetLabel(a)}</strong>
         <div><Check label="스타일" checked={styles.includes(a.assetId)} onChange={() => setStyles(toggle(styles, a.assetId))}/><Check label="자세" checked={poses.includes(a.assetId)} onChange={() => setPoses(toggle(poses, a.assetId))}/></div>
       </article>)}
       {!p.assets.length && <p className="caption">먼저 참조 이미지를 가져오세요.</p>}
     </>}
     {tab === 'approval' && <>
       {p.references.map(r => <article className="source-tool-version" key={r.referenceRevisionId}>
-        <div className="row"><strong>기준 {short(r.referenceRevisionId)}</strong><span className={`badge ${r.approval === 'approved' ? 'success' : 'warn'}`}>{r.approval === 'approved' ? '승인됨' : '초안'}</span></div>
+        <div className="row"><strong>{referenceLabel(p,r.referenceRevisionId)}</strong><span className={`badge ${r.approval === 'approved' ? 'success' : 'warn'}`}>{r.approval === 'approved' ? '승인됨' : '초안'}</span></div>
+        <ReferenceNameInput s={s} reference={r} label={`기준 ${p.references.indexOf(r)+1} 그림 이름`}/>
         <p>{r.fixedTraits || '등록한 외형 이미지 기준'}</p>
         {r.approval !== 'approved' && <><Check label="외형·역할·방향을 확인했습니다" checked={confirmed} onChange={setConfirmed}/><button disabled={!confirmed || s.busy || !!s.commands.length} onClick={() => s.mutation(`/reference-revisions/${r.referenceRevisionId}/approve`, { expectedRevision: p.revision, reviewChecks: { identity: true } })}>이 기준 승인</button></>}
       </article>)}
@@ -227,7 +250,7 @@ export function ImageGenerationStep({ s }: {
     };
     const activeReference = p.references.find(r => r.referenceRevisionId === p.activeReferenceRevisionId && r.approval === 'approved');
     const identityAsset = p.assets.find(a => a.assetId === activeReference?.identityAssetId);
-    return (<SourceTool name="동작 생성" previewLabel="승인 기준" preview={<SourcePane title={`승인 외형 기준 · ${short(activeReference?.referenceRevisionId)}`} className="source-tool-identity-pane">
+    return (<SourceTool name="동작 생성" previewLabel="승인 기준" preview={<SourcePane title={referenceLabel(p,activeReference?.referenceRevisionId)} className="source-tool-identity-pane">
     <div className="source-tool-canvas checker">{identityAsset ? <img src={identityAsset.url} alt="승인된 외형 기준"/> : <Empty title="승인한 외형 기준이 없습니다"><p>기준 도구에서 외형을 승인해 주세요.</p></Empty>}</div>
     <section className="source-tool-traits" tabIndex={0} aria-label="승인된 고정 특징">
       <h3>고정 특징</h3><p>{activeReference?.fixedTraits || '등록한 외형 이미지 기준'}</p>
@@ -360,7 +383,7 @@ export function ExtractStep({ s, initialAssetId }: {
     <button className="primary full" disabled={disabled || !asset || mode === 'regions' && !regions.length} onClick={() => s.job('extract', [assetId], { mode, rows, columns, regions, minArea, ...(groupId ? { groupId } : {}) })}>프레임 후보 추출</button>
     {disabled && <p className="caption">저장 완료·작업 처리기 연결 후 실행할 수 있습니다.</p>}
   </>}>
-    <Select label="처리할 이미지" value={assetId} onChange={e => { setAsset(e.target.value); setRegions([]); setRegionHistory([]); setSelected([]); }}><option value="">이미지 선택</option>{p.assets.map(a => <option key={a.assetId} value={a.assetId}>{a.originalFilename} · {a.width}×{a.height}</option>)}</Select>
+    <Select label="처리할 이미지" value={assetId} onChange={e => { setAsset(e.target.value); setRegions([]); setRegionHistory([]); setSelected([]); }}><option value="">이미지 선택</option>{p.assets.map(a => <option key={a.assetId} value={a.assetId}>{assetLabel(a)} · {a.width}×{a.height}</option>)}</Select>
     <Select label="추출 방식" value={mode} onChange={e => setMode(e.target.value)}><option value="whole">전체 이미지 · 한 프레임</option><option value="grid">규칙 격자</option><option value="components">연결 성분 자동 추출</option><option value="regions">수동 영역</option></Select>
     {mode === 'grid' && <div className="source-tool-numbers"><Num label="행" value={rows} onChange={setRows} min={1} max={64}/><Num label="열" value={columns} onChange={setColumns} min={1} max={64}/></div>}
     {mode === 'components' && <><Num label="최소 연결 영역 (px²)" value={minArea} onChange={setArea} min={1}/><p className="caption">분리된 장비는 수동 영역에서 합쳐 다시 추출하세요.</p></>}

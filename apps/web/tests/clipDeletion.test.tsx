@@ -44,6 +44,37 @@ let s:Studio;
 beforeEach(()=>{
  s={snapshot:structuredClone(project),base:structuredClone(project),commands:[],redoCommands:[],busy:false,conflict:null,jobs:[],resolveId:(id:string)=>id,setNotice:vi.fn(),edit:vi.fn(op=>{s.commands.push({operation:op});s.snapshot=applyDraft(s.base!,s.commands);})} as unknown as Studio;
 });
+describe('clip reference picture',()=>{
+ beforeEach(()=>{
+  const references=['r1','r2'].map((id,i)=>({referenceRevisionId:id,identityAssetId:'a'+i,approval:'approved',fixedTraits:`힐러 ${i+1}, 금발`}));
+  s.base={...s.base!,activeReferenceRevisionId:'r2',references,assets:references.map((r,i)=>({assetId:r.identityAssetId,url:`/${i}.png`,originalFilename:`${i}.png`})),clips:s.base!.clips.map(c=>({...c,referenceRevisionId:'r1'}))} as Snapshot;
+  s.snapshot=structuredClone(s.base);
+ });
+ it('shows the linked image, opens it without edits, and switches using the original reference ID',()=>{
+  const h=new Harness(s),picture=()=>nodes(h.tree).find(n=>n.type==='img'&&n.props.alt==='선택한 동작의 기준 그림');
+  expect(picture()!.props.src).toBe('/0.png');h.click('크게 보기');
+  const dialog=nodes(h.tree).find(n=>n.type===EditorDialog&&n.props.title==='동작에 연결된 기준 그림')!;
+  expect(dialog.props.open).toBe(true);expect(text(dialog)).toContain('기준 1 · 힐러 1 · 0.png');expect(s.edit).not.toHaveBeenCalled();
+  dialog.props.onClose();h.render();
+  const select=nodes(h.tree).find(n=>n.type===Select&&n.props.label==='동작에 사용할 승인 기준')!;
+  expect(text(select)).toContain('기준 2 · 힐러 2 · 1.png');select.props.onChange({target:{value:'r2'}});h.render();
+  expect(s.edit).toHaveBeenCalledExactlyOnceWith({type:'updateClip',clipId:'c',changes:{referenceRevisionId:'r2'}});
+  expect(picture()!.props.src).toBe('/1.png');expect(s.snapshot!.clips[0].review).not.toBe('approved');
+ });
+ it('never substitutes the active image for an unlinked clip',()=>{
+  s.snapshot!.clips[0].referenceRevisionId=null;const h=new Harness(s);
+  expect(nodes(h.tree).some(n=>n.type==='img'&&n.props.alt==='선택한 동작의 기준 그림')).toBe(false);
+  expect(text(h.tree)).toContain('이 동작에 사용할 승인 기준을 선택하세요.');
+ });
+ it('lets review comparison change images without changing the clip reference',()=>{
+  const frame={frameVersionId:'f',imageAssetId:'a0',review:'pending'};
+  const h=new Harness(s,'c',({s})=>CandidateReview({s,frame:frame as any,clip:s.snapshot!.clips[0]}));
+  const select=nodes(h.tree).find(n=>n.type===Select&&n.props.label==='나란히 비교할 승인 기준')!;
+  select.props.onChange({target:{value:'r2'}});h.render();
+  const image=nodes(h.tree).find(n=>n.type==='img'&&n.props.alt==='승인된 외형 기준')!;
+  expect(image.props.src).toBe('/1.png');expect(s.edit).not.toHaveBeenCalled();expect(s.snapshot!.clips[0].referenceRevisionId).toBe('r1');
+ });
+});
 describe('library clip deletion',()=>{
  it('sizes the confirmation to its content instead of stretching between modal insets',()=>{
   const css=readFileSync(new URL('../src/editor-shell.css',import.meta.url),'utf8');

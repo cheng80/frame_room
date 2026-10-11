@@ -1,5 +1,7 @@
 import type {Asset, Video} from './types';
 
+export const assetLabel=(asset:Asset):string=>asset.name?.trim()||asset.originalFilename;
+
 type Provenance={kind?:string;providerId?:string;parentAssetId?:string;sourceVideoId?:string;processing?:string;interpolated?:boolean;interpolationMethod?:string};
 function readProvenance(value:unknown):Provenance {
   if(!value||typeof value!=='object'||Array.isArray(value))return {};
@@ -15,6 +17,11 @@ function readProvenance(value:unknown):Provenance {
   };
 }
 
+export function isVideoProcessingAsset(asset:Asset):boolean {
+  const kind=readProvenance(asset.provenance).kind;
+  return kind==='video-input'||kind==='video-frame-raw'||kind==='video-frame';
+}
+
 /** Source identity is provenance + asset ID, never the filename or image appearance. */
 export function assetProvenanceLabel(asset:Asset,assets:ReadonlyMap<string,Asset>,videos?:ReadonlyMap<string,Video>) {
   const provenance=readProvenance(asset.provenance);
@@ -28,6 +35,7 @@ export function assetProvenanceLabel(asset:Asset,assets:ReadonlyMap<string,Asset
     case 'clip-follow':label='동작 부위 흔들림 결과';break;
     case 'clip-render':label='저장된 동작 렌더 결과';break;
     case 'raw-crop':label='추출 프레임';break;
+    case 'video-input':label='영상 기준 캔버스';break;
     case 'video-frame-raw':label='영상 원본 프레임';break;
     case 'video-frame':label=provenance.processing==='video-finish'?(provenance.interpolated?`${interpolatedLabel}·색상 마무리 프레임`:'영상 색상 마무리 프레임'):provenance.interpolated?`${interpolatedLabel} 프레임`:provenance.processing==='video-normalization'?'영상 크기 정규화 프레임':provenance.processing==='chroma-key'||readProvenance(assets.get(provenance.parentAssetId||'')?.provenance).kind==='video-frame-raw'?'영상 배경 제거 프레임':'영상 추출 프레임';break;
     case 'imported':case 'upload':case 'uploaded':label='가져온 원본';break;

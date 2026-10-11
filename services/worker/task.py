@@ -59,7 +59,9 @@ def restore(request,out):
             for old,data,meta in pending_videos:
                 video_mapping[old['videoId']]=videos.register(data,old['originalFilename'],old.get('provenance'),meta)
             for old,data,meta in pending:
-                new=s.register_asset(data,old['originalFilename'],old['role'],old['provenance'],meta); mapping[old['assetId']]=new
+                new=s.register_asset(data,old['originalFilename'],old['role'],old['provenance'],meta)
+                if 'name' in old: new['name']=old['name']
+                mapping[old['assetId']]=new
             # Portable snapshot contains only relative public URLs. Remap each opaque asset use.
             def remap(v):
                 if isinstance(v,dict): return {k:remap(x) for k,x in v.items()}
@@ -70,7 +72,7 @@ def restore(request,out):
             p=remap(p);p['assets']=[remap(x) for x in mapping.values()];p['videos']=[remap(x) for x in video_mapping.values()];p=s.remap_reference_ids(p)
             # DB provenance must match the remapped portable snapshot too.
             with s.transaction() as c:
-                for a in p['assets']: c.execute('UPDATE assets SET metadata=? WHERE id=?',(s.dumps(a),a['assetId']))
+                for a in p['assets']: c.execute('UPDATE assets SET metadata=? WHERE id=?',(s.dumps({k:v for k,v in a.items() if k!='name'}),a['assetId']))
                 for v in p['videos']: c.execute('UPDATE videos SET metadata=? WHERE id=?',(s.dumps(v),v['videoId']))
             p.update(projectId=s.uid(),name=p['name']+' (복원)',revision=1,journal=[],createdAt=s.now())
             return dict(restoredProject=p,files=[])

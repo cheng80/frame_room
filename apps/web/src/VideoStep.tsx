@@ -1,3 +1,4 @@
+import {assetLabel} from './assetProvenance';
 import {useId, useMemo, useRef, useState, type FormEvent} from 'react';
 import {api} from './api';
 import {EditorCanvas} from './Canvas';
@@ -146,8 +147,8 @@ export function VideoStep({s, onSelectClip}: {s: Studio; onSelectClip?: (clipId:
         <h2 className="source-tool-heading">{mode === 'generate' ? '영상에 사용할 기준 이미지' : '보관된 원본 영상'}</h2>
         <div className="source-tool-scroll">
           {mode === 'generate' ? <>
-            {asset ? <div className="video-reference checker"><img src={asset.url} alt={`영상 기준 · ${asset.originalFilename}`}/></div> : <Empty title="기준 이미지를 선택해 주세요"/>}
-            {asset ? <p className="caption">{asset.originalFilename} · {reference ? '승인된 외형 기준 사용' : '선택한 이미지 사용'}</p> : null}
+            {asset ? <div className="video-reference checker"><img src={asset.url} alt={`영상 기준 · ${assetLabel(asset)}`}/></div> : <Empty title="기준 이미지를 선택해 주세요"/>}
+            {asset ? <p className="caption">{assetLabel(asset)} · {reference ? '승인된 외형 기준 사용' : '선택한 이미지 사용'}</p> : null}
             {reference?.fixedTraits ? <p className="video-traits">{reference.fixedTraits}</p> : null}
           </> : <>
             <Select label="처리할 원본 영상" value={video?.videoId ?? ''} onChange={e => chooseVideo(e.target.value)}>
@@ -208,7 +209,7 @@ export function VideoStep({s, onSelectClip}: {s: Studio; onSelectClip?: (clipId:
             {mode === 'generate' ? <>
               <Select label="기준 이미지" value={generation.assetId} required onChange={e => setGenerationField('assetId', e.target.value)}>
                 <option value="">이미지 선택</option>
-                {p.assets.map(a => <option key={a.assetId} value={a.assetId}>{a.originalFilename}{approvedVideoReference(p, a.assetId) ? ' · 승인 기준' : ''}</option>)}
+                {p.assets.map(a => <option key={a.assetId} value={a.assetId}>{assetLabel(a)}{approvedVideoReference(p, a.assetId) ? ' · 승인 기준' : ''}</option>)}
               </Select>
               <Select label="영상 모델" value={generation.model} onChange={e => setGenerationField('model', e.target.value)}>
                 {VIDEO_MODELS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
@@ -305,7 +306,7 @@ export function VideoStep({s, onSelectClip}: {s: Studio; onSelectClip?: (clipId:
               <Select label="색 번짐 판정 기준" value={spillReferenceAssetId} onChange={e => {setSpillReference({videoId: video?.videoId ?? '', assetId: e.target.value}); setError('');}}>
                 <option value="">{hasVideoReference ? '영상 생성 기준 사용' : '기준 없음 · 약한 보정'}</option>
                 {missingSpillReference ? <option value={spillReferenceAssetId} disabled>기준 이미지 없음 · 다시 선택</option> : null}
-                {p.assets.map(a => <option key={a.assetId} value={a.assetId}>{a.originalFilename}</option>)}
+                {p.assets.map(a => <option key={a.assetId} value={a.assetId}>{assetLabel(a)}</option>)}
               </Select>
               {missingSpillReference ? <p className="warning">선택한 기준 이미지가 없습니다. 영상 제작에 쓴 원본 그림을 다시 선택해 주세요.</p>
                 : !spillReferenceAssetId && !hasVideoReference ? <p className="caption">기준이 없으면 칼·손 안쪽에 배경색이 남을 수 있습니다. 영상 제작에 쓴 원본 그림을 선택해 주세요.</p> : null}

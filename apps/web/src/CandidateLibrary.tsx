@@ -1,3 +1,4 @@
+import {assetLabel} from './assetProvenance';
 import {useMemo} from 'react';
 import type {Asset, Job, Snapshot} from './types';
 import {assetProvenanceLabel} from './assetProvenance';
@@ -26,7 +27,7 @@ export function CandidateLibrary({snapshot, jobs, includeHidden, selectedFrameId
   const assets = useMemo(() => new Map(snapshot.assets.map(a => [a.assetId, a])), [snapshot.assets]);
   function sourceLink(id: string, prefix = '원본') {
     const asset: Asset | undefined = assets.get(id);
-    return asset ? <button type="button" className="cl-link" title={`${asset.originalFilename} · ${id}`} onClick={() => onSource(id)}>{prefix} · {asset.originalFilename} <span>{shortId(id)}</span></button> : <span className="cl-note">{prefix} {shortId(id)} · 기록 없음</span>;
+    return asset ? <button type="button" className="cl-link" title={`${assetLabel(asset)} · ${id}`} onClick={() => onSource(id)}>{prefix} · {assetLabel(asset)} <span>{shortId(id)}</span></button> : <span className="cl-note">{prefix} {shortId(id)} · 기록 없음</span>;
   }
   return <div className="aw-scroll aw-candidate-list cl-library" aria-label="제작 이력과 후보 묶음">
     <p className="cl-note">후보는 추천 순위가 아닙니다. 수동 승인은 자동 검사 결과와 별개입니다.</p>

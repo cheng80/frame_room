@@ -193,8 +193,11 @@ class RefBody(Strict): expectedRevision:int; reference:dict
 def reference(pid:str,body:RefBody):
     with s.transaction() as c:
         p=s.get_project(pid,c); s.check_revision(p,body.expectedRevision)
-        d=body.reference; allowed={'identityAssetId','styleAssetIds','poseAssetIds','fixedTraits','allowedChanges','forbiddenTransfers','facing','bodyMeasurement'}
+        d=body.reference; allowed={'name','identityAssetId','styleAssetIds','poseAssetIds','fixedTraits','allowedChanges','forbiddenTransfers','facing','bodyMeasurement'}
         if set(d)-allowed: raise s.AppError('REFERENCE_FIELDS','지원하지 않는 기준 설정입니다.')
+        if 'name' in d and (not isinstance(d['name'],str) or len(d['name'])>200): raise s.AppError('REFERENCE_NAME_INVALID','기준 이름은 200자 이내 문자열이어야 합니다.')
+        d=dict(d)
+        if 'name' in d: d['name']=d['name'].strip()
         for aid in [d.get('identityAssetId')]+d.get('styleAssetIds',[])+d.get('poseAssetIds',[]): find(p['assets'],'assetId',aid)
         ref=dict(referenceRevisionId=s.uid(),styleAssetIds=[],poseAssetIds=[],fixedTraits='',allowedChanges='',forbiddenTransfers='',facing='right',bodyMeasurement=None,approval='draft')
         ref.update(d); p['references'].append(ref); s.write_project(c,p,'기준 초안 저장')

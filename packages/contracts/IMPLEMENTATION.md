@@ -1,18 +1,23 @@
 # 구현 통합 계약 (DATA_API_SPEC의 구체화)
 Python 모듈은 repository root에서 import. API base /v1, port 8765. React dev 5173 proxy.
 Project snapshot: {projectId,schemaVersion:1,revision,name,characterName,createdAt,updatedAt,assets:Asset[],references:Reference[],activeReferenceRevisionId:null|string,frames:Frame[],alignmentGroups:Group[],alignments:{[frameVersionId]:Alignment},clips:Clip[],outline:Outline,generationSettings:{},journal:[],generations:[]}
-Asset: {assetId,sha256,decodedHash,originalFilename,mediaType,width,height,role,alphaStats:{transparent,partial,opaque},provenance,url:'/v1/assets/{id}/content'} (storageKey internal DB)
+Asset: {assetId,name?:string,sha256,decodedHash,originalFilename,mediaType,width,height,role,alphaStats:{transparent,partial,opaque},provenance,url:'/v1/assets/{id}/content'} (storageKey internal DB)
+
+자료 표시 이름은 프로젝트 snapshot의 optional `asset.name`으로 보관한다. 기존 `/v1/projects/{pid}/edits`의 `{type:'renameAsset',assetId,name}`으로 편집하며 문자열·최대 200자·앞뒤 공백 제거·빈 이름과 중복 이름을 허용한다. 비우거나 이전 자료에 이름이 없으면 `originalFilename`을 표시한다. 이름 변경은 기존 저장 버전 충돌 검사와 이력·복원 절차를 따르고, 원본 파일명·내용·해시·asset ID·출처·기준/후보 연결 및 승인 상태는 유지한다. 잘못된 이름, 없는 자료 ID, 다른 프로젝트의 자료 ID는 전체 edits를 원자적으로 거절한다. 실제 파일 이름과 전역 리소스 메타데이터는 변경하지 않는다.
 Frame: {frameId,frameVersionId,parentFrameVersionId?,rawAssetId,imageAssetId,sourceRect:{x,y,width,height},sourceToFrameTransform:{scaleX:1,scaleY:1,offsetX,offsetY},extractionVersion:'raw-v1',nativeScaleGroupId,review:'pending'|'approved'|'rejected',reviewReason?:string,reviewReferenceRevisionId?:string,hidden:false}
 Group: {alignmentGroupId,groupRevisionId,frameVersionIds,mode:'preserve-source-scale'|'shared-scale-foot-anchor',sharedScale:1,cell:{width:512,height:512,edge:2},targetAnchor:{x:256,y:494},bodyMeasurement:null|{topY,bottomY,targetHeight,approved:true},resampler:'nearest',roundingVersion:'js-round-v1'}
 Alignment: {frameVersionId,groupRevisionId,sourceAnchor:{x,y},anchorSpace:'crop',method:'automatic'|'manual',contactMode:'grounded'|'airborne',rootAnchor?:{x,y},authoredOffsetPx:{x:0,y:0},approval:'pending'|'approved'}
 Clip: {clipId,clipRevisionId,name,stateId,facing:'right',referenceRevisionId,loop:true,endBehavior:'hold-last',defaultFps:10,occurrences:Occurrence[],review:'pending'|'approved'}
 Occurrence: {occurrenceId,frameVersionId,durationMs:100,timingMode:'fps'|'explicit',transform:{dx:0,dy:0,scaleX:1,scaleY:1,rotationDeg:0,shearX:0,shearY:0,flipX:false,flipY:false,pivot:{x:256,y:256}},pixelEdits:[{x,y,color:[r,g,b,a]}]}
-Reference: {referenceRevisionId,identityAssetId,styleAssetIds:[],poseAssetIds:[],fixedTraits,allowedChanges,forbiddenTransfers,facing,bodyMeasurement:null,approval:'draft'|'approved'}
+Reference: {referenceRevisionId,name?:string,identityAssetId,styleAssetIds:[],poseAssetIds:[],fixedTraits,allowedChanges,forbiddenTransfers,facing,bodyMeasurement:null,approval:'draft'|'approved'}
+
+기준 그림 이름은 표시용 메타데이터다. 기준 생성의 optional `reference.name`과 기존 `/v1/projects/{pid}/edits`의 `{type:'renameReference',referenceRevisionId,name}`으로 지정한다. 이름은 문자열·최대 200자이며 앞뒤 공백을 제거한다. 빈 이름은 자동 표시 이름으로 돌아간다. 이전 snapshot의 이름 누락을 지원하고 중복 이름도 허용한다. 이름 변경은 기존 revision 충돌 검사·저장 이력을 따르며 기준/동작 승인·연결 ID·그림·원본 파일명과 clipRevisionId를 변경하지 않는다. 잘못된 이름과 없는 기준 ID는 전체 edits를 원자적으로 거절한다.
 Outline: {enabled:false,mode:'preview-only'|'bake',teamLabel,colorRGBA:[66,190,255,255],thicknessPx:2,directions:8,opacityPerCopy:0.8,rendererVersion:'outline-v1'}
 
 GET /projects -> {projects:[snapshot summaries]}; POST /projects {name,characterName,cell?:{width,height}} -> snapshot. GET /projects/{id} -> snapshot. Assets multipart files,role,importMode -> {assets,savedRevision}. Reference POST {expectedRevision,reference:{...}} -> {referenceRevisionId,savedRevision}; approve POST {expectedRevision,reviewChecks:{identity:true}} -> ACK.
 PATCH edits {expectedRevision,operations:[{type,...}]} -> {savedRevision,snapshot}. Allowed concrete operations:
 - setGenerationSettings {settings}
+- renameReference {referenceRevisionId,name}: 표시 이름만 변경하며 기준·동작 승인과 원본은 보존
 - createClip {clip:{name,...}}; deleteClip {clipId} removes that clip and its current occurrences from the snapshot while retaining source data and saved history; updateClip {clipId,changes:{name,loop,defaultFps,facing,referenceRevisionId,review}}
 - addOccurrence {clipId,frameVersionId,index?}; removeOccurrence {clipId,occurrenceId}; reorderOccurrences {clipId,occurrenceIds}; duplicateOccurrence {clipId,occurrenceId}
 - setTiming {clipId,occurrenceId,durationMs,timingMode}; setTransform {clipId,occurrenceId,transform}; setPixelEdits {clipId,occurrenceId,pixelEdits}

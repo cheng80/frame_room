@@ -25,6 +25,8 @@ export function applyDraft(base:Snapshot,commands:DraftCommand[]):Snapshot {
  const c=s.clips.find(x=>x.clipId===o.clipId);const occ=c?.occurrences.find(x=>x.occurrenceId===o.occurrenceId);const clipWasApproved=c?.review==='approved';
  switch(o.type){
  case 'updateCharacter':s.characterName=o.name;break;
+ case 'renameAsset':{const a=s.assets.find(a=>a.assetId===o.assetId);if(a)a.name=o.name.trim();break;}
+ case 'renameReference':{const r=s.references.find(r=>r.referenceRevisionId===o.referenceRevisionId);if(r)r.name=o.name.trim();break;}
  case 'setGenerationSettings':s.generationSettings={...o.settings};break;
  case 'createClip':s.clips.push({clipId:localId!,clipRevisionId:localId!,stateId:localId!,facing:'right',referenceRevisionId:s.activeReferenceRevisionId,loop:true,endBehavior:'hold-last',defaultFps:10,occurrences:[],review:'pending',...o.clip} as Clip);break;
  case 'deleteClip':s.clips=s.clips.filter(x=>x.clipId!==o.clipId);break;

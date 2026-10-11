@@ -4,6 +4,16 @@ import {occurrenceAt,validateRuntime} from '../src/render';
 import type {Snapshot} from '../src/types';
 const base={projectId:'p',revision:1,activeReferenceRevisionId:'r',clips:[{clipId:'c',review:'approved',defaultFps:10,occurrences:[]}],alignments:{f:{approval:'approved'}},alignmentGroups:[{alignmentGroupId:'g',frameVersionIds:['f'],sharedScale:1}],frames:[{frameVersionId:'f',review:'pending'}]} as unknown as Snapshot;
 describe('independent occurrences and saving',()=>{
+ it('renames only the reference metadata without invalidating approvals and supports undo/redo',()=>{
+  const fixture=structuredClone(transitions.snapshot) as unknown as Snapshot,before=structuredClone(fixture);
+  const commands=[{operation:{type:'renameReference',referenceRevisionId:'r',name:'  효과 없는 오른쪽 측면  '}}];
+  const renamed=applyDraft(fixture,commands);
+  expect(renamed.references[0].name).toBe('효과 없는 오른쪽 측면');
+  expect({...renamed,references:before.references}).toEqual(before);
+  expect(renamed.references[0]).toEqual({...before.references[0],name:'효과 없는 오른쪽 측면'});
+  expect(fixture).toEqual(before);expect(applyDraft(fixture,[])).toEqual(before);expect(applyDraft(fixture,commands)).toEqual(renamed);
+  expect(applyDraft(renamed,[{operation:{type:'renameReference',referenceRevisionId:'r',name:''}}]).references[0].name).toBe('');
+ });
  it('preserves [A,A] as separate slots and durations',()=>{const s=applyDraft(base,[{operation:{type:'addOccurrence',clipId:'c',frameVersionId:'f'},localId:'o1'},{operation:{type:'duplicateOccurrence',clipId:'c',occurrenceId:'o1'},localId:'o2'},{operation:{type:'setTiming',clipId:'c',occurrenceId:'o2',durationMs:240,timingMode:'explicit'}}]);expect(s.clips[0].occurrences.map(o=>o.durationMs)).toEqual([100,240]);expect(s.clips[0].occurrences.map(o=>o.occurrenceId)).toEqual(['o1','o2']);expect(base.clips[0].occurrences).toEqual([]);});
  it('remaps draft identifiers before dependent server operations',()=>{expect(remapCommand({operation:{type:'reorderOccurrences',clipId:'draft-c',occurrenceIds:['draft-o']}},{'draft-c':'c','draft-o':'o'}).operation).toEqual({type:'reorderOccurrences',clipId:'c',occurrenceIds:['o']});});
  it('keeps empty timeline empty after removing final occurrence',()=>{const s=applyDraft(base,[{operation:{type:'addOccurrence',clipId:'c',frameVersionId:'f'},localId:'o'},{operation:{type:'removeOccurrence',clipId:'c',occurrenceId:'o'}}]);expect(s.clips[0].occurrences).toHaveLength(0);});

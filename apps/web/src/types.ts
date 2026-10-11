@@ -1,7 +1,7 @@
 export type Point={x:number;y:number};
 export type Rect=Point & {width:number;height:number};
 export type RGBA=[number,number,number,number];
-export interface Asset {assetId:string;sha256:string;decodedHash:string;originalFilename:string;mediaType:string;width:number;height:number;role:string;alphaStats:{transparent:number;partial:number;opaque:number};provenance:unknown;url:string}
+export interface Asset {assetId:string;name?:string;sha256:string;decodedHash:string;originalFilename:string;mediaType:string;width:number;height:number;role:string;alphaStats:{transparent:number;partial:number;opaque:number};provenance:unknown;url:string}
 export interface Video {videoId:string;sha256:string;originalFilename:string;mediaType:string;width:number;height:number;fps:number;frameCount:number;durationMs:number;timesMs?:number[];streamIndex?:number;provenance:unknown;url:string}
 export interface Frame {frameId:string;frameVersionId:string;parentFrameVersionId?:string;rawAssetId:string;imageAssetId:string;sourceRect:Rect;sourceToFrameTransform:{scaleX:number;scaleY:number;offsetX:number;offsetY:number};extractionVersion:string;extractionReview?:{componentIndex?:number;area?:number;belowMinArea?:boolean;warnings?:unknown[];rect?:Rect};nativeScaleGroupId:string;review:string;reviewReason?:string;hidden:boolean}
 export interface Group {alignmentGroupId:string;groupRevisionId:string;frameVersionIds:string[];mode:string;sharedScale:number;cell:{width:number;height:number;edge:number};targetAnchor:Point;bodyMeasurement:null|{topY:number;bottomY:number;targetHeight:number;approved:boolean};resampler:string;roundingVersion:string}
@@ -10,7 +10,7 @@ export interface Transform {dx:number;dy:number;scaleX:number;scaleY:number;rota
 export interface PixelEdit extends Point {color:RGBA}
 export interface Occurrence {occurrenceId:string;frameVersionId:string;durationMs:number;timingMode:string;transform:Transform;pixelEdits:PixelEdit[]}
 export interface Clip {sourceVideoId?:string;clipId:string;clipRevisionId:string;name:string;stateId:string;facing:string;referenceRevisionId:string|null;loop:boolean;endBehavior:string;defaultFps:number;occurrences:Occurrence[];review:string;reviewInvalidatedReason?:string}
-export interface Reference {referenceRevisionId:string;identityAssetId:string;styleAssetIds:string[];poseAssetIds:string[];fixedTraits:string;allowedChanges:string;forbiddenTransfers:string;facing:string;bodyMeasurement:unknown;approval:string}
+export interface Reference {referenceRevisionId:string;name?:string;identityAssetId:string;styleAssetIds:string[];poseAssetIds:string[];fixedTraits:string;allowedChanges:string;forbiddenTransfers:string;facing:string;bodyMeasurement:unknown;approval:string}
 export interface Outline {enabled:boolean;mode:string;teamLabel:string;colorRGBA:RGBA;thicknessPx:number;directions:number;opacityPerCopy:number;rendererVersion:string}
 export interface ProjectStorage {layout:'project-folder';path:string;available:boolean;syncPending?:boolean}
 export interface MissingProjectFolder {projectId:string;name:string;path:string;revision:number}

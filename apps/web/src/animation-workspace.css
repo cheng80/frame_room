@@ -136,6 +136,17 @@
 .animation-workspace .aw-file-info dt{color:#a5b7c5}
 .animation-workspace .aw-file-info dd{margin:0;overflow-wrap:anywhere;min-width:0}
 .animation-workspace .aw-property-group fieldset{border:0;padding:0;margin:0;min-width:0}
+.animation-workspace .aw-reference-hint{font-size:11px;color:#acc0b2;line-height:1.6;margin-bottom:8px}
+.animation-workspace .aw-reference-detail{display:flex;align-items:flex-start;gap:10px;margin-bottom:12px}
+.animation-workspace .aw-reference-thumb{width:84px;flex-shrink:0;padding:4px;display:flex;flex-direction:column;align-items:center;gap:4px}
+.animation-workspace .aw-reference-thumb img{width:100%;height:100px;object-fit:contain;image-rendering:pixelated}
+.animation-workspace .aw-reference-thumb span{font-size:11px}
+.animation-workspace .aw-reference-detail>p{font-size:11px;line-height:1.6;overflow-wrap:anywhere}
+.editor-tool.reference-image-dialog{width:min(800px,calc(100vw - 24px));height:fit-content;max-height:calc(100dvh - 24px);overflow:auto}
+.aw-reference-full{margin:0}
+.aw-reference-full img{display:block;width:100%;height:min(60dvh,600px);object-fit:contain;image-rendering:pixelated}
+.aw-reference-full figcaption{padding:12px 16px;font-size:12px;line-height:1.6;overflow-wrap:anywhere}
+.candidate-review .comparison-grid figcaption>span{min-width:0;overflow-wrap:anywhere}
 .animation-workspace .aw-button-pair{display:flex;gap:7px;margin-top:12px}
 .animation-workspace .aw-button-pair>button{flex:1}
 .animation-workspace .aw-review-actions{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}

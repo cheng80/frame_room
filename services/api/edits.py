@@ -11,6 +11,10 @@ class CreateClip(Strict):
     type:Literal['createClip']; clip:dict
 class DeleteClip(Strict):
     type:Literal['deleteClip']; clipId:str
+class RenameReference(Strict):
+    type:Literal['renameReference']; referenceRevisionId:str; name:str=Field(max_length=200,strict=True)
+class RenameAsset(Strict):
+    type:Literal['renameAsset']; assetId:str; name:str=Field(max_length=200,strict=True)
 class UpdateClip(Strict):
     type:Literal['updateClip']; clipId:str; changes:dict
 class AddOccurrence(Strict):
@@ -38,7 +42,7 @@ class Outline(Strict):
     type:Literal['setOutline']; outline:dict
 class Character(Strict):
     type:Literal['updateCharacter']; name:str=Field(min_length=1,max_length=200)
-Operation=Annotated[Union[SetSettings,CreateClip,DeleteClip,UpdateClip,AddOccurrence,RemoveOccurrence,Reorder,Timing,Transform,Pixels,Replace,Review,Group,Alignment,Outline,Character],Field(discriminator='type')]
+Operation=Annotated[Union[SetSettings,CreateClip,DeleteClip,RenameReference,RenameAsset,UpdateClip,AddOccurrence,RemoveOccurrence,Reorder,Timing,Transform,Pixels,Replace,Review,Group,Alignment,Outline,Character],Field(discriminator='type')]
 class EditRequest(Strict):
     expectedRevision:int; operations:list[Operation]=Field(min_length=1,max_length=500)
 
@@ -90,6 +94,8 @@ def apply(p,ops):
             fps=d.get('defaultFps',10); number(fps,1,60,'FPS',True)
             cid=uid(); p['clips'].append(dict(clipId=cid,clipRevisionId=uid(),name=d.get('name','새 동작'),stateId=d.get('stateId',cid),facing=d.get('facing','right'),referenceRevisionId=d.get('referenceRevisionId',p['activeReferenceRevisionId']),loop=d.get('loop',True),endBehavior='hold-last',defaultFps=fps,occurrences=[],review='pending'))
         elif t=='deleteClip': p['clips'].remove(clip)
+        elif t=='renameReference': find(p['references'],'referenceRevisionId',op['referenceRevisionId'])['name']=op['name'].strip()
+        elif t=='renameAsset': find(p['assets'],'assetId',op['assetId'])['name']=op['name'].strip()
         elif t=='updateClip':
             d=op['changes']; fields(d,['name','loop','defaultFps','facing','referenceRevisionId','review'])
             if 'review' in d and d['review'] not in ('approved','pending'): raise AppError('REVIEW_INVALID','검수 상태가 잘못되었습니다.')

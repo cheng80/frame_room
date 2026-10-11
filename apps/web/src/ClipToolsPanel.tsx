@@ -1,3 +1,4 @@
+import {assetLabel} from './assetProvenance';
 import {useEffect, useId, useRef, useState, type PointerEvent} from 'react';
 import type {Clip, Job, Snapshot} from './types';
 import type {Studio} from './useStudio';
@@ -121,7 +122,7 @@ export function ClipTools({s, clipId, onClip, onSelectOccurrence}: Props) {
           </div>
           <Input label="장비 표식 색" type="color" value={state.handed.marker} onChange={event => updateHanded('marker', event.target.value)}/>
           <Input label="표식 색 코드" value={state.handed.marker} required pattern="#[0-9a-fA-F]{6}" onChange={event => updateHanded('marker', event.target.value)}/>
-          <Select label="장비가 온전히 보이는 투명 기준 그림 (선택)" value={state.handed.referenceAssetId} onChange={event => updateHanded('referenceAssetId', event.target.value)}><option value="">사용하지 않음</option>{snapshot.assets.filter(asset => asset.alphaStats?.transparent > 0).map(asset => <option key={asset.assetId} value={asset.assetId}>{asset.originalFilename}</option>)}</Select>
+          <Select label="장비가 온전히 보이는 투명 기준 그림 (선택)" value={state.handed.referenceAssetId} onChange={event => updateHanded('referenceAssetId', event.target.value)}><option value="">사용하지 않음</option>{snapshot.assets.filter(asset => asset.alphaStats?.transparent > 0).map(asset => <option key={asset.assetId} value={asset.assetId}>{assetLabel(asset)}</option>)}</Select>
           <p className="caption">투명 픽셀이 있는 이 프로젝트의 그림만 표시합니다. 장비 표식이 온전히 보이는 기준 그림을 선택하세요.</p>
           {checkError ? <p className="caption">{checkError}</p> : null}
           <button type="submit" className="aw-wide" disabled={locked || !!checkError}>장비 좌우 검사</button>

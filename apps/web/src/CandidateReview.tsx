@@ -1,3 +1,5 @@
+import {assetLabel} from './assetProvenance';
+import {referenceLabel} from './referenceLabel';
 import {useRef,useState} from 'react';
 import type {Studio} from './useStudio';
 import type {Frame,Clip} from './types';
@@ -7,7 +9,7 @@ import {approvalLabel} from './workflow';
 /** Frame-level review, independent from an occurrence's timing and transforms. */
 export function CandidateReview({s,frame,clip,onSource}:{s:Studio;frame:Frame;clip?:Clip;onSource?:(assetId:string)=>void}) {
   const project=s.snapshot!;
-  const [referenceId,setReferenceId]=useState(clip?.referenceRevisionId||project.activeReferenceRevisionId||'');
+  const [referenceId,setReferenceId]=useState((clip?clip.referenceRevisionId:project.activeReferenceRevisionId)||'');
   const [reason,setReason]=useState(frame.reviewReason||'');
   const [error,setError]=useState('');
   const [zoom,setZoom]=useState('fit');
@@ -30,14 +32,14 @@ export function CandidateReview({s,frame,clip,onSource}:{s:Studio;frame:Frame;cl
     <div className="row">
       <Select label="나란히 비교할 승인 기준" value={referenceId} onChange={e=>setReferenceId(e.target.value)}>
         <option value="">승인 기준 선택</option>
-        {project.references.filter(r=>r.approval==='approved').map(r=><option key={r.referenceRevisionId} value={r.referenceRevisionId}>승인 {short(r.referenceRevisionId)}{r.referenceRevisionId===clip?.referenceRevisionId?' · 이 동작의 기준':''}</option>)}
+        {project.references.filter(r=>r.approval==='approved').map(r=><option key={r.referenceRevisionId} value={r.referenceRevisionId}>{referenceLabel(project,r.referenceRevisionId)}{r.referenceRevisionId===clip?.referenceRevisionId?' · 이 동작의 기준':''}</option>)}
       </Select>
       <Select label="비교 이미지 배율" value={zoom} onChange={e=>setZoom(e.target.value)}><option value="fit">패널에 맞춤</option><option value="1">1:1 픽셀</option><option value="2">200% 확대</option><option value="4">400% 확대</option></Select>
     </div>
     <div className="comparison-grid">{views.map(view=><figure key={view.label}>
-      <figcaption><strong>{view.label}</strong><span className="mono">{short(view.id)}</span></figcaption>
+      <figcaption><strong>{view.label}</strong><span>{view.label==='승인된 외형 기준'?referenceLabel(project,view.id):short(view.id)}</span></figcaption>
       <div className={`comparison-image checker ${zoom==='fit'?'fit':''}`}>{view.asset?<img src={view.asset.url} alt={view.label} style={zoom==='fit'?undefined:{width:view.asset.width*Number(zoom),height:view.asset.height*Number(zoom)}}/>:<p>{view.label==='승인된 외형 기준'?'승인한 외형 기준을 선택해 주세요.':'후보 원본 이미지를 찾을 수 없습니다.'}</p>}</div>
-      <small>{view.asset?`${view.asset.originalFilename} · ${view.asset.width} × ${view.asset.height}`:'자료 없음'}</small>
+      <small>{view.asset?`${assetLabel(view.asset)} · ${view.asset.width} × ${view.asset.height}`:'자료 없음'}</small>
     </figure>)}</div>
     {reference&&<p className="caption">고정 특징: {reference.fixedTraits||'승인된 외형 이미지 기준'} · 비교 기준 선택은 동작의 사용 기준을 변경하지 않습니다.</p>}
     {frame.reviewReason&&<div className="review-reason"><strong>{frame.review==='rejected'?(reasonIsDraft?'초안 거절 사유':'저장된 거절 사유'):'마지막 검수 사유'}</strong><p>{frame.reviewReason}</p></div>}

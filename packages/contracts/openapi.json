@@ -1737,6 +1737,12 @@
                   "$ref": "#/components/schemas/DeleteClip"
                 },
                 {
+                  "$ref": "#/components/schemas/RenameReference"
+                },
+                {
+                  "$ref": "#/components/schemas/RenameAsset"
+                },
+                {
                   "$ref": "#/components/schemas/UpdateClip"
                 },
                 {
@@ -1784,6 +1790,8 @@
                   "deleteClip": "#/components/schemas/DeleteClip",
                   "duplicateOccurrence": "#/components/schemas/RemoveOccurrence",
                   "removeOccurrence": "#/components/schemas/RemoveOccurrence",
+                  "renameAsset": "#/components/schemas/RenameAsset",
+                  "renameReference": "#/components/schemas/RenameReference",
                   "reorderOccurrences": "#/components/schemas/Reorder",
                   "replaceFrameVersion": "#/components/schemas/Replace",
                   "setAlignment": "#/components/schemas/Alignment",
@@ -2205,6 +2213,58 @@
           "occurrenceId"
         ],
         "title": "RemoveOccurrence"
+      },
+      "RenameAsset": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "renameAsset",
+            "title": "Type"
+          },
+          "assetId": {
+            "type": "string",
+            "title": "Assetid"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Name"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "assetId",
+          "name"
+        ],
+        "title": "RenameAsset"
+      },
+      "RenameReference": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "renameReference",
+            "title": "Type"
+          },
+          "referenceRevisionId": {
+            "type": "string",
+            "title": "Referencerevisionid"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Name"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "referenceRevisionId",
+          "name"
+        ],
+        "title": "RenameReference"
       },
       "Reorder": {
         "properties": {

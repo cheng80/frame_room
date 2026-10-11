@@ -82,6 +82,14 @@
 .source-tool-asset small { font-size: 10px; }
 .source-tool-thumb { display: grid; place-items: center; height: 130px; border-radius: 3px; overflow: hidden; }
 .source-tool-thumb img { width: 100%; height: 100%; min-height: 0; object-fit: contain; image-rendering: pixelated; }
+.source-tool .source-tool-asset-preview { width: 100%; padding: 0; position: relative; }
+.source-tool-asset-preview > span { position: absolute; bottom: 4px; right: 4px; padding: 2px 5px; background: #111820dd; color: var(--text); font-size: 10px; border-radius: 3px; }
+.source-tool-asset .field { margin: 0; }
+.source-tool-asset .field > label { font-size: 10px; }
+.editor-tool.asset-image-dialog { width: min(800px,calc(100vw - 24px)); height: fit-content; max-height: calc(100dvh - 24px); overflow: auto; }
+.asset-image-full { margin: 0; }
+.asset-image-full img { display: block; width: 100%; height: min(55dvh,600px); object-fit: contain; image-rendering: pixelated; }
+.asset-image-full figcaption { padding: 12px 16px; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
 .source-tool-files { padding: 0; margin: 0; list-style: none; }
 .source-tool-files li { display: grid; gap: 2px; padding: 8px 0; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; font-size: 12px; }
 .source-tool-segments { display: flex; gap: 4px; padding-bottom: 12px; }

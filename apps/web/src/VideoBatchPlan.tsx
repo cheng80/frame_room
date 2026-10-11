@@ -1,3 +1,4 @@
+import {assetLabel} from './assetProvenance';
 import {useRef, useState} from 'react';
 import {api, ApiError} from './api';
 import {uid, type Job, type Snapshot} from './types';
@@ -86,8 +87,8 @@ export function VideoBatchPlan({s, generation, processing, available, active, vi
     <p className="caption">최대 {VIDEO_BATCH_LIMIT}건 · 추가만으로 생성하지 않습니다. 기준 그림은 그대로 사용합니다.</p>
     {items.length ? <>
       <ol className="video-batch-items">
-        {items.map((item, index) => <li key={`${key}-${index}`}>
-          <div><strong>{index + 1}. {snapshot.assets.find(asset => asset.assetId === item.assetId)?.originalFilename || '기준 이미지 없음'}</strong>
+        {items.map((item, index) => {const asset=snapshot.assets.find(asset=>asset.assetId===item.assetId);return <li key={`${key}-${index}`}>
+          <div><strong>{index + 1}. {asset ? assetLabel(asset) : '기준 이미지 없음'}</strong>
             <span>{VIDEO_STATES.find(state => state.id === item.params.state)?.label} · {VIDEO_DIRECTIONS.find(direction => direction.id === item.params.direction)?.label} · {item.params.facing === 'left' ? '왼쪽' : '오른쪽'}</span>
             <span>{VIDEO_MODELS.find(model => model.id === item.params.model)?.label} · {item.params.durationSeconds}초 · {item.params.resolution} · {item.params.finishMode === 'gif' ? 'GIF 색상' : 'RGBA 유지'}</span>
             <span>최대 {String(item.params.maxFrames)}장 · 주기 보간 {item.params.between === 'off' ? '끄기' : item.params.between === 'on' ? '켜기' : '자동 보호'} · 시작 발 {item.params.startFoot === 'left' ? '왼발' : item.params.startFoot === 'right' ? '오른발' : '자동'}</span>
@@ -99,7 +100,7 @@ export function VideoBatchPlan({s, generation, processing, available, active, vi
             {typeof item.params.matchClipId === 'string' ? <span>주기 맞춤 · {snapshot.clips.find(clip => clip.clipId === item.params.matchClipId)?.name || '대상 동작 없음'}</span> : null}
           </div>
           <button type="button" aria-label={`묶음 ${index + 1}번 제거`} disabled={locked || !!attempted} onClick={() => remove(index)}>제거</button>
-        </li>)}
+        </li>;})}
       </ol>
       <p className="video-batch-summary"><strong>영상 {items.length}건 · 총 {items.reduce((sum, item) => sum + item.params.durationSeconds, 0)}초</strong><br/>각 영상마다 Grok 로그인 사용량이 차감됩니다.</p>
       {attempted ? <p className="caption">이미 보낸 설정으로 접수 결과를 확인합니다. 확인 전에는 항목을 변경하지 않습니다.</p> : null}
