@@ -19,7 +19,6 @@ from PIL import Image
 
 from .view_direction import DIRECTIONS, strip_view_instructions, view_instruction
 
-ENGINE_ROOT = Path(__file__).resolve().parents[2] / "engine" / "sprite-gen"
 ENGINE_COMMIT = "b058341f7543f3adcbea227bd4e6b7587895b1bc"
 ADAPTER_VERSION = "1.3.0"
 DEFAULT_MODEL = "gpt-6-sol"
@@ -53,10 +52,11 @@ def _write_json(path: Path, value: dict) -> None:
 
 
 def _engine():
-    import sprite_gen.gen as gen
-    if not Path(gen.__file__).resolve().is_relative_to(ENGINE_ROOT.resolve()):
-        raise ProviderError("provider.engine_mismatch", "프로젝트 전용 engine venv로 worker를 실행하세요.")
-    return gen
+    from alignment.pipeline import _engine as load_engine, PipelineError
+    try:
+        return load_engine("gen")
+    except PipelineError as exc:
+        raise ProviderError("provider.engine_mismatch", "프로젝트 전용 engine venv로 worker를 실행하세요.") from exc
 
 
 def _models() -> list[str]:

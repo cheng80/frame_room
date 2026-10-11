@@ -12,7 +12,6 @@ never receive a directory containing an earlier attempt's raw frames.
 from __future__ import annotations
 
 import hashlib
-import importlib
 import io
 import json
 import math
@@ -20,7 +19,6 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
-import sys
 import tempfile
 
 from PIL import Image, ImageSequence
@@ -42,17 +40,13 @@ class VideoProcessingError(Exception):
 
 
 def _engine(module: str):
-    # Same source guard as alignment.pipeline; no shared skill import/fallback.
-    for name, loaded in list(sys.modules.items()):
-        if name == "sprite_gen" or name.startswith("sprite_gen."):
-            origin = getattr(loaded, "__file__", None)
-            if origin and not Path(origin).resolve().is_relative_to(ENGINE_ROOT.resolve()):
-                raise VideoProcessingError("VIDEO_ENGINE_MISMATCH", "프로젝트 전용 엔진이 필요합니다.")
-    if not (ENGINE_ROOT / "sprite_gen").is_dir():
-        raise VideoProcessingError("VIDEO_ENGINE_UNAVAILABLE", "프로젝트 전용 엔진이 없습니다.")
-    if str(ENGINE_ROOT) not in sys.path:
-        sys.path.insert(0, str(ENGINE_ROOT))
-    return importlib.import_module("sprite_gen." + module)
+    from alignment.pipeline import _engine as load_engine, PipelineError
+    try:
+        return load_engine(module)
+    except PipelineError as exc:
+        code = "VIDEO_ENGINE_UNAVAILABLE" if exc.code == "ENGINE_UNAVAILABLE" else "VIDEO_ENGINE_MISMATCH"
+        raise VideoProcessingError(code, "프로젝트 전용 엔진이 없습니다." if code == "VIDEO_ENGINE_UNAVAILABLE"
+                                   else "프로젝트 전용 엔진이 필요합니다.") from exc
 
 
 def _sha(path: Path) -> str:
