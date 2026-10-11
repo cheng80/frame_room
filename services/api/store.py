@@ -14,6 +14,9 @@ class StoreConnection(sqlite3.Connection):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.dirty_projects = set()
+    def __exit__(self, *args):
+        try: return super().__exit__(*args)
+        finally: self.close()
 def uid(): return str(uuid.uuid4())
 def now(): return datetime.now(timezone.utc).isoformat()
 def dumps(x): return json.dumps(x, ensure_ascii=False, separators=(',', ':'), allow_nan=False)

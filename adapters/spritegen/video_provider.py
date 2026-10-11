@@ -30,7 +30,8 @@ def validate_params(params,*,generation):
         number(value['startIndex'],0,63,'시작 위상',True);value['startIndex']=int(value['startIndex'])
     if value['loopMode']=='manual':
         if generation: raise s.AppError('VIDEO_RANGE','구간 직접 선택은 생성 완료된 영상에서 사용할 수 있습니다.')
-        number(value.get('startFrame'),0,599,'시작 프레임',True);number(value.get('endFrame'),1,600,'끝 프레임',True)
+        for k,lo,hi,label in [('startFrame',0,599,'시작 프레임'),('endFrame',1,600,'끝 프레임')]:
+            number(value.get(k),lo,hi,label,True);value[k]=int(value[k])
         if value['endFrame']<=value['startFrame']: raise s.AppError('VIDEO_RANGE','끝 프레임은 시작보다 커야 합니다.')
     if generation and 'spillReferenceAssetId' in params: raise s.AppError('VIDEO_SETTING','새 영상은 생성에 사용한 기준 그림으로 색 번짐을 판정합니다.')
     for k in ('videoId','referenceRevisionId','spillReferenceAssetId','matchClipId'):

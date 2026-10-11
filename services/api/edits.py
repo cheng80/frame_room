@@ -166,7 +166,7 @@ def apply(p,ops):
             if 'cell' in d:
                 fields(d['cell'],['width','height','edge'])
                 for k in ('width','height'): number(d['cell'].get(k),1,4096,'셀 크기',True)
-                number(d['cell'].get('edge',0),0,min(d['cell']['width'],d['cell']['height'])//2,'여백',True)
+                number(d['cell'].get('edge',0),0,(min(d['cell']['width'],d['cell']['height'])-1)//2,'여백',True)
             if 'targetAnchor' in d: point(d['targetAnchor'],'목표 앵커')
             if d.get('mode') not in (None,'preserve-source-scale','shared-scale-foot-anchor'): raise AppError('ALIGNMENT_MODE','지원하지 않는 정렬 모드입니다.')
             if d.get('mode',g['mode'])=='shared-scale-foot-anchor':
