@@ -372,25 +372,114 @@ def test_delete_project_rolls_back_all_dependent_deletes(client):
     assert deletion_state()==before
 
 
-def test_delete_project_during_idempotent_export_cannot_recreate_export(client,monkeypatch):
-    from services.api import main as api
+@pytest.mark.parametrize('completed',[False,True])
+def test_delete_project_serializes_with_export_registration(client,completed):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
     c=client;p,_=approved(c)
     p=edit(c,p,[{'type':'updateClip','clipId':p['clips'][0]['clipId'],'changes':{'review':'approved'}}])
     pid=p['projectId'];url='/v1/projects/'+pid
     body={'savedRevision':p['revision'],'clipRevisionIds':[p['clips'][0]['clipRevisionId']],'idempotencyKey':s.uid()}
-    response=c.post(url+'/exports',json=body);assert response.status_code==202
-    run_job(response.json()['jobId'])
-    enqueue=api.enqueue
-    def delete_after_enqueue(*args,**kwargs):
-        job=enqueue(*args,**kwargs)
-        api.delete_project(pid,api.DeleteProject(expectedRevision=p['revision']))
-        return job
-    monkeypatch.setattr(api,'enqueue',delete_after_enqueue)
-    response=c.post(url+'/exports',json=body)
-    assert response.status_code==404 and response.json()['code']=='PROJECT_NOT_FOUND'
+    if completed:
+        response=c.post(url+'/exports',json=body);assert response.status_code==202
+        run_job(response.json()['jobId'])
+    barrier=Barrier(2)
+    def remove():
+        barrier.wait(timeout=5)
+        return c.request('DELETE',url,json={'expectedRevision':p['revision']})
+    def submit():
+        barrier.wait(timeout=5)
+        return c.post(url+'/exports',json=body)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        removing=pool.submit(remove);submitting=pool.submit(submit)
+        deleted=removing.result(timeout=10);exported=submitting.result(timeout=10)
     with s.connect() as db:
-        assert not db.execute('SELECT 1 FROM exports WHERE project_id=?',(pid,)).fetchone()
-        assert not db.execute('SELECT 1 FROM jobs WHERE project_id=?',(pid,)).fetchone()
+        if deleted.status_code==200:
+            assert exported.status_code in (202,404,424),exported.text
+            # Deletion can finish between the initial snapshot and asset check.
+            if exported.status_code!=202:
+                assert exported.json()['code']=={404:'PROJECT_NOT_FOUND',424:'ASSET_MISSING'}[exported.status_code]
+            assert not db.execute('SELECT 1 FROM exports WHERE project_id=?',(pid,)).fetchone()
+            assert not db.execute('SELECT 1 FROM jobs WHERE project_id=?',(pid,)).fetchone()
+        else:
+            assert deleted.status_code==409 and deleted.json()['code']=='PROJECT_BUSY'
+            assert not completed and exported.status_code==202,exported.text
+            record=exported.json()
+            assert db.execute('SELECT job_id FROM exports WHERE id=?',(record['exportId'],)).fetchone()[0]==record['jobId']
+
+
+def test_export_registration_failure_rolls_back_job_events_and_outbox(client):
+    import sqlite3
+    c=client;p,_=approved(c)
+    p=edit(c,p,[{'type':'updateClip','clipId':p['clips'][0]['clipId'],'changes':{'review':'approved'}}])
+    folder=s.project_folder(p['projectId']);portable=(folder/'project.sqlite3').read_bytes()
+    before=deletion_state()
+    with s.connect() as db:
+        db.execute("CREATE TRIGGER reject_export BEFORE INSERT ON exports BEGIN SELECT RAISE(ABORT, 'injected export failure'); END")
+    with pytest.raises(sqlite3.IntegrityError,match='injected export failure'):
+        c.post('/v1/projects/'+p['projectId']+'/exports',json={'savedRevision':p['revision'],
+            'clipRevisionIds':[p['clips'][0]['clipRevisionId']],'idempotencyKey':s.uid()})
+    assert deletion_state()==before and (folder/'project.sqlite3').read_bytes()==portable
+    with s.connect() as db:
+        assert not db.execute('SELECT 1 FROM folder_sync WHERE project_id=?',(p['projectId'],)).fetchone()
+
+
+def test_export_concurrent_idempotency_preserves_snapshot_and_running_job(client):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+    from services.worker.main import claim
+    c=client;p,_=approved(c)
+    p=edit(c,p,[{'type':'updateClip','clipId':p['clips'][0]['clipId'],'changes':{'review':'approved'}}])
+    url='/v1/projects/'+p['projectId']+'/exports'
+    body={'savedRevision':p['revision'],'clipRevisionIds':[p['clips'][0]['clipRevisionId']],'idempotencyKey':s.uid()}
+    barrier=Barrier(2)
+    def submit():
+        barrier.wait(timeout=5)
+        return c.post(url,json=body)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        futures=[pool.submit(submit) for _ in range(2)]
+        responses=[future.result(timeout=10) for future in futures]
+    assert all(r.status_code==202 for r in responses),[r.text for r in responses]
+    record=responses[0].json();assert responses[1].json()==record
+    job=s.get_job(record['jobId']);assert job['snapshot']==s.get_project(p['projectId'])
+    claimed=claim();assert claimed['jobId']==job['jobId'] and claimed['exportId']==record['exportId']
+    running=s.get_job(job['jobId'])
+    repeated=c.post(url,json=body)
+    assert repeated.status_code==202 and repeated.json()==record
+    assert s.get_job(job['jobId'])==running
+    conflict=c.post(url,json={**body,'outlineMode':'preview-only'})
+    assert conflict.status_code==409 and conflict.json()['code']=='IDEMPOTENCY_CONFLICT'
+    with s.connect() as db:
+        assert db.execute("SELECT count(*) FROM jobs WHERE project_id=? AND operation='export'",(p['projectId'],)).fetchone()[0]==1
+        assert db.execute('SELECT count(*) FROM exports WHERE job_id=?',(job['jobId'],)).fetchone()[0]==1
+
+
+def test_export_postcommit_folder_failure_retains_atomic_records_for_retry(client,monkeypatch):
+    import sqlite3
+    from services.api import project_folders
+    c=client;p,_=approved(c)
+    p=edit(c,p,[{'type':'updateClip','clipId':p['clips'][0]['clipId'],'changes':{'review':'approved'}}])
+    url='/v1/projects/'+p['projectId']+'/exports'
+    body={'savedRevision':p['revision'],'clipRevisionIds':[p['clips'][0]['clipRevisionId']],'idempotencyKey':s.uid()}
+    def unavailable(*_): raise OSError('injected folder failure')
+    with monkeypatch.context() as fault:
+        fault.setattr(project_folders,'_sync',unavailable)
+        response=c.post(url,json=body)
+    assert response.status_code==503 and response.json()['code']=='PROJECT_FOLDER_SYNC_FAILED'
+    with s.connect() as db:
+        row=db.execute("SELECT id FROM jobs WHERE project_id=? AND operation='export'",(p['projectId'],)).fetchone()
+        jid=row[0];eid=db.execute('SELECT id FROM exports WHERE job_id=?',(jid,)).fetchone()[0]
+        assert db.execute('SELECT 1 FROM folder_sync WHERE project_id=?',(p['projectId'],)).fetchone()
+    snapshot=s.get_job(jid)['snapshot']
+    response=c.post(url,json=body)
+    assert response.status_code==202 and response.json()=={'exportId':eid,'jobId':jid}
+    assert s.get_job(jid)['snapshot']==snapshot
+    # An idempotent read does not dirty the transaction again; retain the outbox
+    # for the existing startup/worker/explicit folder flush recovery path.
+    project_folders.flush([p['projectId']])
+    with sqlite3.connect(s.project_folder(p['projectId'])/'project.sqlite3') as db:
+        assert db.execute('SELECT job_id FROM exports WHERE id=?',(eid,)).fetchone()[0]==jid
+        assert db.execute('SELECT status FROM jobs WHERE id=?',(jid,)).fetchone()[0]=='queued'
 
 
 def test_delete_project_serializes_with_new_job_submission(client):

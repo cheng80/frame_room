@@ -143,6 +143,32 @@ def _wait_entered(sandbox):
                      label='fake provider entry')
 
 
+def test_legacy_missing_exports_fail_without_blocking_later_jobs(sandbox):
+    s=sandbox.s
+    missing=[sandbox.enqueue('export') for _ in range(2)]
+    snapshots={job['jobId']:s.get_job(job['jobId'])['snapshot'] for job in missing}
+    healthy=sandbox.enqueue()
+    original=s.asset_path(sandbox.original['assetId']).read_bytes()
+    proc=sandbox.start()
+    assert sandbox.terminal(healthy)['status']=='succeeded'
+    assert proc.poll() is None and _call_count(sandbox.data)==0
+    assert s.asset_path(sandbox.original['assetId']).read_bytes()==original
+    with s.connect() as db:
+        for job in missing:
+            failed=sandbox.job(job)
+            assert failed['status']=='failed' and failed['step']=='stopped'
+            assert failed['errors'][0]['code']=='EXPORT_MISSING'
+            assert failed['errors'][0]['retryable'] is False
+            assert not failed.get('childPid') and not failed.get('externalStarted')
+            assert failed['snapshot']==snapshots[job['jobId']]
+            event=json.loads(db.execute('SELECT body FROM events WHERE job_id=? ORDER BY seq DESC LIMIT 1',(job['jobId'],)).fetchone()[0])
+            assert event['status']=='failed' and event['errors']==failed['errors']
+        assert not db.execute('SELECT 1 FROM exports WHERE project_id=?',(sandbox.project['projectId'],)).fetchone()
+    with sqlite3.connect(s.project_folder(sandbox.project['projectId'])/'project.sqlite3') as db:
+        for job in missing:
+            assert db.execute('SELECT status FROM jobs WHERE id=?',(job['jobId'],)).fetchone()[0]=='failed'
+
+
 def test_real_worker_backup_preserves_source_and_publishes_once(sandbox):
     s = sandbox.s
     original = s.asset_path(sandbox.original['assetId'])

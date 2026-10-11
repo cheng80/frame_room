@@ -443,10 +443,10 @@ def export_create(pid:str,body:ExportRequest):
                 raise s.AppError('ANCHOR_UNAPPROVED','현재 그룹 기준의 앵커 승인이 필요합니다.',422,{'affectedIds':[frame['frameVersionId']]})
             s.asset_path(frame['imageAssetId'])
     request=body.model_dump(exclude={'idempotencyKey'})
-    j=enqueue(pid,'export',request,body.idempotencyKey,body.savedRevision)
     with s.transaction() as c:
-        # An idempotent terminal job may be deleted after enqueue returns.
-        s.get_project(pid,c); s.get_job(j['jobId'],c)
+        # Queue visibility and export registration share the same commit.
+        s.check_revision(s.get_project(pid,c),body.savedRevision)
+        j=enqueue(pid,'export',request,body.idempotencyKey,body.savedRevision,connection=c)
         existing=c.execute('SELECT id FROM exports WHERE job_id=?',(j['jobId'],)).fetchone()
         eid=existing[0] if existing else s.uid()
         if not existing:

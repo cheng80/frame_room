@@ -111,11 +111,13 @@ def claim():
             if not row: return None
             j=json.loads(row[0])
             if j.get('projectId'): s.project_folder(j['projectId'],c)
-            j.update(status='running',step=j['operation'],lease={'workerPid':os.getpid(),'startedAt':s.now()},externalStarted=j['operation']=='generate')
             if j['operation']=='export':
                 export=c.execute('SELECT id FROM exports WHERE job_id=?',(j['jobId'],)).fetchone()
-                if not export: return None
+                if not export:
+                    j.update(status='failed',step='stopped',errors=[dict(code='EXPORT_MISSING',message='출력 접수 기록이 없습니다. 새 출력 요청을 만드세요.',stage='export',retryable=False)])
+                    s.write_job(c,j); return None
                 j['exportId']=export[0]
+            j.update(status='running',step=j['operation'],lease={'workerPid':os.getpid(),'startedAt':s.now()},externalStarted=j['operation']=='generate')
             s.write_job(c,j); return j
     except (s.AppError,OSError) as exc:
         if not handle_folder_failure(j,exc): raise
