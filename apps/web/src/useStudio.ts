@@ -5,11 +5,19 @@ import {uid,type Snapshot,type MissingProjectFolder,type DraftCommand,type Opera
 export function useStudio(standalone=false){
  const [service,setService]=useState<Health|null>(null),[projects,setProjects]=useState<Snapshot[]>([]),[base,setBase]=useState<Snapshot|null>(null),[commands,setCommands]=useState<DraftCommand[]>([]),[redoCommands,setRedo]=useState<DraftCommand[]>([]),[resolvedIds,setResolvedIds]=useState<Record<string,string>>({}),[busy,setBusyState]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[conflict,setConflict]=useState<Snapshot|null>(null),[jobs,setJobs]=useState<Job[]>([]),[providers,setProviders]=useState<Provider[]>([]),[exports,setExports]=useState<ExportRecord[]>([]),[revisions,setRevisions]=useState<{revision:number;createdAt:string;reason:string}[]>([]);
  const ref=useRef({base,commands,busy});ref.current={base,commands,busy};const jobStates=useRef('');const detailsEpoch=useRef(0);const projectsEpoch=useRef(0);const deletedProjects=useRef(new Set<string>());
+ const [providersChecking,setProvidersChecking]=useState(false),[providersError,setProvidersError]=useState('');const connecting=useRef(false);
  function setBusy(value:boolean){ref.current.busy=value;setBusyState(value);}
  const snapshot=useMemo(()=>base?applyDraft(base,commands):null,[base,commands]);
  function report(e:unknown){setError(e instanceof Error?e.message:'작업을 완료하지 못했습니다.');}
  async function refreshProjects(){const epoch=++projectsEpoch.current;const r=await api<{projects:Snapshot[]}>('/projects');if(epoch===projectsEpoch.current)setProjects(r.projects.filter(p=>!deletedProjects.current.has(p.projectId)));}
- async function connect(){try{setService(await health());await refreshProjects();const p=await api<{providers:Provider[]}>('/providers');setProviders(p.providers);}catch(e){setService(null);report(e);}}
+ async function connect(){
+  if(connecting.current)return;connecting.current=true;setProvidersChecking(true);setProvidersError('');
+  try{
+   try{setService(await health());}catch(e){setService(null);setProviders([]);setProvidersError('로컬 서버에 연결할 수 없어 모델 상태를 확인하지 못했습니다.');report(e);return;}
+   await refreshProjects().catch(report);
+   try{const p=await api<{providers:Provider[]}>('/providers');setProviders(p.providers);}catch(e){setProviders([]);setProvidersError('모델 연결 상태를 조회하지 못했습니다. 다시 확인해 주세요.');report(e);}
+  }finally{connecting.current=false;setProvidersChecking(false);}
+ }
  useEffect(()=>{if(!standalone)void connect();},[standalone]);
  useEffect(()=>{if(!base)return;try{const key=`frame-room-draft:${base.projectId}`;if(commands.length)localStorage.setItem(key,JSON.stringify({base,commands}));else localStorage.removeItem(key);}catch{setError('브라우저 초안 보관 공간이 부족합니다. 저장하거나 초안을 다운로드해 주세요.');}},[base,commands]);
  useEffect(()=>{const leave=(e:BeforeUnloadEvent)=>{if(ref.current.commands.length){e.preventDefault();}};window.addEventListener('beforeunload',leave);return()=>window.removeEventListener('beforeunload',leave);},[]);
@@ -115,6 +123,6 @@ export function useStudio(standalone=false){
   });
  }
  async function job(operation:string,assetIds:string[]=[],params:Record<string,unknown>={}){if(!base)return;return mutation(`/projects/${base.projectId}/jobs`,{operation,inputRevision:base.revision,assetIds,params,idempotencyKey:uid()});}
- return {resolveId:(id:string)=>resolvedIds[id]||id,service,projects,base,snapshot,commands,redoCommands,busy,error,notice,conflict,jobs,providers,exports,revisions,edit,undo,redo,save,reapply,load,run,job,pickProjectFolder,openProjectFolder,missingProjectFolders,cleanupMissingFolders,revealProject,deleteProject,mutation,connect,refreshProjects,refreshDetails,report,setError,setNotice,setBase,setCommands,setConflict,setExports};
+ return {resolveId:(id:string)=>resolvedIds[id]||id,service,projects,base,snapshot,commands,redoCommands,busy,error,notice,conflict,jobs,providers,providersChecking,providersError,exports,revisions,edit,undo,redo,save,reapply,load,run,job,pickProjectFolder,openProjectFolder,missingProjectFolders,cleanupMissingFolders,revealProject,deleteProject,mutation,connect,refreshProjects,refreshDetails,report,setError,setNotice,setBase,setCommands,setConflict,setExports};
 }
 export type Studio=ReturnType<typeof useStudio>;

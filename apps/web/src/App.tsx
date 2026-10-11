@@ -10,6 +10,7 @@ import {EditStep} from './AnimationWorkspace';
 import {ReviewStep,ExportStep,JobsStep,HistoryStep,JobCard} from './FinishSteps';
 import {FileViewer} from './Canvas';
 import {EditorDialog} from './EditorDialog';
+import {ProviderConnections} from './ProviderConnections';
 import './editor-shell.css';
 
 const tools=[
@@ -88,7 +89,7 @@ export default function App(){
    </div>)}</div>
    {!s.projects.length&&<Empty title="프로젝트를 만들거나 폴더를 열어 주세요"><p>기존 프로젝트는 폴더를 선택하면 편집을 이어갈 수 있습니다.</p><button disabled={s.busy||!s.service} onClick={()=>openTool('create')}>새 프로젝트</button></Empty>}
   </main>}
-  <footer className="studio-status"><span className={`service ${s.service?'online':''}`}>{page==='viewer'?'독립 파일 재생':service}</span><span className="studio-notice" role="status">{s.notice||((page==='editor'&&p)?`${p.assets.length}개 자료 · ${p.frames.length}개 후보 · ${p.clips.length}개 동작`:'원본과 편집 이력은 이 컴퓨터에 저장됩니다.')}</span><button onClick={s.connect}>연결 확인</button></footer>
+  <footer className="studio-status"><span className={`service ${s.service?'online':''}`}>{page==='viewer'?'독립 파일 재생':service}</span>{page!=='viewer'&&<ProviderConnections providers={s.providers} service={s.service} checking={s.providersChecking} error={s.providersError} onCheck={s.connect}/>}<span className="studio-notice" role="status">{s.notice||((page==='editor'&&p)?`${p.assets.length}개 자료 · ${p.frames.length}개 후보 · ${p.clips.length}개 동작`:'원본과 편집 이력은 이 컴퓨터에 저장됩니다.')}</span>{page!=='viewer'&&<button disabled={s.providersChecking} onClick={s.connect}>{s.providersChecking?'확인 중…':'연결 확인'}</button>}</footer>
   <EditorDialog open={toolOpen} onClose={closeTool} closeDisabled={s.busy&&(activeTool==='create'||activeTool==='openFolder')} title={tool?.label||labels[activeTool]||'작업 도구'} description={tool?.description} className={`tool-${activeTool}`} actions={page==='editor'&&p?<><span className="tool-save-state" role="status">{savedText}</span><button disabled={!s.commands.length||s.busy||!!s.conflict} onClick={()=>s.save()}><Save size={14}/>저장</button></>:undefined}>
    <Feedback s={s}/>
    {tools.some(t=>t.id===activeTool)&&<nav className="tool-stage-nav" aria-label="자료 준비 순서">{tools.map((t,i)=><button key={t.id} aria-pressed={activeTool===t.id} onClick={()=>setActiveTool(t.id)}><span>{i+1}</span>{t.label}</button>)}</nav>}
