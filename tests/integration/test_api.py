@@ -43,6 +43,98 @@ def approved(c):
     cl=p['clips'][0];p=edit(c,p,[{'type':'addOccurrence','clipId':cl['clipId'],'frameVersionId':f['frameVersionId']}])
     return p,a
 
+def test_asset_generation_enqueues_without_reference_and_preserves_request(client):
+    p=new(client);params={'scope':'asset','providerId':'codex','frameCount':1,'prompt':'  첫 원본 이미지  '}
+    job=queue(client,p,'generate',params=params)
+    saved=s.get_job(job['jobId'])
+    assert saved['status']=='queued' and saved['request']['params']==params
+    assert saved['snapshot']['references']==[] and saved['snapshot']['activeReferenceRevisionId'] is None
+    assert load(client,p)==p
+
+@pytest.mark.parametrize('change',[
+    {'frameCount':2}, {'frameCount':True}, {'prompt':''}, {'prompt':'  '}, {'prompt':None},
+    {'prompt':123}, {'prompt':'x'*20001}, {'providerId':'grok'}, {'providerId':'openai'},
+    {'referenceRevisionId':None}, {'referenceRevisionId':''}, {'referenceRevisionId':'r'},
+    {'frameVersionId':None}, {'frameVersionId':''}, {'frameVersionId':'f'},
+    {'layoutGuide':True}, {'viewDirection':'side'}, {'unexpected':True},
+])
+def test_asset_generation_rejects_invalid_params_before_enqueue(client,change):
+    p=new(client);params={'scope':'asset','providerId':'codex','frameCount':1,'prompt':'첫 이미지',**change}
+    response=client.post('/v1/projects/'+p['projectId']+'/jobs',json={
+        'operation':'generate','inputRevision':p['revision'],'params':params,'idempotencyKey':s.uid()})
+    assert response.status_code==422,response.text
+    assert response.json()['code'].startswith('provider.')
+    assert client.get('/v1/projects/'+p['projectId']+'/jobs').json()['jobs']==[]
+    assert load(client,p)==p
+
+@pytest.mark.parametrize('existing',[False,True])
+def test_asset_generation_rejects_asset_ids_before_enqueue(client,existing):
+    p=new(client);aid='unknown'
+    if existing: p,asset=upload(client,p);aid=asset['assetId']
+    response=client.post('/v1/projects/'+p['projectId']+'/jobs',json={
+        'operation':'generate','inputRevision':p['revision'],'assetIds':[aid],
+        'params':{'scope':'asset','providerId':'codex','frameCount':1,'prompt':'첫 이미지'},'idempotencyKey':s.uid()})
+    assert response.status_code==422,response.text
+    assert response.json()['code']=='provider.invalid_asset_settings'
+    assert client.get('/v1/projects/'+p['projectId']+'/jobs').json()['jobs']==[]
+    assert load(client,p)==p
+
+def test_asset_generation_translates_shared_validator_error(client,monkeypatch):
+    from adapters.spritegen import provider
+    p=new(client)
+    def reject(params,reference=None,regeneration_target=None):
+        assert reference is None and regeneration_target is None
+        raise provider.ProviderError('provider.test_error','검증 실패',details={'field':'prompt'})
+    monkeypatch.setattr(provider,'validate_asset_params',reject)
+    response=client.post('/v1/projects/'+p['projectId']+'/jobs',json={
+        'operation':'generate','inputRevision':p['revision'],'params':{'scope':'asset'},'idempotencyKey':s.uid()})
+    assert response.status_code==422,response.text
+    assert response.json()['code']=='provider.test_error'
+    assert response.json()['details']=={'field':'prompt'}
+    assert client.get('/v1/projects/'+p['projectId']+'/jobs').json()['jobs']==[]
+
+@pytest.mark.parametrize('scope',[None,'states','sheet','frame'])
+@pytest.mark.parametrize('reference_state',['missing','draft','approved'])
+def test_nonasset_generation_preserves_reference_gate(client,scope,reference_state):
+    p=new(client)
+    if reference_state!='missing':
+        p,a=upload(client,p)
+        reference=client.post('/v1/projects/'+p['projectId']+'/reference-revisions',json={
+            'expectedRevision':p['revision'],'reference':{'identityAssetId':a['assetId']}}).json()
+        if reference_state=='approved':
+            assert client.post('/v1/reference-revisions/'+reference['referenceRevisionId']+'/approve',json={
+                'expectedRevision':reference['savedRevision'],'reviewChecks':{'identity':True}}).status_code==200
+        p=load(client,p)
+    params={'providerId':'codex','frameCount':1,'prompt':'기존 생성'}
+    if scope is not None: params['scope']=scope
+    if reference_state=='draft': params['referenceRevisionId']=reference['referenceRevisionId']
+    response=client.post('/v1/projects/'+p['projectId']+'/jobs',json={
+        'operation':'generate','inputRevision':p['revision'],'params':params,'idempotencyKey':s.uid()})
+    assert response.status_code=={'missing':404,'draft':424,'approved':202}[reference_state],response.text
+    if reference_state=='draft': assert response.json()['code']=='REFERENCE_REQUIRED'
+    assert len(client.get('/v1/projects/'+p['projectId']+'/jobs').json()['jobs'])==(reference_state=='approved')
+
+def test_image_use_settings_round_trip_without_generation(client):
+    p=new(client)
+    settings={'providerId':'codex','prompt':'3등신 여성 성직자','frameCount':8,'scope':'sheet','layoutGuide':True,
+              'imageUse':'grok-video','videoBase':{'direction':'side','facing':'right','pose':'walk','bodyPlan':'biped','equipment':'staff:right'}}
+    p=edit(client,p,[{'type':'setGenerationSettings','settings':settings}])
+    assert load(client,p)['generationSettings']==settings
+    assert client.get('/v1/projects/'+p['projectId']+'/jobs').json()['jobs']==[]
+    assert p['storage']['syncPending'] is False
+
+@pytest.mark.parametrize('settings',[
+    {'imageUse':'unknown'}, {'layoutGuide':'true'}, {'videoBase':None}, {'videoBase':[]},
+    {'videoBase':{'direction':'unknown'}}, {'videoBase':{'facing':'front'}}, {'videoBase':{'pose':'run'}},
+    {'videoBase':{'equipment':False}}, {'videoBase':{'bodyPlan':'x'*2001}}, {'videoBase':{'extra':'unknown'}},
+])
+def test_invalid_image_use_settings_leave_project_unchanged(client,settings):
+    p=new(client)
+    response=client.patch('/v1/projects/'+p['projectId']+'/edits',json={'expectedRevision':p['revision'],'operations':[{'type':'setGenerationSettings','settings':settings}]})
+    assert response.status_code==422,response.text
+    assert load(client,p)['revision']==p['revision']
+    assert load(client,p)['generationSettings']==p['generationSettings']
+
 def test_reference_name_create_rename_history_and_legacy_round_trip(client):
     c=client;p,a=approved(c);url='/v1/projects/'+p['projectId']
     created=c.post(url+'/reference-revisions',json={'expectedRevision':p['revision'],'reference':{'identityAssetId':a['assetId'],'name':'  용사 🐉  '}})

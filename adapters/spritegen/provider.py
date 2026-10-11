@@ -17,6 +17,8 @@ from typing import Callable
 
 from PIL import Image
 
+from .view_direction import DIRECTIONS, strip_view_instructions, view_instruction
+
 ENGINE_ROOT = Path(__file__).resolve().parents[2] / "engine" / "sprite-gen"
 ENGINE_COMMIT = "b058341f7543f3adcbea227bd4e6b7587895b1bc"
 ADAPTER_VERSION = "1.3.0"
@@ -112,7 +114,7 @@ def providers() -> list[dict]:
              "aspectRatio": False, "nativeAlphaRequest": True, "transparentOutputGuaranteed": False,
              "layoutGuide": True,
              "remoteCancel": False, "resultLookup": False,
-             "scope": ["states", "sheet", "frame"], "frameCount": {"min": 1, "max": 24, "mode": "prompt-only"},
+             "scope": ["states", "sheet", "frame", "asset"], "frameCount": {"min": 1, "max": 24, "mode": "prompt-only"},
              "imagesPerCall": 1, "concurrency": 1, "automaticRetry": False, "fallback": False,
          }},
         {"providerId": "openai", "name": "OpenAI Images API", "enabled": False, "available": False,
@@ -124,7 +126,46 @@ def providers() -> list[dict]:
     ]
 
 
+def validate_view_params(params: dict) -> None:
+    if "viewDirection" in params:
+        direction = params["viewDirection"]
+        if not isinstance(direction, str) or direction not in DIRECTIONS:
+            raise ProviderError("provider.invalid_view_direction", "보기 방향을 확인하세요.", details={"field": "viewDirection"})
+    if "viewFacing" in params:
+        facing = params["viewFacing"]
+        if "viewDirection" not in params or not isinstance(facing, str) or facing not in ("right", "left"):
+            raise ProviderError("provider.invalid_view_facing", "보기 방향과 함께 오른쪽 또는 왼쪽을 선택하세요.",
+                                details={"field": "viewFacing"})
+    for field in ("bodyPlan", "equipment"):
+        if field in params and (not isinstance(params[field], str) or len(params[field]) > 2000):
+            raise ProviderError("provider.invalid_structure", f"{field}는 2,000자 이하 문자열이어야 합니다.",
+                                details={"field": field})
+
+
+def validate_asset_params(params: dict, reference: dict | None = None, regeneration_target: dict | None = None) -> None:
+    """An explicit first-image request cannot inherit animation references or targets."""
+    if params.get("scope") != "asset":
+        raise ProviderError("provider.invalid_scope", "자료 이미지는 scope=asset으로 요청하세요.")
+    allowed = {"scope", "providerId", "model", "prompt", "frameCount", "background", "layoutGuide"}
+    if set(params) - allowed or reference or regeneration_target is not None:
+        raise ProviderError("provider.invalid_asset_settings", "자료 이미지 생성에는 기준·프레임·별도 참조를 지정할 수 없습니다.")
+    if params.get("providerId") != "codex":
+        raise ProviderError("provider.unsupported", "자료 이미지는 Codex · ChatGPT 구독을 사용하세요.")
+    if type(params.get("frameCount", 1)) is not int or params.get("frameCount", 1) != 1:
+        raise ProviderError("provider.invalid_frame_count", "자료 이미지는 한 장만 생성합니다.")
+    if type(params.get("layoutGuide", False)) is not bool or params.get("layoutGuide", False):
+        raise ProviderError("provider.invalid_layout_guide", "자료 이미지에는 구도 가이드를 사용하지 않습니다.")
+    prompt = params.get("prompt")
+    if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > 20000:
+        raise ProviderError("provider.invalid_prompt", "이미지 설명은 20,000자 이하로 입력하세요.")
+    if params.get("background", "transparent") not in ("transparent", "white", "green", "magenta"):
+        raise ProviderError("provider.invalid_background", "자료 이미지 배경을 선택하세요.")
+    if (params.get("model") or DEFAULT_MODEL) not in _models():
+        raise ProviderError("provider.unsupported_model", "Codex 모델 목록의 모델을 선택하세요.")
+
+
 def _validate(params: dict, reference: dict, regeneration_target: dict | None = None) -> tuple[str, int, str]:
+    validate_view_params(params)
     if params.get("providerId") != "codex":
         raise ProviderError("provider.unsupported", "providerId를 codex로 명시해야 합니다.")
     for option in ("quality", "resolution", "aspectRatio", "aspect_ratio"):
@@ -145,7 +186,7 @@ def _validate(params: dict, reference: dict, regeneration_target: dict | None = 
     if params.get("layoutGuide", False) and count != 1:
         raise ProviderError("provider.invalid_layout_guide", "구도 가이드는 요청 프레임 수가 1장일 때 사용할 수 있습니다.")
     scope = params.get("scope", "states")
-    if scope not in ("states", "sheet", "frame") or (scope == "frame" and count != 1):
+    if scope not in ("states", "sheet", "frame", "asset") or (scope == "frame" and count != 1):
         raise ProviderError("provider.invalid_scope", "단일 프레임 생성은 scope=frame, frameCount=1이 필요합니다.")
     if scope == "frame":
         frame_id = params.get("frameVersionId")
@@ -159,7 +200,9 @@ def _validate(params: dict, reference: dict, regeneration_target: dict | None = 
             raise ProviderError("provider.invalid_regeneration_target", "재생성 참조의 imageAssetId와 SHA-256이 필요합니다.")
     elif regeneration_target is not None:
         raise ProviderError("provider.invalid_regeneration_target", "재생성 대상 참조는 scope=frame에서만 사용할 수 있습니다.")
-    if reference.get("approval") != "approved" or not reference.get("identityAssetId"):
+    if scope == "asset":
+        validate_asset_params(params, reference, regeneration_target)
+    elif reference.get("approval") != "approved" or not reference.get("identityAssetId"):
         raise ProviderError("provider.reference_unapproved", "identity 이미지가 있는 승인된 기준 참조가 필요합니다.")
     for field in ("styleAssetIds", "poseAssetIds"):
         if not isinstance(reference.get(field, []), list):
@@ -168,7 +211,10 @@ def _validate(params: dict, reference: dict, regeneration_target: dict | None = 
 
 
 def _prompt(params: dict, reference: dict, refs: list[dict], count: int) -> str:
-    lines = [params["prompt"], "", "REFERENCE ROLES (attachment order):"]
+    selected_view = "viewDirection" in params
+    lines = [strip_view_instructions(params["prompt"]) if selected_view else params["prompt"]]
+    if params.get("scope") != "asset":
+        lines += ["", "REFERENCE ROLES (attachment order):"]
     for i, ref in enumerate(refs, 1):
         rule = {"identity": "Preserve this character's identity and fixed traits.",
                 "style": "Transfer rendering style only, never character identity, costume or anatomy.",
@@ -183,10 +229,18 @@ def _prompt(params: dict, reference: dict, refs: list[dict], count: int) -> str:
                     "a new identity reference: the identity image and its fixed traits take priority over "
                     "this target whenever they conflict. Other pose references are supplemental guidance."
                 )}[ref["role"]]
+        if selected_view and ref["role"] == "identity":
+            rule += " Preserve appearance, costume, colors and proportions, but apply the selected view " \
+                    "instead of this attachment's viewing angle or facing."
         lines.append(f"Image {i}: {ref['role']}. {rule}")
     for key in ("fixedTraits", "allowedChanges", "forbiddenTransfers", "facing"):
-        if reference.get(key):
-            lines.append(f"{key}: {json.dumps(reference[key], ensure_ascii=False)}")
+        if selected_view and key == "facing":
+            continue
+        value = reference.get(key)
+        if selected_view and key in ("fixedTraits", "allowedChanges") and isinstance(value, str):
+            value = strip_view_instructions(value)
+        if value:
+            lines.append(f"{key}: {json.dumps(value, ensure_ascii=False)}")
     background = params.get("background")
     if background == "transparent":
         lines.append(
@@ -204,13 +258,15 @@ def _prompt(params: dict, reference: dict, refs: list[dict], count: int) -> str:
         )
     elif background:
         lines.append(f"Requested background: {background}. This is a visual instruction; preserve the raw result.")
-    output_instruction = (
+    output_instruction = "Create exactly one PNG image of the requested subject, with no sprite sheet or multiple panels." if params.get("scope") == "asset" else (
         "Create exactly one PNG containing a single replacement for the selected regeneration-target frame."
         if params.get("scope") == "frame" else
         f"Create exactly one sprite sheet PNG containing {count} distinct animation frame(s)."
     )
     lines += ["", output_instruction,
+              "Keep the complete requested subject inside the image." if params.get("scope") == "asset" else
               "Keep the same character scale and complete silhouette in every frame; do not crop feet or equipment.",
+              "Do not add text, labels, grid lines or a painted checkerboard." if params.get("scope") == "asset" else
               "Separate frames clearly; do not add text, labels, grid lines or a painted checkerboard.",
               "Generate once only; do not make an additional generation attempt, retry, or switch providers."]
     return "\n".join(lines)
@@ -231,7 +287,7 @@ def generate(params: dict, reference: dict, asset_path: Callable[[str], Path], o
     engine = _engine()
     refs = []
     source_paths = []
-    role_assets = [("identity", [reference["identityAssetId"]]),
+    role_assets = [] if scope == "asset" else [("identity", [reference["identityAssetId"]]),
                    ("style", reference.get("styleAssetIds", [])), ("pose", reference.get("poseAssetIds", []))]
     if regeneration_target is not None:
         role_assets.append(("regeneration-target", [regeneration_target["imageAssetId"]]))
@@ -293,6 +349,8 @@ def generate(params: dict, reference: dict, asset_path: Callable[[str], Path], o
     engine_prompt = _prompt(params, reference, refs, count)
     if guide is not None:
         engine_prompt += "\n\n" + guide["prompt"]
+    if "viewDirection" in params:
+        engine_prompt += "\n\n" + view_instruction(params["viewDirection"], params.get("viewFacing", "right"))
     # Match generate_image's boundary normalization before hashing/snapshotting.
     # The caller's original text remains untouched in params and snapshot.prompt.
     engine_prompt = engine_prompt.strip()

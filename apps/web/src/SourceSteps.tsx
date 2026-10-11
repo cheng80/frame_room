@@ -9,7 +9,9 @@ import { Field, Input, Select, Num, Check, Empty, short } from './ui';
 import type { Asset, Rect } from './types';
 import { VideoStep } from './VideoStep';
 import { VideoBasePreset } from './VideoBasePreset';
+import { buildVideoBasePrompt, DEFAULT_VIDEO_BASE_SETTINGS, type VideoBaseSettings } from './videoBasePrompt';
 import { imageProviders } from './videoWorkflow';
+import {stripViewInstructions} from './viewDirection';
 import './source-tools.css';
 /** The dialog owns its header; this grid fills only its remaining tool-content. */
 function SourceTool({ name, previewLabel = '미리보기', preview, settings, toolbar }: {
@@ -46,9 +48,10 @@ function SourcePane({ title, children, footer, className = '' }: {
       {footer && <div className="source-tool-footer">{footer}</div>}
     </section>);
 }
-export function AssetsStep({ s, onNext }: {
+export function AssetsStep({ s, onNext, onGenerate }: {
     s: Studio;
     onNext: () => void;
+    onGenerate: () => void;
 }) {
     const p = s.snapshot!;
     const [role, setRole] = useState('source');
@@ -96,6 +99,7 @@ export function AssetsStep({ s, onNext }: {
     }
     return (<SourceTool name="이미지 가져오기" previewLabel="등록된 자료" toolbar={<div className="source-tool-filebar" onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); setFiles(Array.from(e.dataTransfer.files)); }}>
       <label className="file-button">파일 선택<input type="file" multiple accept="image/png,image/webp" onChange={e => setFiles(Array.from(e.target.files || []))}/></label>
+      <button type="button" onClick={onGenerate}>AI로 이미지 생성</button>
       <span>PNG · WebP · 파일당 {Math.floor(limit / 1024 / 1024)}MB · 여기에 놓기</span>
       <span className="badge" aria-live="polite">{files.length}개 선택</span>
       <button type="button" onClick={onNext}>기준 정하기 →</button>
@@ -210,27 +214,42 @@ export function GenerationStep({ s, onSelectClip }: { s: Studio; onSelectClip?: 
       {mode === 'video' ? <VideoStep key={s.snapshot!.projectId} s={s} onSelectClip={onSelectClip}/> : <ImageGenerationStep key={s.snapshot!.projectId} s={s}/>}
     </div>;
 }
-export function ImageGenerationStep({ s }: {
+export function ImageGenerationStep({ s, assetMode = false, onBack }: {
     s: Studio;
+    assetMode?: boolean;
+    onBack?: () => void;
 }) {
     const p = s.snapshot!;
-    const settings = p.generationSettings;
-    const providers = imageProviders(s.providers);
+    const settings: Record<string, unknown> = assetMode ? {} : p.generationSettings;
+    const providers = imageProviders(s.providers).filter(provider => !assetMode || provider.providerId === 'codex');
     const [providerId, setProvider] = useState(String(providers.find(item => item.providerId === settings.providerId)?.providerId || providers[0]?.providerId || ''));
     const [model, setModel] = useState(String(settings.model || ''));
     const [prompt, setPrompt] = useState(String(settings.prompt || ''));
-    const [frameCount, setCount] = useState(Number(settings.frameCount || 4));
+    const [frameCount, setCount] = useState(assetMode ? 1 : Number(settings.frameCount || 4));
     const [resolution, setResolution] = useState(String(settings.resolution || '1024x1024'));
     const [quality, setQuality] = useState(String(settings.quality || 'medium'));
-    const [background, setBackground] = useState(String(settings.background || 'green'));
+    const [background, setBackground] = useState(String(settings.background || (assetMode ? 'transparent' : 'green')));
     const [layoutGuide, setLayoutGuide] = useState(settings.layoutGuide === true);
-    const [scope, setScope] = useState('states');
-    const [frameVersionId, setFrame] = useState('');
+    const [scope, setScope] = useState(settings.scope === 'sheet' || settings.scope === 'frame' ? settings.scope : 'states');
+    const [frameVersionId, setFrame] = useState(typeof settings.frameVersionId === 'string' ? settings.frameVersionId : '');
+    const [imageUse, setImageUse] = useState(settings.imageUse === 'grok-video' ? 'grok-video' : 'frames');
+    const [videoBase, setVideoBase] = useState<VideoBaseSettings>(() => {
+        const saved = settings.videoBase && typeof settings.videoBase === 'object' ? settings.videoBase as Record<string, unknown> : {};
+        return {
+            direction: typeof saved.direction === 'string' && ['front', 'back', 'side', 'front_diagonal', 'back_diagonal'].includes(saved.direction) ? saved.direction : DEFAULT_VIDEO_BASE_SETTINGS.direction,
+            facing: saved.facing === 'left' || saved.facing === 'right' ? saved.facing : DEFAULT_VIDEO_BASE_SETTINGS.facing,
+            pose: saved.pose === 'walk' || saved.pose === 'idle' ? saved.pose : DEFAULT_VIDEO_BASE_SETTINGS.pose,
+            bodyPlan: typeof saved.bodyPlan === 'string' ? saved.bodyPlan : DEFAULT_VIDEO_BASE_SETTINGS.bodyPlan,
+            equipment: typeof saved.equipment === 'string' ? saved.equipment : DEFAULT_VIDEO_BASE_SETTINGS.equipment,
+        };
+    });
+    const grokVideo = imageUse === 'grok-video';
+    const requestScope = assetMode ? 'asset' : grokVideo ? 'states' : scope;
     const provider = providers.find(p => p.providerId === providerId);
     const models = provider?.models || [];
     const approved = p.references.some(r => r.referenceRevisionId === p.activeReferenceRevisionId && r.approval === 'approved');
     const available = provider?.available !== false && provider?.loginReady !== false && !!provider;
-    const singleFrame = scope === 'frame' || frameCount === 1;
+    const singleFrame = assetMode || grokVideo || scope === 'frame' || frameCount === 1;
     useEffect(() => {
         if (!model && models.length) {
             setModel(typeof models[0] === 'string' ? models[0] : models[0].id);
@@ -239,35 +258,54 @@ export function ImageGenerationStep({ s }: {
     const params = {
         providerId,
         model: model || provider?.defaultModel || provider?.model || '',
-        prompt,
+        prompt: grokVideo ? [stripViewInstructions(prompt), buildVideoBasePrompt(videoBase)].filter(Boolean).join('\n\n') : prompt,
+        ...(grokVideo ? {viewDirection: videoBase.direction, viewFacing: videoBase.facing, bodyPlan: videoBase.bodyPlan, equipment: videoBase.equipment} : {}),
         background,
-        frameCount: scope === 'frame' ? 1 : frameCount,
+        frameCount: grokVideo || scope === 'frame' ? 1 : frameCount,
         layoutGuide: !!provider?.capabilities?.layoutGuide && singleFrame && layoutGuide,
-        ...(provider?.capabilities?.resolution ? {resolution} : {}),
-        ...(provider?.capabilities?.quality ? {quality} : {}),
-        scope,
-        ...(scope === 'frame' ? {frameVersionId} : {}),
+        ...(!assetMode && provider?.capabilities?.resolution ? {resolution} : {}),
+        ...(!assetMode && provider?.capabilities?.quality ? {quality} : {}),
+        scope: requestScope,
+        ...(requestScope === 'frame' ? {frameVersionId} : {}),
     };
     const activeReference = p.references.find(r => r.referenceRevisionId === p.activeReferenceRevisionId && r.approval === 'approved');
     const identityAsset = p.assets.find(a => a.assetId === activeReference?.identityAssetId);
-    return (<SourceTool name="동작 생성" previewLabel="승인 기준" preview={<SourcePane title={referenceLabel(p,activeReference?.referenceRevisionId)} className="source-tool-identity-pane">
+    const {viewDirection: _direction, viewFacing: _facing, bodyPlan: _body, equipment: _equipment, ...savedParams} = params;
+    return (<SourceTool name={assetMode ? '자료 이미지 생성' : '동작 생성'} previewLabel={assetMode ? '생성 안내' : '승인 기준'} toolbar={assetMode && onBack ? <div className="source-tool-filebar"><button type="button" onClick={onBack}>자료 가져오기로 돌아가기</button></div> : undefined} preview={assetMode ? <SourcePane title="새 자료 이미지">
+      <Empty title="설명으로 새 이미지를 만듭니다"><p>기준 그림 없이 GPT ImageGen으로 한 장 생성합니다. 결과 원본은 라이브러리의 자료에 보관됩니다.</p><p>그림을 확인한 뒤 외형 기준으로 선택하고 승인할 수 있습니다.</p></Empty>
+    </SourcePane> : <SourcePane title={referenceLabel(p,activeReference?.referenceRevisionId)} className="source-tool-identity-pane">
     <div className="source-tool-canvas checker">{identityAsset ? <img src={identityAsset.url} alt="승인된 외형 기준"/> : <Empty title="승인한 외형 기준이 없습니다"><p>기준 도구에서 외형을 승인해 주세요.</p></Empty>}</div>
     <section className="source-tool-traits" tabIndex={0} aria-label="승인된 고정 특징">
-      <h3>고정 특징</h3><p>{activeReference?.fixedTraits || '등록한 외형 이미지 기준'}</p>
-      {activeReference?.allowedChanges && <><h3>변경 가능</h3><p>{activeReference.allowedChanges}</p></>}
+      <h3>{grokVideo ? '이번 생성에 유지할 특징' : '고정 특징'}</h3><p>{activeReference?.fixedTraits ? (grokVideo ? stripViewInstructions(activeReference.fixedTraits) : activeReference.fixedTraits) : '등록한 외형 이미지 기준'}</p>
+      {activeReference?.allowedChanges && <><h3>변경 가능</h3><p>{grokVideo ? stripViewInstructions(activeReference.allowedChanges) : activeReference.allowedChanges}</p></>}
       {activeReference?.forbiddenTransfers && <><h3>가져오면 안 되는 특징</h3><p>{activeReference.forbiddenTransfers}</p></>}
     </section>
-  </SourcePane>} settings={<SourcePane title="동작과 생성 설정" footer={<>
-    {!approved && <p className="warning">외형 기준을 먼저 승인해 주세요.</p>}
-    {!!s.commands.length && <p className="warning">설정을 저장한 뒤 생성해 주세요.</p>}
-    <button className="full" onClick={() => s.edit({ type: 'setGenerationSettings', settings: params })}>설정을 초안에 적용</button>
-    <button className="primary full" disabled={!approved || !available || !prompt.trim() || s.busy || !!s.commands.length || s.service?.worker !== 'ready' || scope === 'frame' && !frameVersionId} onClick={() => s.job('generate', [], params)}>새 후보 생성</button>
+  </SourcePane>} settings={<SourcePane title={assetMode ? '자료 이미지 생성 설정' : '동작과 생성 설정'} footer={<>
+    {!assetMode && !approved && <p className="warning">외형 기준을 먼저 승인해 주세요.</p>}
+    {!!s.commands.length && <p className="warning">{assetMode ? '현재 편집 초안을 저장한 뒤 생성해 주세요.' : '설정을 저장한 뒤 생성해 주세요.'}</p>}
+    {!assetMode && <button className="full" onClick={() => s.edit({ type: 'setGenerationSettings', settings: { ...savedParams, prompt, frameCount, scope, frameVersionId, layoutGuide, imageUse, videoBase } })}>설정을 초안에 적용</button>}
+    <button className="primary full" disabled={(!assetMode && !approved) || !available || !prompt.trim() || s.busy || !!s.commands.length || s.service?.worker !== 'ready' || requestScope === 'frame' && !frameVersionId} onClick={() => s.job('generate', [], params)}>{assetMode ? '자료 이미지 1장 생성' : '새 후보 생성'}</button>
   </>}>
-    <Field label="동작과 포즈 설명"><textarea className="source-tool-prompt" value={prompt} onChange={e => setPrompt(e.target.value)} placeholder="오른쪽을 바라보며 달리는 캐릭터. 승인 기준의 의상과 장비를 유지해 주세요."/></Field>
-    <VideoBasePreset onApply={text => { setPrompt(previous => [previous.trim(), text].filter(Boolean).join('\n\n')); setScope('states'); setCount(1); }}/>
+    {!assetMode && <>
+    <Select label="Grok 영상 사용" value={imageUse} onChange={e => setImageUse(e.target.value)}>
+      <option value="frames">사용 안 함 · 이미지 프레임 생성</option>
+      <option value="grok-video">사용함 · 영상용 기준 그림 1장</option>
+    </Select>
+    </>}
+    <Field label={assetMode ? '만들 이미지 설명' : '동작과 포즈 설명'}><textarea className="source-tool-prompt" value={prompt} maxLength={assetMode ? 20000 : undefined} onChange={e => setPrompt(e.target.value)} placeholder={assetMode ? '예: SD 3등신 여성 힐러. 효과 없는 황금색 스태프를 든 정면 모습, 선명한 2D 픽셀 아트.' : '제자리에서 걷는 캐릭터. 승인 기준의 의상과 장비를 유지해 주세요.'}/></Field>
+    {!assetMode && (grokVideo ? <>
+      <p className="caption">선택한 이미지 제공자로 영상용 기준 그림 1장을 새 동작 후보로 생성합니다. Grok 영상은 자동 생성하지 않습니다.</p>
+      <VideoBasePreset value={videoBase} onChange={setVideoBase}/>
+      <details className="source-tool-details">
+        <summary>방향이 반영된 생성 설명 보기</summary>
+        <p className="caption">원래 설명과 승인 기준은 보존합니다. 이번 요청에서는 기존 보기 방향 표현을 정리하고 아래 방향을 적용합니다.</p>
+        <Field label="방향이 반영된 생성 설명"><textarea className="source-tool-prompt" readOnly value={params.prompt}/></Field>
+      </details>
+    </> : <>
     <Select label="생성 범위" value={scope} onChange={e => setScope(e.target.value)}><option value="states">새 동작 후보</option><option value="sheet">스프라이트 시트</option><option value="frame">한 프레임 재생성</option></Select>
     {scope === 'frame' ? <Select label="재생성할 프레임" value={frameVersionId} onChange={e => setFrame(e.target.value)}><option value="">후보 선택</option>{p.frames.map((f, i) => <option key={f.frameVersionId} value={f.frameVersionId}>후보 {i + 1} · {short(f.frameVersionId)}</option>)}</Select> : <Num label="요청 프레임 수" value={frameCount} onChange={setCount} min={1} max={provider?.capabilities?.frameCount?.max || 24}/>}
-    {provider?.capabilities?.layoutGuide && <>
+    </>)}
+    {!assetMode && provider?.capabilities?.layoutGuide && <>
       <fieldset disabled={!singleFrame} style={{border: 0, padding: 0, margin: 0}}>
         <Check label="구도 가이드 사용" checked={singleFrame && layoutGuide} onChange={setLayoutGuide}/>
       </fieldset>

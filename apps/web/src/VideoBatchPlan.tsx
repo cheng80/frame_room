@@ -1,5 +1,6 @@
 import {assetLabel} from './assetProvenance';
 import {useRef, useState} from 'react';
+import {bodyPlanLabel} from './BodyPlanField';
 import {api, ApiError} from './api';
 import {uid, type Job, type Snapshot} from './types';
 import type {Studio} from './useStudio';
@@ -93,7 +94,7 @@ export function VideoBatchPlan({s, generation, processing, available, active, vi
             <span>{VIDEO_MODELS.find(model => model.id === item.params.model)?.label} · {item.params.durationSeconds}초 · {item.params.resolution} · {item.params.finishMode === 'gif' ? 'GIF 색상' : 'RGBA 유지'}</span>
             <span>최대 {String(item.params.maxFrames)}장 · 주기 보간 {item.params.between === 'off' ? '끄기' : item.params.between === 'on' ? '켜기' : '자동 보호'} · 시작 발 {item.params.startFoot === 'left' ? '왼발' : item.params.startFoot === 'right' ? '오른발' : '자동'}</span>
             {typeof item.params.startIndex === 'number' ? <span>수동 시작 위치 · {item.params.startIndex} (0부터)</span> : null}
-            {item.params.bodyPlan ? <span>신체 구조 · {item.params.bodyPlan}</span> : null}
+            {item.params.bodyPlan ? <span>신체 구조 · {bodyPlanLabel(item.params.bodyPlan)}</span> : null}
             {item.params.equipment ? <span>장비와 손 · {item.params.equipment}</span> : null}
             {item.params.motionPrompt ? <span className="video-batch-prompt">추가 지시 · {item.params.motionPrompt}</span> : null}
             {item.params.repairMode !== 'off' ? <span>RIFE 보정 {item.params.repairMode === 'on' ? '필수' : '자동'}</span> : null}

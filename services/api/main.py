@@ -265,6 +265,8 @@ def enqueue(pid,operation,request,idem,expected=None,connection=None):
             return s.public_job(json.loads(row['body']))
         p=s.get_project(pid,c) if pid else None
         if p is not None and expected is not None: s.check_revision(p,expected)
+        if operation=='generate' and request['params'].get('scope')=='asset' and request.get('assetIds'):
+            raise s.AppError('provider.invalid_asset_settings','자료 이미지 생성에는 별도 참조를 지정할 수 없습니다.')
         if p:
             for aid in request.get('assetIds',[]): find(p['assets'],'assetId',aid)
         if operation in ('preview_follow','apply_follow','check_handed'):
@@ -276,10 +278,18 @@ def enqueue(pid,operation,request,idem,expected=None,connection=None):
                 from adapters.spritegen.clip_tools import validate_params
                 validate_params(p,operation,request.get('params',{}))
         if operation=='generate':
-            ref=find(p['references'],'referenceRevisionId',request['params'].get('referenceRevisionId',p['activeReferenceRevisionId']))
-            if ref['approval']!='approved': raise s.AppError('REFERENCE_REQUIRED','승인된 기준이 필요합니다.',424)
-            if request['params'].get('providerId') not in ('codex','grok','openai'): raise s.AppError('PROVIDER_REQUIRED','생성 연결을 명시적으로 선택하세요.')
-            number(request['params'].get('frameCount',1),1,24,'요청 프레임 수',True)
+            from adapters.spritegen.provider import ProviderError, validate_asset_params, validate_view_params
+            asset_scope=request['params'].get('scope')=='asset'
+            try:
+                if asset_scope: validate_asset_params(request['params'],reference=None)
+                else: validate_view_params(request['params'])
+            except ProviderError as exc:
+                raise s.AppError(exc.code,exc.message,details=exc.details) from exc
+            if not asset_scope:
+                ref=find(p['references'],'referenceRevisionId',request['params'].get('referenceRevisionId',p['activeReferenceRevisionId']))
+                if ref['approval']!='approved': raise s.AppError('REFERENCE_REQUIRED','승인된 기준이 필요합니다.',424)
+                if request['params'].get('providerId') not in ('codex','grok','openai'): raise s.AppError('PROVIDER_REQUIRED','생성 연결을 명시적으로 선택하세요.')
+                number(request['params'].get('frameCount',1),1,24,'요청 프레임 수',True)
         if operation in ('generate_video','process_video'):
             from adapters.spritegen.video_provider import validate_params
             settings=validate_params(request.get('params',{}),generation=operation=='generate_video')

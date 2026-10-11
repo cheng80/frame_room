@@ -61,6 +61,29 @@ export function approvedVideoReference(snapshot: Snapshot, assetId?: string) {
 export function defaultVideoAssetId(snapshot: Snapshot) {
   return approvedVideoReference(snapshot)?.identityAssetId ?? snapshot.assets[0]?.assetId ?? '';
 }
+export function videoAssetSettings(snapshot: Snapshot, assetId: string): Pick<VideoGenerationSettings, 'direction' | 'facing' | 'bodyPlan' | 'equipment'> {
+  const asset = snapshot.assets.find(a => a.assetId === assetId);
+  const provenance = asset?.provenance as {generationVersionId?: string} | undefined;
+  const generation = provenance?.generationVersionId ? snapshot.generations?.find(value =>
+    (value as {generationVersionId?: string})?.generationVersionId === provenance.generationVersionId,
+  ) as {requestSnapshot?: {params?: Record<string, unknown>}} | undefined : undefined;
+  const params = generation?.requestSnapshot?.params;
+  const reference = approvedVideoReference(snapshot, assetId);
+  // Legacy base pictures recorded the view in their generated prompt, before viewDirection existed.
+  const description = typeof params?.prompt === 'string' ? params.prompt : reference?.fixedTraits ?? '';
+  const oldViews = [...description.matchAll(/앞 대각선(?: 45도)?|뒤 대각선(?: 45도)?|정확한 (?:오른쪽 |왼쪽 )?측면|정확한 정면|정확한 뒷면/g)];
+  const oldView = oldViews.at(-1)?.[0];
+  const legacyDirection = oldView?.includes('앞 대각선') ? 'front_diagonal' : oldView?.includes('뒤 대각선') ? 'back_diagonal' : oldView?.includes('측면') ? 'side' : oldView?.includes('뒷면') ? 'back' : 'front';
+  const direction = typeof params?.viewDirection === 'string' && VIDEO_DIRECTIONS.some(view => view.id === params.viewDirection)
+    ? params.viewDirection : legacyDirection;
+  const legacyFacing = description.match(/몸과 얼굴, 발끝 모두 (오른쪽|왼쪽)을 향한다/)?.[1] ?? oldView;
+  return {
+    direction,
+    facing: params?.viewFacing === 'left' || !params?.viewFacing && (legacyFacing?.includes('왼쪽') || reference?.facing === 'left') ? 'left' : 'right',
+    bodyPlan: typeof params?.bodyPlan === 'string' ? params.bodyPlan : '',
+    equipment: typeof params?.equipment === 'string' ? params.equipment : '',
+  };
+}
 function integer(value: string, min: number, max: number, label: string) {
   const n = Number(value);
   if (!value.trim() || !Number.isInteger(n) || n < min || n > max) {

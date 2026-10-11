@@ -9,12 +9,14 @@
 - `GET /v1/videos/{videoId}/content`: 원본 MP4. `Video`는 `{videoId, sha256, originalFilename, mediaType, width, height, fps, frameCount, durationMs, provenance, url}`.
 - `POST /v1/projects/{id}/jobs`: 기존 envelope와 idempotencyKey를 유지. operation에 `generate_video`, `process_video` 추가.
 - `POST /v1/projects/{id}/video-batches`: `{inputRevision, items:[{assetId, params}], idempotencyKey}`로 1~16개 영상 제작을 원자적으로 접수한다. 각 항목은 `generate_video`와 같은 검증을 받으며 하나라도 잘못되면 전체를 접수하지 않는다. 응답은 `{batchId, jobs}`. 같은 키·같은 내용의 재전송은 같은 작업들을 반환하며 다른 내용이면 409다. 항목별 `batchId`, `batchIndex`(0부터), `batchSize`를 작업에 표시한다. 모델 호출 수는 항목 수이며 실행 버튼에서 이 수를 명시한다. 방향별 기준 그림은 항목마다 사용자가 선택하고 별도 그림을 몰래 생성하지 않는다. 작업 처리기는 저장된 항목을 순차 실행하며 탭이 닫혀도 접수된 작업은 유지된다.
-- `generate_video`: assetIds는 기준 그림 하나. params는 `state`(idle/walk/run/jump/attack), `direction`(side/front/back), `facing`(right/left), `motionPrompt`, `model`, `durationSeconds`(기본 3), `resolution`(기본480p), 선택 `referenceRevisionId`, 아래 후처리 설정. `referenceRevisionId`를 지정하면 승인된 참조여야 한다.
+- `generate_video`: assetIds는 기준 그림 하나. params는 `state`(idle/walk/run/jump/attack/dance/wave/cheer), `direction`(side/front/back/front_diagonal/back_diagonal), `facing`(right/left), `motionPrompt`, `model`, `durationSeconds`(기본 3), `resolution`(기본480p), 선택 `referenceRevisionId`, 아래 후처리 설정. `referenceRevisionId`를 지정하면 승인된 참조여야 한다.
 - `process_video`: assetIds는 빈 배열. params `videoId`는 프로젝트 소속 영상. 선택 `spillReferenceAssetId`는 같은 프로젝트의 원본 기준 이미지이며, 영상 안쪽에 섞인 배경색과 캐릭터 본래 색을 구분하는 데 사용한다. 생략하면 영상 생성 때 보존한 기준 이미지를 사용하고, 그것도 없으면 보수적인 작은 영역 보정만 적용한다. 명시한 기준이 없거나 다른 프로젝트 소속이면 접수 전에 거부한다. `generate_video`는 자체 생성 기준을 사용하므로 이 설정을 받지 않는다. 아래 후처리 설정 적용. 외부 생성 없이 원본을 다시 처리한다.
 - 공통 후처리 params: `state` 기본 walk, `key` auto/green/magenta/cyan/white 중 지원 범위, `loopMode` auto/full/manual, 수동 구간 `startFrame`(0부터), `endFrame`(미포함), `maxFrames` 4~64이며 생략 시 walk는 **8**, 나머지는 32다. 명시한 값과 기존 저장 요청은 유지한다. `bodyHeight` 16~512 기본94, `cellWidth` 32~1024 기본64, `cellHeight` 32~1024 기본128. 선택 구간을 시간 순서로 샘플링하며 한 사이클 시간을 유지한다. 구간 불합격을 자동 재생성으로 바꾸지 않는다.
 - 공통 `finishMode`: `gif`(기본) 또는 `rgba`. `gif`는 검수한 3배 GIF와 같은 색상·알파 결과를 PNG 후보에 저장한다. 공통 크기 PNG를 출력 셀에 배치하고 nearest 3배 → 검정에 알파 합성 → 프레임별 최대 255색 → 알파 128 이하 제거 → 원래 크기로 복원한다. 이진 알파 PNG 자체가 편집과 bake의 입력이므로 화면만 바꾸는 필터가 아니다. `rgba`는 반투명을 유지한다. 두 모드 모두 원래 크기의 추출·배경 제거 PNG 및 마무리 전 정규화 PNG를 보존한다. 기존 저장 프로젝트의 픽셀을 조회만으로 변경하지 않는다.
 
 ## 작업·저장
+
+`build_motion_prompt_parts`는 요청과 snapshot의 `motionPrompt` 원문을 보존하고 실행에 쓰는 custom 문자열에만 [공유 보기 정리 규칙](view-direction-rules.json)을 적용한다. 알려진 이전 긍정 보기·시선 표현을 정리한 뒤 선택 `direction/facing`의 기존 템플릿을 적용한다. 정리 후 custom이 비면 기존 동작 템플릿을 사용한다. 보기 방향 금지문·캐릭터 자신의 손·장비·효과·동작 지시는 보존한다. 효과 금지와 이전 보기 표현이 같은 절에 있어도 보기는 정리한다. 정리된 custom을 기준으로 충돌을 검사하므로 해소된 시선 충돌은 사라지며 장비 좌우 충돌 진단은 유지한다. 알고리즘과 좁은 언어 지원 범위는 [구현 계약](IMPLEMENTATION.md)을 따른다. 기준 이미지 원본이나 생성 provenance를 프롬프트 정리로 바꾸지 않는다.
 
 단계: prepare → submit → poll → download → extract → select_cycle → import_candidates → complete. 접수 ID는 POST 직후 저장한다. 알려진 ID는 재시도 시 GET만 사용한다. 응답을 못 받은 POST는 접수 불명으로 남기고 재전송을 거부한다. 모델 오류·인증 오류에 자동 재생성이나 인증 경로 전환은 없다.
 
@@ -46,6 +48,8 @@
 - `between: auto/on/off`(기본 auto)는 주기 맞춤에서 중간 그림이 필요할 때 적용한다. auto는 최신 보간 품질 검사로 번짐·검은 경계가 감지된 중간 그림을 가까운 원본으로 대체한다. on은 RIFE 강제 사용, off는 가까운 원본 사용이다. `repairMode`와 별도 설정이며, 기본 8장 축소 샘플링에는 중간 그림을 생성하지 않는다.
 - `startFoot: auto/left/right`(기본 auto)는 시작 발 분석/주기 정렬에 사용한다. `process_video`의 선택 `startIndex`는 새 출력의 시작을 0부터 지정하며 0~63 및 실제 출력 수 범위를 모두 검사한다. 프레임과 표시 시간을 함께 회전한다. 판정 근거가 부족하거나 신체 구조가 이족이 아니면 발 정체를 확정하지 않는다. 원본 동작/비교 기준 clip의 시작 위치는 변경하지 않는다.
 - 생성 명세 `bodyPlan`, `equipment`는 선택 문자열이다. 예: `quadruped`, `the rider=biped; the horse=quadruped`, `sword:right; shield:left`. 장비 좌우는 캐릭터 자신의 좌우이며 빈 필드는 기존 프롬프트와 호환된다. 구문을 접수 전에 검사하며 영상 요청·묶음 snapshot에 포함한다. 명세 전달은 실제 모델 순응의 보장이 아니다.
+- 신체 구조 UI는 직접 입력 없이 한글 선택지로 제한한다. `biped`(두 발형), `quadruped`(네 발형), `legless`(다리 없는 형태), `arachnid`(여덟 다리형), `winged_biped`(두 발·날개형), `winged_quadruped`(네 발·날개형)를 지원한다. 추가 형태는 프로젝트 어댑터에서 검증하며 기준 그림과 영상 모두 다리·날개 수와 역할을 명시한다. 날개형의 걷기·달리기는 지상 이동이고 날개를 다리나 사람의 팔로 바꾸지 않는다. 비행 동작은 추가하지 않는다. 기존 복합 명세는 API에서 계속 지원하고 UI에서는 유지 전용으로 표시한다. 새 형태에도 이족 인간 전용 발 정체 판정을 적용하지 않는다.
+- `reference`는 목록에 없는 형태도 **기준 그림의 구조 그대로 유지**로 선택할 수 있게 한다. 다리·팔·날개·촉수 등의 수와 부착 위치를 원본 기준에서 유지하도록 지시하며 특정 수나 인간형 자세를 강제하지 않는다. 판별된 골격 데이터가 아니라 프롬프트 지시이며 생성 순응을 보장하지 않는다. 기존 빈 값의 이족 기본 동작은 유지한다.
 - `process_video`에 `direction/facing/bodyPlan/equipment`를 명시하지 않으면 영상에 저장된 생성 설정을 재사용한다. 설정도 없으면 기존 기본값을 사용한다. UI의 원본 방향 선택은 명시적 override다.
 - 업로드 검사·시간 탐색·디코딩은 같은 영상 stream을 사용한다. 표지 그림 stream과 오디오 길이는 제외한다. 영상 메타데이터의 `streamIndex`와 작업 `processing.source.timesMs`(마지막 종료 경계를 포함한 n+1개)를 기록한다. 평균 FPS로 제안한 구간은 UI에 추정값이라고 표시하고, 처리 후 실제 timestamp를 사용한다.
 - `processing.version`은 `video-processing-v4-sprite-gen-2.34`. `selection`에 대응 포즈 크기 변화(`sizeHold`), 주기 혼입(`period`), 그림 갱신 빈도(`held`), 발 판정(`footStrike`), 수동 위상(`outputPhase`), 재검토 권고(`retake`)를 기록한다. 과거 결과의 필드 생략을 허용한다. 재검토 권고는 유료 생성 호출로 이어지지 않는다.

@@ -19,6 +19,8 @@ import {JobCard} from '../src/FinishSteps';
 import {EditorCanvas} from '../src/Canvas';
 import {VideoBatchPlan} from '../src/VideoBatchPlan';
 import {VideoBasePreset} from '../src/VideoBasePreset';
+import {BodyPlanField} from '../src/BodyPlanField';
+import {buildVideoBasePrompt, DEFAULT_VIDEO_BASE_SETTINGS} from '../src/videoBasePrompt';
 import {VideoDiagnostics} from '../src/VideoDiagnostics';
 import {defaultVideoProcessing, type VideoGenerationSettings} from '../src/videoWorkflow';
 
@@ -51,7 +53,7 @@ class Harness {
     const node = nodes(this.tree).find(n => n.props.label === label);
     if (!node) throw new Error(`No field: ${label}`); return node;
   }
-  change(label: string, value: string) { this.field(label).props.onChange({target: {value}}); this.render(); }
+  change(label: string, value: string) { const field = this.field(label); field.props.onChange(field.type === BodyPlanField ? value : {target: {value}}); this.render(); }
   submit() { return nodes(this.tree).find(n => n.type === 'form')!.props.onSubmit({preventDefault: vi.fn()}); }
   file(file: File) { nodes(this.tree).find(n => n.type === 'input' && n.props.type === 'file')!.props.onChange({target: {files: [file]}}); this.render(); }
 }
@@ -95,6 +97,14 @@ describe('video batch controls', () => {
     s.jobs = Array.from({length: 6}, (_, i) => ({jobId: String(i), operation: 'generate_video', status: 'queued'})) as Job[];
     h.render(); await h.click('영상 작업 모두 보기 (6건)');
     expect(nodes(h.tree).filter(n => n.type === JobCard)).toHaveLength(6);
+  });
+  it('shows the selected body plan in Korean while retaining the request value', async () => {
+    const {h, generation} = batchHarness();
+    generation.bodyPlan = 'quadruped'; h.render();
+    await h.click('현재 설정을 묶음에 추가');
+    expect(text(h.tree)).toContain('신체 구조 · 네 발형 · 동물·네 발 몬스터');
+    expect(h.slots.some(slot => Array.isArray(slot.value) && slot.value[0]?.params?.bodyPlan === 'quadruped')).toBe(true);
+    expect(submissions()).toHaveLength(0);
   });
   it('adds coherent settings without any request and submits an explicitly counted batch', async () => {
     const {h, generation, processing, onSubmitted} = batchHarness();
@@ -493,18 +503,56 @@ describe('video job recovery actions', () => {
 });
 
 describe('video base subject guidance', () => {
+  it.each([
+    ['reference', '기준 그림의 다리·팔·날개·촉수'],
+    ['arachnid', '여덟 다리'],
+    ['winged_biped', '두 다리와 두 날개'],
+    ['winged_quadruped', '네 다리와 두 날개'],
+  ])('uses %s anatomy for every base view and carries it to video requests', async (bodyPlan, limbs) => {
+    for (const direction of ['side', 'front', 'back', 'front_diagonal', 'back_diagonal']) {
+      for (const pose of ['walk', 'idle']) {
+        const prompt = buildVideoBasePrompt({...DEFAULT_VIDEO_BASE_SETTINGS, bodyPlan, direction, pose});
+        expect(prompt).toContain(limbs);
+        expect(prompt).not.toContain('한 발은 자기 골반');
+        expect(prompt).not.toContain('양발 끝');
+        if (bodyPlan.startsWith('winged_')) expect(prompt).toContain('비행하지 않는다');
+      }
+    }
+    const h = new Harness(s);
+    h.change('신체 구조', bodyPlan);
+    await h.submit();
+    expect(s.job).toHaveBeenLastCalledWith('generate_video', ['image-1'], expect.objectContaining({bodyPlan}));
+  });
+  it('initializes and switches video direction from each selected picture without generation', () => {
+    s.snapshot!.assets[0].provenance = {generationVersionId: 'a'};
+    s.snapshot!.assets.push({assetId: 'second', originalFilename: 'diagonal.png', provenance: {generationVersionId: 'b'}} as Snapshot['assets'][number]);
+    s.snapshot!.generations = [
+      {generationVersionId: 'a', requestSnapshot: {params: {viewDirection: 'front', viewFacing: 'right'}}},
+      {generationVersionId: 'b', requestSnapshot: {params: {viewDirection: 'back_diagonal', viewFacing: 'left', equipment: 'staff:right'}}},
+    ];
+    const h = new Harness(s);
+    expect(h.field('보기 방향').props.value).toBe('front');
+    expect(h.field('캐릭터 방향').props.disabled).toBe(true);
+    h.change('기준 이미지', 'second');
+    expect(h.field('보기 방향').props.value).toBe('back_diagonal');
+    expect(h.field('캐릭터 방향').props.value).toBe('left');
+    expect(h.field('장비와 손').props.value).toBe('staff:right');
+    h.change('보기 방향', 'front_diagonal');
+    expect(h.field('보기 방향').props.value).toBe('front_diagonal');
+    expect(s.job).not.toHaveBeenCalled();
+  });
   it('does not impose biped body parts on quadruped or legless base prompts', async () => {
-    const onApply = vi.fn(), h = new Harness(s, vi.fn(), () => VideoBasePreset({onApply}));
+    let value = {...DEFAULT_VIDEO_BASE_SETTINGS};
+    const h = new Harness(s, vi.fn(), () => VideoBasePreset({value, onChange: next => {value = next;}}));
     h.change('기준 그림의 신체 구조', 'quadruped');
     h.change('기준 그림의 장비와 손', 'sword:right; shield:left');
-    await h.click('기준 그림 설명 추가');
-    expect(onApply.mock.calls[0][0]).toContain('신체 구조: quadruped');
-    expect(onApply.mock.calls[0][0]).toContain('sword:right; shield:left');
-    expect(onApply.mock.calls[0][0]).not.toContain('한 발은 자기 골반');
-    expect(onApply.mock.calls[0][0]).not.toContain('양발 끝');
+    const prompt = buildVideoBasePrompt(value);
+    expect(prompt).toContain('신체 구조: quadruped');
+    expect(prompt).toContain('sword:right; shield:left');
+    expect(prompt).not.toContain('한 발은 자기 골반');
+    expect(prompt).not.toContain('양발 끝');
     h.change('기준 그림의 신체 구조', 'legless'); h.change('기준 그림의 장비와 손', '');
-    await h.click('기준 그림 설명 추가');
-    expect(onApply.mock.calls[1][0]).not.toContain('두 발');
+    expect(buildVideoBasePrompt(value)).not.toContain('두 발');
     expect(s.job).not.toHaveBeenCalled();
   });
 });

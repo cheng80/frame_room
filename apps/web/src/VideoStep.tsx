@@ -12,8 +12,10 @@ import {
   validateVideoUpload, VIDEO_DIRECTIONS, VIDEO_MODELS, VIDEO_STATES, videoGenerationRequest,
   videoProcessingRequest, videoProvenanceLabel, type VideoGenerationSettings, type VideoProcessingSettings,
   videoBeforeFinishSnapshot, videoClipColorLabel, videoRangeBoundary, videoRangeSource, videoHasExactTimes,
-  videoMatchClips,
+  videoMatchClips, videoAssetSettings,
 } from './videoWorkflow';
+import {stripViewInstructions} from './viewDirection';
+import {BodyPlanField} from './BodyPlanField';
 import './video-tools.css';
 
 export function VideoStep({s, onSelectClip}: {s: Studio; onSelectClip?: (clipId: string) => void}) {
@@ -26,7 +28,7 @@ export function VideoStep({s, onSelectClip}: {s: Studio; onSelectClip?: (clipId:
   const [mode, setMode] = useState<'generate' | 'process'>('generate');
   const [generation, setGeneration] = useState<VideoGenerationSettings>(() => ({
     assetId: defaultVideoAssetId(p), model: VIDEO_MODELS[0].id, durationSeconds: '3', resolution: '480p',
-    direction: 'side', facing: 'right', motionPrompt: '', bodyPlan: '', equipment: '',
+    ...videoAssetSettings(p, defaultVideoAssetId(p)), motionPrompt: '',
   }));
   const [processing, setProcessing] = useState(defaultVideoProcessing);
   const [videoId, setVideoId] = useState('');
@@ -149,7 +151,7 @@ export function VideoStep({s, onSelectClip}: {s: Studio; onSelectClip?: (clipId:
           {mode === 'generate' ? <>
             {asset ? <div className="video-reference checker"><img src={asset.url} alt={`영상 기준 · ${assetLabel(asset)}`}/></div> : <Empty title="기준 이미지를 선택해 주세요"/>}
             {asset ? <p className="caption">{assetLabel(asset)} · {reference ? '승인된 외형 기준 사용' : '선택한 이미지 사용'}</p> : null}
-            {reference?.fixedTraits ? <p className="video-traits">{reference.fixedTraits}</p> : null}
+            {reference?.fixedTraits ? <p className="video-traits">{stripViewInstructions(reference.fixedTraits)}</p> : null}
           </> : <>
             <Select label="처리할 원본 영상" value={video?.videoId ?? ''} onChange={e => chooseVideo(e.target.value)}>
               {!videos.length ? <option value="">등록된 영상 없음</option> : null}
@@ -207,7 +209,7 @@ export function VideoStep({s, onSelectClip}: {s: Studio; onSelectClip?: (clipId:
           <h2 className="source-tool-heading">{mode === 'generate' ? '생성 설정 · 1회 요청' : '후보 추출 · 추가 생성 없음'}</h2>
           <div className="source-tool-scroll">
             {mode === 'generate' ? <>
-              <Select label="기준 이미지" value={generation.assetId} required onChange={e => setGenerationField('assetId', e.target.value)}>
+              <Select label="기준 이미지" value={generation.assetId} required onChange={e => setGeneration(previous => ({...previous, assetId: e.target.value, ...videoAssetSettings(p, e.target.value)}))}>
                 <option value="">이미지 선택</option>
                 {p.assets.map(a => <option key={a.assetId} value={a.assetId}>{assetLabel(a)}{approvedVideoReference(p, a.assetId) ? ' · 승인 기준' : ''}</option>)}
               </Select>
@@ -221,8 +223,9 @@ export function VideoStep({s, onSelectClip}: {s: Studio; onSelectClip?: (clipId:
               </div>
               <div className="source-tool-numbers">
                 <Select label="보기 방향" value={generation.direction} onChange={e => setGenerationField('direction', e.target.value)}>{VIDEO_DIRECTIONS.map(direction => <option key={direction.id} value={direction.id}>{direction.label}</option>)}</Select>
-                <Select label="캐릭터 방향" value={generation.facing} onChange={e => setGenerationField('facing', e.target.value)}><option value="right">오른쪽</option><option value="left">왼쪽</option></Select>
+                <Select label="캐릭터 방향" disabled={generation.direction === 'front' || generation.direction === 'back'} value={generation.facing} onChange={e => setGenerationField('facing', e.target.value)}><option value="right">오른쪽</option><option value="left">왼쪽</option></Select>
               </div>
+              <p className="caption">선택한 그림의 생성 기록에서 방향·신체 구조·장비를 불러옵니다. 기록이 없는 그림은 방향을 확인해 주세요. 보기 방향을 바꿔도 기존 그림 자체가 회전하지는 않으므로, 그 방향의 기준 그림을 먼저 만들어 선택하세요.</p>
             </> : null}
             {mode === 'process' ? <div className="source-tool-numbers">
               <Select label="원본 보기 방향" value={processing.direction ?? ''} onChange={e => setProcessingField('direction', e.target.value)}>
@@ -237,12 +240,12 @@ export function VideoStep({s, onSelectClip}: {s: Studio; onSelectClip?: (clipId:
             {mode === 'generate' ? <>
               <details className="source-tool-details">
                 <summary>신체 구조·장비 지정 · 선택</summary>
-                <Input label="신체 구조" value={generation.bodyPlan} onChange={e => setGenerationField('bodyPlan', e.target.value)} placeholder="예: quadruped"/>
-                <p className="caption">비우면 두 발 캐릭터로 처리합니다. biped: 두 발 · quadruped: 네 발 · legless: 다리 없음. 여러 대상은 the rider=biped; the horse=quadruped처럼 구분하세요.</p>
+                <BodyPlanField label="신체 구조" value={generation.bodyPlan} onChange={bodyPlan => setGenerationField('bodyPlan', bodyPlan)}/>
                 <Input label="장비와 손" value={generation.equipment} onChange={e => setGenerationField('equipment', e.target.value)} placeholder="예: sword:right; shield:left"/>
                 <p className="caption">캐릭터 자신의 오른손은 right, 왼손은 left입니다. 장비 이름과 손을 콜론으로, 여러 장비는 세미콜론으로 구분하세요.</p>
               </details>
               <Field label="추가 동작 지시 · 선택"><textarea maxLength={2000} value={generation.motionPrompt} onChange={e => setGenerationField('motionPrompt', e.target.value)} placeholder="예: 제자리에서 걷기. 검과 의상 유지."/></Field>
+              {stripViewInstructions(generation.motionPrompt) !== generation.motionPrompt.trim() ? <p className="caption">기존 보기 방향 지시를 정리한 추가 지시: {stripViewInstructions(generation.motionPrompt) || '선택한 동작 상태 사용'}</p> : null}
               {!available ? <p className="warning">{provider?.reason || provider?.disabledReason || 'Grok 영상 연결을 확인해 주세요. 기존 영상 처리는 계속 사용할 수 있습니다.'}</p> : null}
               <button type="button" disabled={s.busy} onClick={s.connect}>Grok 연결 다시 확인</button>
             </> : null}

@@ -96,7 +96,9 @@ def _execute(j,out):
         return execute_video(j,out)
     if op=='generate':
         from adapters.spritegen.provider import generate
-        rid=params.get('referenceRevisionId',p['activeReferenceRevisionId']); ref=next(r for r in p['references'] if r['referenceRevisionId']==rid)
+        rid=None; ref=None
+        if params.get('scope')!='asset':
+            rid=params.get('referenceRevisionId',p['activeReferenceRevisionId']); ref=next(r for r in p['references'] if r['referenceRevisionId']==rid)
         checkpoint=out.parent/'provider-completed.json'
         if j.get('reuseProviderAttemptId') and not checkpoint.exists():
             prior=s.job_directory(j['jobId'])/j['reuseProviderAttemptId']/'provider-completed.json'
@@ -123,7 +125,7 @@ def _execute(j,out):
                 target={'frameVersionId':frame['frameVersionId'],'imageAssetId':asset['assetId'],'sha256':asset['sha256']}
                 result=generate(params,ref,s.asset_path,out,regeneration_target=target)
             else:
-                result=generate(params,ref,s.asset_path,out)
+                result=generate(params,ref if ref is not None else {},s.asset_path,out)
             s.atomic_bytes(checkpoint,s.dumps({'requestHash':j['requestHash'],'providerResult':result}).encode())
         gid=s.uid(); assets=[]
         for name in result['paths']:

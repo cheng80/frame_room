@@ -1,7 +1,7 @@
 """Local motion prompts and structured anatomy/equipment settings.
 
 Uses the project's sprite-gen v2.34 parsers and prompt pieces (Apache-2.0).
-The existing FrameRoom prompt stays byte-identical when no structure is given.
+Existing templates are retained; only positive custom view phrases are cleaned.
 No generation, reference redraw, image mirroring or visual verification occurs
 here. Equipment sides are the character's own sides, independent of the view.
 
@@ -13,12 +13,19 @@ an explicit body part always remains the caller's choice.
 """
 from __future__ import annotations
 
+import json
+from pathlib import Path
 import re
 
 from services.api import store as s
+from .view_direction import DIRECTIONS, strip_view_instructions
 
 STATES = ("idle", "walk", "run", "jump", "attack", "dance", "wave", "cheer")
-DIRECTIONS = ("side", "front", "back", "front_diagonal", "back_diagonal")
+_EXTRA_BODY_MOTION = {
+    entry["value"]: entry["motionText"]
+    for entry in json.loads((Path(__file__).resolve().parents[2] / "packages/contracts/body-plans.json").read_text())
+    if entry["motionText"]
+}
 
 
 def _modules():
@@ -53,9 +60,19 @@ def parse_structured_params(params: dict):
         return [], []
     body_plan, handedness, _ = _modules()
     try:
-        bodies = body_plan.parse_all(body_specs)
+        plans, engine_specs = [], []
+        for spec in body_specs:
+            plan = spec.rsplit("=", 1)[-1].strip().lower()
+            plans.append(plan)
+            # Reuse upstream name/scene validation, then restore the catalog plan.
+            if plan in _EXTRA_BODY_MOTION:
+                spec = spec.rsplit("=", 1)[0] + "=biped" if "=" in spec else "biped"
+            engine_specs.append(spec)
+        bodies = [body_plan.Body(plan=plan, figure=body.figure)
+                  for plan, body in zip(plans, body_plan.parse_all(engine_specs))]
     except SystemExit as exc:
-        raise s.AppError("VIDEO_BODY_PLAN", "체형은 biped, quadruped, legless 또는 인물=체형으로 입력하세요.",
+        raise s.AppError("VIDEO_BODY_PLAN", "체형은 reference, biped, quadruped, legless, arachnid, winged_biped, "
+                         "winged_quadruped 또는 인물=체형으로 입력하세요.",
                          details={"field": "bodyPlan", "reason": str(exc)}) from exc
     try:
         specs = []
@@ -76,6 +93,19 @@ def parse_structured_params(params: dict):
     return bodies, items
 
 
+def _body_text(body_plan, bodies):
+    if not any(body.plan in _EXTRA_BODY_MOTION for body in bodies):
+        return body_plan.text(bodies)
+    parts = []
+    for body in bodies:
+        if body.plan in _EXTRA_BODY_MOTION:
+            motion = _EXTRA_BODY_MOTION[body.plan]
+            parts.append(f"{body.figure}: {motion}" if body.figure else motion)
+        else:
+            parts.append(f"Keep {body.figure} {body_plan.SCENE_TEXT[body.plan]}.")
+    return " ".join(parts)
+
+
 def _choice(params, field, choices, default):
     value = params.get(field, default)
     if value not in choices:
@@ -91,11 +121,11 @@ def build_motion_prompt_parts(params: dict):
     custom = params.get("motionPrompt", "")
     if not isinstance(custom, str) or len(custom) > 2000:
         raise s.AppError("VIDEO_PROMPT", "동작 설명은 2,000자 이하로 입력하세요.")
-    custom = " ".join(custom.split())
+    custom = strip_view_instructions(custom)
     bodies, items = parse_structured_params(params)
     body_plan, handedness, prompt_parts = _modules()
     biped = body_plan.biped(bodies)
-    has_legless = any(body.plan == "legless" for body in bodies)
+    unspecified_gait = any(body.plan in ("legless", "reference") for body in bodies)
     motions = {
         "idle": "The character stands still with both feet planted, gently breathing and settling its loose cloth. "
                 "The feet never step, shuffle or slide; no walking or turning.",
@@ -125,7 +155,7 @@ def build_motion_prompt_parts(params: dict):
             cheer="The character celebrates in place with an expressive body pose, holds it for a beat, then "
                   "settles back to the exact starting stance at an even rhythm.",
         )
-        if has_legless:
+        if unspecified_gait:
             motions["walk"] = "The character moves naturally in place at a walking pace, using its own body as in the image."
             motions["run"] = "The character moves quickly in place, using its own body as in the image."
     views = {
@@ -140,7 +170,7 @@ def build_motion_prompt_parts(params: dict):
                          "The face stays hidden; never turn into a side view or move across the screen.",
     }
     parts = ["2D game sprite animation.", custom or motions[state]]
-    if anatomy := body_plan.text(bodies):
+    if anatomy := _body_text(body_plan, bodies):
         parts.append(anatomy)
     parts.append(views[direction])
     if state in ("walk", "run"):
@@ -149,7 +179,7 @@ def build_motion_prompt_parts(params: dict):
         if biped:
             parts.append("A slow, relaxed, unhurried walk: small, low steps with the feet barely leaving the ground, "
                          "a gentle arm swing close to the body and no bounce — never running, jogging, skipping or hopping.")
-        elif has_legless:
+        elif unspecified_gait:
             parts.append("A slow, relaxed, unhurried pace: small, even movements — never rushing, running or leaping.")
         else:
             parts.append("A slow, relaxed, unhurried walk: small, low steps with the feet barely leaving the ground and "

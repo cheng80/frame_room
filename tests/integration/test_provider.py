@@ -12,6 +12,7 @@ import pytest
 from PIL import Image
 
 from adapters.spritegen import provider
+from adapters.spritegen.view_direction import DIRECTIONS, view_instruction
 from sprite_gen import gen
 from sprite_gen.gen import codex_provider
 from sprite_gen.gen.base import GenTimeoutError, GenResult
@@ -92,6 +93,47 @@ def test_reference_approval_gate(inputs, monkeypatch):
     with pytest.raises(provider.ProviderError, match='승인'):
         provider.generate(params, reference, asset_path, out_dir)
     assert not out_dir.exists()
+
+
+@pytest.mark.parametrize('change', [
+    {'frameCount': 2}, {'frameCount': True}, {'providerId': 'openai'}, {'prompt': ''},
+    {'prompt': 'x' * 20001}, {'referenceRevisionId': None}, {'frameVersionId': ''},
+    {'layoutGuide': True}, {'background': 'unknown'}, {'model': 'unknown'}, {'viewDirection': 'front'},
+])
+def test_asset_settings_reject_invalid_requests_before_generation(inputs, monkeypatch, change):
+    _, _, asset_path, out = inputs
+    params = {'providerId': 'codex', 'scope': 'asset', 'frameCount': 1, 'prompt': 'A spider', **change}
+    monkeypatch.setattr(gen, 'generate_image', lambda *a, **kw: pytest.fail('must not generate'))
+    with pytest.raises(provider.ProviderError):
+        provider.validate_asset_params(params)
+    with pytest.raises(provider.ProviderError):
+        provider.generate(params, {}, asset_path, out)
+    assert not out.exists()
+
+
+def test_asset_generation_has_no_references_and_preserves_original_and_receipt(inputs, monkeypatch):
+    _, _, _, out = inputs
+    params = {'providerId': 'codex', 'model': provider.DEFAULT_MODEL, 'scope': 'asset',
+              'frameCount': 1, 'prompt': 'An eight-legged spider', 'background': 'transparent'}
+    original = copy.deepcopy(params)
+    seen = []
+    def generate(provider_id, prompt, path, **kwargs):
+        seen.append((provider_id, prompt, kwargs))
+        assert kwargs['refs'] == []
+        Image.new('RGBA', (16, 20), (10, 100, 20, 255)).save(path)
+        return GenResult(provider='codex', prompt=prompt, out=path, raw=path, raw_bytes=path.stat().st_size, elapsed_seconds=1,
+                         model=kwargs['model'], session_id='fake-session', refs=[])
+    monkeypatch.setattr(gen, 'generate_image', generate)
+    result = provider.generate(params, {}, lambda _: pytest.fail('no reference lookup'), out)
+    assert len(seen) == 1
+    prompt = seen[0][1]
+    assert 'no sprite sheet or multiple panels' in prompt and 'REFERENCE ROLES' not in prompt
+    assert 'Create exactly one sprite sheet' not in prompt
+    assert result['requestSnapshot']['reference'] == {} and result['requestSnapshot']['references'] == []
+    assert result['requestSnapshot']['scope'] == 'asset' and result['requestSnapshot']['params'] == original
+    assert params == original and result['receipt']['requestedFrameCount'] == 1
+    assert result['receipt']['returnedImageCount'] == 1
+    assert Path(result['paths'][0]).read_bytes() == (out / 'provider-attempt/generated.png').read_bytes()
 
 
 def test_generate_passes_roles_and_preserves_receipt_and_raw(inputs, monkeypatch):
@@ -421,3 +463,123 @@ def test_frame_regeneration_requires_matching_target_before_any_call(inputs, mon
         provider.generate(params, reference, asset_path, out_dir, regeneration_target=target)
     assert error.value.code == code and not error.value.outcome_unknown
     assert not out_dir.exists()
+
+
+INVALID_VIEW_PARAMS = [
+    ({'viewDirection': value}, 'provider.invalid_view_direction')
+    for value in ('unknown', '', None, True, 1, [], {})
+] + [
+    ({'viewDirection': 'front', 'viewFacing': value}, 'provider.invalid_view_facing')
+    for value in ('front', '', None, True, 1, [], {})
+] + [({'viewFacing': 'left'}, 'provider.invalid_view_facing')] + [
+    ({field: value}, 'provider.invalid_structure')
+    for field in ('bodyPlan', 'equipment') for value in (None, True, 1, [], {}, 'x' * 2001)
+]
+
+
+@pytest.mark.parametrize('change,code', INVALID_VIEW_PARAMS)
+def test_view_validation_before_any_submission(inputs, monkeypatch, change, code):
+    params, reference, asset_path, out_dir = inputs
+    params.update(change)
+    monkeypatch.setattr(provider, '_engine', lambda: pytest.fail('must reject before engine access'))
+    with pytest.raises(provider.ProviderError) as error:
+        provider.generate(params, reference, asset_path, out_dir)
+    assert error.value.code == code and not out_dir.exists()
+
+
+@pytest.mark.parametrize('direction', DIRECTIONS)
+@pytest.mark.parametrize('facing', [None, 'right', 'left'])
+@pytest.mark.parametrize('layout_guide', [False, True])
+def test_selected_view_is_last_and_preserves_original_inputs(inputs, monkeypatch, direction, facing, layout_guide):
+    params, reference, asset_path, out_dir = inputs
+    params.update(prompt='오른쪽을 보는 정확한 측면의 이동 중간 자세. 오른손 검, no turning to side.',
+                  viewDirection=direction, frameCount=1, layoutGuide=layout_guide,
+                  bodyPlan=' quadruped ', equipment='sword:right; shield:left')
+    if facing is not None:
+        params['viewFacing'] = facing
+    reference.update(fixedTraits='green hair, side-view, 오른손 검',
+                     allowedChanges='three-quarter front view; walking without glow',
+                     forbiddenTransfers='side-view, facing right, costume', facing='old-side-angle')
+    original = copy.deepcopy((params, reference))
+    seen = []
+    original_image = asset_path('identity').read_bytes()
+
+    def generate(provider_id, prompt, out, **kwargs):
+        seen.append(prompt)
+        out.write_bytes(original_image)
+        raw = out.with_suffix('.png.raw.png')
+        raw.write_bytes(original_image)
+        return GenResult(provider=provider_id, prompt=prompt, out=out, raw=raw, raw_bytes=len(original_image),
+                         elapsed_seconds=0, model=kwargs['model'], refs=kwargs['refs'])
+
+    monkeypatch.setattr(gen, 'generate_image', generate)
+    result = provider.generate(params, reference, asset_path, out_dir)
+    snapshot = result['requestSnapshot']
+    prompt = snapshot['enginePrompt']
+    assert seen == [prompt]
+    assert prompt.startswith('이동 중간 자세. 오른손 검, no turning to side.')
+    assert 'fixedTraits: "green hair, 오른손 검"' in prompt
+    assert 'allowedChanges: "walking without glow"' in prompt
+    assert 'forbiddenTransfers: ' + json.dumps(reference['forbiddenTransfers']) in prompt
+    assert 'old-side-angle' not in prompt
+    assert "instead of this attachment's viewing angle or facing" in prompt
+    assert prompt.endswith(view_instruction(direction, facing or 'right'))
+    assert ('viewFacing=' in view_instruction(direction, facing or 'right')) == (direction in ('side', 'front_diagonal', 'back_diagonal'))
+    assert (params, reference) == original
+    assert snapshot['params'] == params and snapshot['reference'] == reference and snapshot['prompt'] == params['prompt']
+    assert snapshot['promptHash'] == hashlib.sha256(prompt.encode()).hexdigest()
+    assert json.loads((out_dir / 'provider-attempt/request-snapshot.json').read_text()) == snapshot
+    assert Path(result['paths'][0]).read_bytes() == original_image
+
+
+def test_legacy_prompt_keeps_original_view_text(inputs):
+    params, reference, _, _ = inputs
+    params['prompt'] = '  side-view, facing right  '
+    reference.update(fixedTraits='정확한 오른쪽 측면', allowedChanges='앞 대각선 45도', facing='right')
+    prompt = provider._prompt(params, reference, [{'role': 'identity'}], 1)
+    assert prompt.startswith(params['prompt'] + '\n')
+    for field in ('fixedTraits', 'allowedChanges', 'facing'):
+        assert f'{field}: ' + json.dumps(reference[field], ensure_ascii=False) in prompt
+    assert 'SELECTED VIEW' not in prompt and 'instead of this attachment' not in prompt
+
+
+def test_view_api_rejects_invalid_params_before_queue_and_preserves_snapshots(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+    from services.api import store as s
+    from services.api.main import app
+
+    monkeypatch.setattr(s, 'DATA', tmp_path / 'data')
+    monkeypatch.setattr(provider, '_engine', lambda: pytest.fail('queue validation must not access engine'))
+    with TestClient(app) as client:
+        client.headers['X-Session-Token'] = client.get('/v1/health').json()['sessionToken']
+        project = client.post('/v1/projects', json={'name': '보기 방향 접수 시험'}).json()
+        root = '/v1/projects/' + project['projectId']
+        data = io.BytesIO()
+        Image.new('RGBA', (16, 20), (100, 70, 40, 255)).save(data, format='PNG')
+        asset = client.post(root + '/assets', files={'files': ('synthetic.png', data.getvalue(), 'image/png')}).json()['assets'][0]
+        project = client.get(root).json()
+        ref = client.post(root + '/reference-revisions', json={'expectedRevision': project['revision'],
+                          'reference': {'identityAssetId': asset['assetId'], 'fixedTraits': '정확한 오른쪽 측면'}}).json()
+        response = client.post('/v1/reference-revisions/' + ref['referenceRevisionId'] + '/approve',
+                               json={'expectedRevision': ref['savedRevision'], 'reviewChecks': {'identity': True}})
+        assert response.status_code == 200, response.text
+        project = client.get(root).json()
+        base = {'providerId': 'codex', 'prompt': '오른쪽을 보는 정확한 측면의 이동 중간 자세'}
+
+        def queue(params):
+            return client.post(root + '/jobs', json={'operation': 'generate', 'inputRevision': project['revision'],
+                               'assetIds': [], 'params': params, 'idempotencyKey': s.uid()})
+
+        for change, code in INVALID_VIEW_PARAMS:
+            response = queue({**base, **change})
+            assert response.status_code == 422, response.text
+            assert response.json()['code'] == code
+        assert client.get(root + '/jobs').json()['jobs'] == []
+        for direction in DIRECTIONS:
+            # Image validation retains raw structure without imposing video grammar.
+            params = {**base, 'viewDirection': direction, 'bodyPlan': ' future anatomy ', 'equipment': 'x' * 2000}
+            response = queue(params)
+            assert response.status_code == 202, response.text
+            job = s.get_job(response.json()['jobId'])
+            assert job['request']['params'] == params
+            assert job['snapshot']['references'] == project['references']

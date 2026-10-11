@@ -13,6 +13,27 @@ import pytest
 from adapters.spritegen import video_processing as vp
 
 
+@pytest.mark.parametrize("body", ("reference", "arachnid", "winged_biped", "winged_quadruped",
+                                  "the rider=biped; the bird=winged_biped", "the rider=biped; the creature=reference"))
+@pytest.mark.parametrize("direction", ("side", "front", "back", "front_diagonal", "back_diagonal"))
+@pytest.mark.parametrize("foot", ("auto", "left", "right"))
+def test_catalog_bodies_clear_human_foot_identity(monkeypatch, body, direction, foot):
+    align = vp._engine("video.align")
+    calls = []
+
+    def measured_strike(images, **options):
+        calls.append(options)
+        return {"start_foot": "right", "start_foot_source": "measured", "offset": 2}
+
+    monkeypatch.setattr(align, "foot_strike", measured_strike)
+    strike = vp._foot_strike([], {"direction": direction, "facing": "left", "startFoot": foot, "bodyPlan": body})
+    assert calls == [{"view": direction + ("@left" if direction in ("side", "front_diagonal", "back_diagonal") else ""),
+                      "foot": "right" if foot == "auto" else foot}]
+    assert strike["start_foot"] is None and strike["start_foot_source"] is None
+    assert "not biped" in strike["foot_why"]
+    assert strike["offset"] == 2
+
+
 def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 

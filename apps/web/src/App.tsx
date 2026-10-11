@@ -4,7 +4,7 @@ import {useStudio,type Studio} from './useStudio';
 import {api,downloadJson} from './api';
 import {uid,type Snapshot,type MissingProjectFolder,type Job} from './types';
 import {Panel,Input,Num,Empty,date} from './ui';
-import {AssetsStep,ReferenceStep,GenerationStep,ExtractStep} from './SourceSteps';
+import {AssetsStep,ReferenceStep,GenerationStep,ImageGenerationStep,ExtractStep} from './SourceSteps';
 import {AlignmentStep} from './EditSteps';
 import {EditStep} from './AnimationWorkspace';
 import {ReviewStep,ExportStep,JobsStep,HistoryStep,JobCard} from './FinishSteps';
@@ -20,7 +20,7 @@ const tools=[
  {id:'extract',label:'프레임 나누기',icon:Scissors,description:'원본과 추출 영역을 보면서 후보를 만듭니다.'},
  {id:'align',label:'크기·발 정렬',icon:Move,description:'후보와 좌표를 나란히 보고 공통 배율과 발을 맞춥니다.'},
 ];
-const labels:Record<string,string>={review:'동작 검수·팀 테두리',export:'게임용 파일 출력',jobs:'백그라운드 작업',history:'이력·백업',conflict:'저장 충돌 해결',create:'새 프로젝트',openFolder:'프로젝트 폴더 열기'};
+const labels:Record<string,string>={generateAsset:'자료 이미지 생성',review:'동작 검수·팀 테두리',export:'게임용 파일 출력',jobs:'백그라운드 작업',history:'이력·백업',conflict:'저장 충돌 해결',create:'새 프로젝트',openFolder:'프로젝트 폴더 열기'};
 function Feedback({s}:{s:Studio}){return s.error?<div className="shell-error" role="alert"><span>{s.error}</span><button onClick={()=>s.setError('')}>오류 닫기</button><button onClick={s.connect}>연결 확인</button></div>:null;}
 function Conflict({s}:{s:Studio}){return s.conflict?<section className="conflict"><h3>다른 창에서 저장한 변경이 있습니다</h3><p>내 기준 v{s.base?.revision} → 서버 v{s.conflict.revision}. 편집 초안 {s.commands.length}개는 보존되어 있습니다.</p><div className="two-columns"><div><h3>내 초안</h3><pre>{JSON.stringify(s.commands.map(c=>c.operation),null,2)}</pre></div><div><h3>서버 최신 이력</h3><pre>{JSON.stringify(s.conflict.journal.slice(-6),null,2)}</pre></div></div><div className="row"><button onClick={s.reapply}>최신 버전에 내 초안 다시 적용</button><button onClick={()=>downloadJson('frame-room-draft.json',{base:s.base,commands:s.commands})}>초안 파일로 보관</button><button onClick={()=>{downloadJson('frame-room-draft.json',{base:s.base,commands:s.commands});s.setBase(s.conflict);s.setCommands([]);s.setConflict(null);}}>초안 다운로드 후 서버 버전 열기</button></div></section>:<p>저장 충돌이 해결되었습니다. 편집 내용을 확인하고 저장하세요.</p>;}
 
@@ -65,7 +65,7 @@ export default function App(){
  const running=s.jobs.filter(j=>['queued','running'].includes(j.status)).length;
  const savedText=p?.storage?.syncPending?`폴더 저장 보류${s.conflict?' · 저장 충돌':s.commands.length?` · 미저장 ${s.commands.length}개`:''}`:s.busy?'저장·처리 중…':s.conflict?'저장 충돌':s.commands.length?`미저장 ${s.commands.length}개`:p?`저장됨 · v${p.revision}`:'로컬 작업 공간';
  const tool=tools.find(t=>t.id===activeTool);
- const toolContent=p?<>{activeTool==='assets'&&<AssetsStep s={s} onNext={()=>setActiveTool('reference')}/>} {activeTool==='reference'&&<ReferenceStep s={s}/>} {activeTool==='generate'&&<GenerationStep s={s} onSelectClip={openVideoClip}/>} {activeTool==='extract'&&<ExtractStep s={s} initialAssetId={toolSelection.assetId}/>} {activeTool==='align'&&<AlignmentStep s={s} initialFrameId={toolSelection.frameVersionId}/>} {activeTool==='review'&&<ReviewStep s={s}/>} {activeTool==='export'&&<ExportStep s={s}/>} {activeTool==='jobs'&&<JobsStep s={s} onSelectClip={openVideoClip}/>} {activeTool==='history'&&<HistoryStep s={s}/>} {activeTool==='conflict'&&<Conflict s={s}/>}</>:null;
+ const toolContent=p?<>{activeTool==='assets'&&<AssetsStep s={s} onNext={()=>setActiveTool('reference')} onGenerate={()=>setActiveTool('generateAsset')}/>} {activeTool==='generateAsset'&&<ImageGenerationStep key={`asset-${p.projectId}`} s={s} assetMode onBack={()=>setActiveTool('assets')}/>} {activeTool==='reference'&&<ReferenceStep s={s}/>} {activeTool==='generate'&&<GenerationStep s={s} onSelectClip={openVideoClip}/>} {activeTool==='extract'&&<ExtractStep s={s} initialAssetId={toolSelection.assetId}/>} {activeTool==='align'&&<AlignmentStep s={s} initialFrameId={toolSelection.frameVersionId}/>} {activeTool==='review'&&<ReviewStep s={s}/>} {activeTool==='export'&&<ExportStep s={s}/>} {activeTool==='jobs'&&<JobsStep s={s} onSelectClip={openVideoClip}/>} {activeTool==='history'&&<HistoryStep s={s}/>} {activeTool==='conflict'&&<Conflict s={s}/>}</>:null;
  return <div className={`studio-shell studio-${page}`}>
   <a className="skip-link" href="#main">작업 영역으로 건너뛰기</a>
   <header className="studio-header">
@@ -108,7 +108,7 @@ export default function App(){
      <button className="primary" disabled={s.busy||!s.service||!folderPath.trim()}>폴더 열기</button>
     </fieldset></form>:<fieldset className="tool-fieldset" disabled={s.busy}>{toolContent}</fieldset>}
    </div>
-   {!['create','openFolder'].includes(activeTool)&&<div className="tool-footer"><span>{activeTool==='generate'?'생성 작업은 도구를 닫아도 계속됩니다.':'편집 중인 동작과 프레임 선택은 유지됩니다.'}</span><button onClick={closeTool}>편집기로 돌아가기</button></div>}
+   {!['create','openFolder'].includes(activeTool)&&<div className="tool-footer"><span>{['generate','generateAsset'].includes(activeTool)?'생성 작업은 도구를 닫아도 계속됩니다.':'편집 중인 동작과 프레임 선택은 유지됩니다.'}</span><button onClick={closeTool}>편집기로 돌아가기</button></div>}
   </EditorDialog>
   <EditorDialog open={!!deleteTarget} onClose={()=>{if(!s.busy)setDeleteTarget(null);}} title="프로젝트 목록에서 제거" className="project-delete-dialog" closeDisabled={s.busy}>
    <Feedback s={s}/>

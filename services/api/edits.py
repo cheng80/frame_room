@@ -87,7 +87,22 @@ def apply(p,ops):
         if 'occurrenceId' in op: occ=find(clip['occurrences'],'occurrenceId',op['occurrenceId'])
         clip_was_approved=clip is not None and clip.get('review')=='approved'
         if t=='setGenerationSettings':
-            fields(op['settings'],['providerId','model','prompt','frameCount','quality','resolution','scope','frameVersionId','clipId','background'])
+            settings=op['settings']
+            fields(settings,['providerId','model','prompt','frameCount','quality','resolution','scope','frameVersionId','clipId','background','layoutGuide','imageUse','videoBase'])
+            if 'layoutGuide' in settings and type(settings['layoutGuide']) is not bool:
+                raise AppError('GENERATION_SETTINGS_INVALID','구도 가이드 사용 여부는 참 또는 거짓이어야 합니다.')
+            if settings.get('imageUse','frames') not in ('frames','grok-video'):
+                raise AppError('GENERATION_SETTINGS_INVALID','이미지 생성 용도를 선택하세요.')
+            if 'videoBase' in settings:
+                base=settings['videoBase']
+                if not isinstance(base,dict): raise AppError('GENERATION_SETTINGS_INVALID','영상용 기준 그림 설정을 확인하세요.')
+                fields(base,['direction','facing','pose','bodyPlan','equipment'])
+                for key,allowed in [('direction',('side','front','back','front_diagonal','back_diagonal')),('facing',('right','left')),('pose',('walk','idle'))]:
+                    if key in base and base[key] not in allowed:
+                        raise AppError('GENERATION_SETTINGS_INVALID','영상용 기준 그림의 방향과 자세를 확인하세요.')
+                for key in ('bodyPlan','equipment'):
+                    if key in base and (not isinstance(base[key],str) or len(base[key])>2000):
+                        raise AppError('GENERATION_SETTINGS_INVALID','신체 구조와 장비 설명은 2,000자 이내로 입력하세요.')
             p['generationSettings']=op['settings']
         elif t=='createClip':
             d=op['clip']; fields(d,['name','stateId','facing','referenceRevisionId','loop','defaultFps'])

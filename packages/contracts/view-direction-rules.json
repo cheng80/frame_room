@@ -1,0 +1,11 @@
+{
+  "patterns": [
+    "(?:정확한\\s*)?(?:앞|뒤|정면|후면)\\s*대각선(?:\\s*(?:45\\s*도|뷰|보기|각도))?(?:의|으로|에서)?",
+    "(?:요청한\\s*|정확한\\s*|완전한\\s*|완전히\\s*|순수한\\s*)?(?:(?:오른쪽|왼쪽)\\s*)?(?:정면|뒷면|후면|측면)(?:\\s*(?:에서\\s*본\\s*(?:모습|시점)?|보기|뷰|각도|방향))?(?:의|으로|에서|과|와)?",
+    "(?:오른쪽|왼쪽)(?:을|를|으로)?\\s*(?:바라보(?:는|며|고|기|다|도록)|보(?:는|며|고|기|도록)|향하(?:는|며|고|도록)|향한(?:다)?)(?:\\s*모습)?",
+    "\\b(?:(?:exact|strict|pure|full)\\s+)?(?:(?:left|right)[ -]+)?(?:three[ -]quarter[ -]+(?:front|back)(?:[ -]+view)?|(?:front|back)[ -]+three[ -]quarter(?:[ -]+view)?|(?:side|front|back|rear)[ -]+view|(?:side[ -]+)?profile(?:[ -]+view)?)\\b",
+    "\\b(?:facing|looking)(?:[ -]+(?:to(?:wards?)?|directly|the))*[ -]+(?:right|left)\\b",
+    "\\b(?:facing|looking)[ -]+(?:directly[ -]+)?(?:towards?[ -]+|away[ -]+from[ -]+)?the[ -]+(?:viewer|camera)\\b"
+  ],
+  "negativePattern": "\\b(?:no|not|never|without|avoid|cannot|don't|doesn't)\\s+(?:(?:use|using|show|showing|a|the|an|exact|strict|pure|full)\\s+)*(?:turn(?:ing)?\\b|rotat(?:e|ing|ion)\\b|fac(?:e|ing)\\b|look(?:ing)?\\b|(?:(?:left|right)[ -]+)?(?:side|front|back|rear)[ -]+view\\b|(?:three[ -]quarter[ -]+)?(?:front|back)[ -]+view\\b|profile\\b)|(?:측면|정면|뒷면|후면|대각선)(?:\\s*(?:각도|방향|뷰|시점))?(?:을|를|으로|로|이|은)?\\s*(?:따르지|돌리지|돌아가지|바꾸지|보이지|금지|제외|아닌|아니)|(?:오른쪽|왼쪽)(?:을|를|으로)?\\s*(?:바라보지|보지|향하지|돌리지)|(?:시선|방향|각도)(?:을|를)?\\s*(?:바꾸지|돌리지)"
+}

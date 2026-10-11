@@ -7,7 +7,7 @@ import {
   videoProcessingRequest, videoProvenanceLabel, videoRetryLabel, type VideoGenerationSettings,
   videoBeforeFinishSnapshot, videoClipColorLabel, videoJobStep, videoRangeBoundary,
   videoBatchItem, videoBatchRequest, VIDEO_BATCH_LIMIT,
-  videoMatchClips, videoHasExactTimes, videoRangeSource,
+  videoMatchClips, videoHasExactTimes, videoRangeSource, videoAssetSettings,
 } from '../src/videoWorkflow';
 
 const video = {videoId: 'v', frameCount: 73, fps: 24, durationMs: 3042, provenance: {kind: 'imported-video'}} as Video;
@@ -19,6 +19,34 @@ const snapshot = {
 const generation = (): VideoGenerationSettings => ({assetId: 'approved', model: 'grok-imagine-video-1.5', durationSeconds: '3', resolution: '480p', direction: 'side', facing: 'right', motionPrompt: '', bodyPlan: '', equipment: ''});
 
 describe('video request boundaries', () => {
+  it.each(['reference', 'arachnid', 'winged_biped', 'winged_quadruped'])('carries %s from image metadata into the next video request', bodyPlan => {
+    const p = {...snapshot, assets: [{assetId: 'approved', provenance: {generationVersionId: 'g'}}],
+      generations: [{generationVersionId: 'g', requestSnapshot: {params: {viewDirection: 'front', bodyPlan}}}],
+    } as Snapshot;
+    const settings = videoAssetSettings(p, 'approved');
+    expect(settings.bodyPlan).toBe(bodyPlan);
+    expect(videoGenerationRequest(p, {...generation(), ...settings}, defaultVideoProcessing()).params.bodyPlan).toBe(bodyPlan);
+  });
+  it('uses the selected asset generation record even after current image settings change', () => {
+    const p = {...snapshot, assets: [{assetId: 'approved', provenance: {generationVersionId: 'g'}}],
+      generationSettings: {videoBase: {direction: 'side', facing: 'right'}},
+      generations: [{generationVersionId: 'g', requestSnapshot: {params: {viewDirection: 'front_diagonal', viewFacing: 'left', bodyPlan: 'biped', equipment: 'staff:right'}}}],
+    } as Snapshot;
+    expect(videoAssetSettings(p, 'approved')).toEqual({direction: 'front_diagonal', facing: 'left', bodyPlan: 'biped', equipment: 'staff:right'});
+    expect(videoAssetSettings({...p, generations: []}, 'approved').direction).toBe('front');
+  });
+  it.each(['side', 'front', 'back', 'front_diagonal', 'back_diagonal'])('carries %s from image metadata', direction => {
+    const p = {...snapshot, assets: [{assetId: 'approved', provenance: {generationVersionId: 'g'}}],
+      generations: [{generationVersionId: 'g', requestSnapshot: {params: {viewDirection: direction, viewFacing: 'right'}}}],
+    } as Snapshot;
+    expect(videoAssetSettings(p, 'approved').direction).toBe(direction);
+  });
+  it('preserves legacy generated side pictures rather than guessing from current settings', () => {
+    const p = {...snapshot, assets: [{assetId: 'approved', provenance: {generationVersionId: 'g'}}],
+      generations: [{generationVersionId: 'g', requestSnapshot: {params: {prompt: '정확한 정면의 참조. 정확한 측면에서 본 모습. 몸과 얼굴, 발끝 모두 왼쪽을 향한다.'}}}],
+    } as Snapshot;
+    expect(videoAssetSettings(p, 'approved')).toMatchObject({direction: 'side', facing: 'left'});
+  });
   it('defaults to game eight while preserving twelve and explicit legacy frame counts', () => {
     expect(defaultVideoProcessing()).toMatchObject({maxFrames: '8', finishMode: 'gif', repairMode: 'off', between: 'auto', startFoot: 'auto', startIndex: ''});
     for (const n of [4, 8, 12, 32, 64]) expect(videoProcessingParams({...defaultVideoProcessing(), maxFrames: String(n)}).maxFrames).toBe(n);
