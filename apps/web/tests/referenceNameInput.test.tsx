@@ -4,7 +4,7 @@ import type {Studio} from '../src/useStudio';
 import type {Reference} from '../src/types';
 
 const reference={referenceRevisionId:'r',name:'기존 이름'} as Reference;
-function setup(options={}){const s={edit:vi.fn(),busy:false,conflict:null,...options} as unknown as Studio;return {s,input:ReferenceNameInput({s,reference})};}
+function setup(options={}){const s={edit:vi.fn(),busy:false,conflict:null,...options} as unknown as Studio,element=ReferenceNameInput({s,reference});return {s,input:element.type(element.props)};}
 describe('reference name input',()=>{
  it('commits one trimmed edit on blur, preserving spaces typed within the name',()=>{
   const {s,input}=setup(),target={value:'  효과 없는 오른쪽 측면  '};

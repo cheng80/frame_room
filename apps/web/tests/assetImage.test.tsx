@@ -14,6 +14,7 @@ import {applyDraft} from '../src/draft';
 type Node=ReactElement<any>;
 function nodes(tree:any):Node[]{if(Array.isArray(tree))return tree.flatMap(nodes);if(!tree?.props)return [];if(tree.type===EditorDialog&&!tree.props.open)return [];return [tree,...nodes(tree.props.children),...nodes(tree.props.actions),...nodes(tree.props.preview),...nodes(tree.props.settings),...nodes(tree.props.toolbar)];}
 function text(tree:any):string{if(typeof tree==='string'||typeof tree==='number')return String(tree);if(Array.isArray(tree))return tree.map(text).join('');return tree?.props?text(tree.props.children):'';}
+function nameInput(element:any){return element.type(element.props);}
 class Harness {
  slots:any[]=[];cursor=0;tree:any;s:Studio;
  constructor(s:Studio){this.s=s;this.render();}
@@ -31,24 +32,24 @@ const studio=(snapshot:Snapshot,extra:Record<string,unknown>={})=>({snapshot,edi
 describe('asset image names and preview',()=>{
  it('trims edits on blur and leaves internal spaces and source metadata untouched',()=>{
   const original=asset(),before=structuredClone(original),s=studio(fixture([original]));
-  const input=AssetNameInput({s,asset:original}),target={value:'  새 자료 이름  '};
+  const input=nameInput(AssetNameInput({s,asset:original})),target={value:'  새 자료 이름  '};
   input.props.onBlur({currentTarget:target});
   expect(s.edit).toHaveBeenCalledExactlyOnceWith({type:'renameAsset',assetId:'a',name:'새 자료 이름'});
   expect(target.value).toBe('새 자료 이름');expect(original).toEqual(before);expect(input.props.maxLength).toBe(200);
  });
  it('ignores unchanged names and allows clearing to restore the original filename label',()=>{
-  const item=asset({name:'이름'}),s=studio(fixture([item])),input=AssetNameInput({s,asset:item});
+  const item=asset({name:'이름'}),s=studio(fixture([item])),input=nameInput(AssetNameInput({s,asset:item}));
   input.props.onBlur({currentTarget:{value:'이름'}});expect(s.edit).not.toHaveBeenCalled();
   input.props.onBlur({currentTarget:{value:'   '}});expect(s.edit).toHaveBeenCalledExactlyOnceWith({type:'renameAsset',assetId:'a',name:''});
  });
  it('cancels Escape and ignores Enter during Korean composition',()=>{
-  const s=studio(fixture([asset({name:'이전'})])),input=AssetNameInput({s,asset:s.snapshot!.assets[0]}),target={value:'새 이름',blur:vi.fn()},preventDefault=vi.fn();
+  const s=studio(fixture([asset({name:'이전'})])),input=nameInput(AssetNameInput({s,asset:s.snapshot!.assets[0]})),target={value:'새 이름',blur:vi.fn()},preventDefault=vi.fn();
   input.props.onKeyDown({key:'Enter',nativeEvent:{isComposing:true},currentTarget:target,preventDefault});expect(target.blur).not.toHaveBeenCalled();
   input.props.onKeyDown({key:'Escape',currentTarget:target});expect(target.value).toBe('이전');expect(target.blur).toHaveBeenCalledOnce();
   input.props.onKeyDown({key:'Enter',nativeEvent:{isComposing:false},currentTarget:target,preventDefault});expect(target.blur).toHaveBeenCalledTimes(2);expect(preventDefault).toHaveBeenCalledOnce();
  });
  it.each([{busy:true},{conflict:{revision:3}}])('disables and does not commit while busy or conflicted',options=>{
-  const s=studio(fixture([asset()]),options),input=AssetNameInput({s,asset:s.snapshot!.assets[0]});
+  const s=studio(fixture([asset()]),options),input=nameInput(AssetNameInput({s,asset:s.snapshot!.assets[0]}));
   expect(input.props.disabled).toBe(true);input.props.onBlur({currentTarget:{value:'수정'}});expect(s.edit).not.toHaveBeenCalled();
  });
  it('labels legacy and custom names and opens previews from primary and folded video cards',()=>{
