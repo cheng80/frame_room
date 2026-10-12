@@ -9,7 +9,7 @@ from PIL import Image
 from services.api import store as s
 
 
-def normalize_frames(frames, standing_height, body_height, directory, *, bounds_paths=None, source_anchor=None, resize_mode='legacy'):
+def normalize_frames(frames, standing_height, body_height, directory, *, bounds_paths=None, source_anchor=None, resize_mode='legacy', save_metadata=None):
     if resize_mode not in ('legacy','color-alpha'):
         raise s.AppError('VIDEO_RESIZE','영상 크기 처리 설정을 확인하세요.')
     boxes=[]
@@ -45,5 +45,5 @@ def normalize_frames(frames, standing_height, body_height, directory, *, bounds_
     recipe=dict(method='video-union-lanczos-v1' if resize_mode=='legacy' else 'video-union-color-alpha-v2.19',sourceRect=rect,sourceToFrameTransform=mapping,
                 bodyHeight=body_height,standingSourceHeight=standing_height,bodyScale=scale,
                 width=width,height=height,anchor=anchor,anchorMode='first-video-frame' if source_anchor else 'union-bottom-centre',resampler='lanczos' if resize_mode=='legacy' else 'hamming-color-lanczos-alpha',perPoseFit=False)
-    s.atomic_bytes(directory/'normalization.json',s.dumps(recipe).encode())
+    (save_metadata or (lambda path,value:s.atomic_bytes(path,s.dumps(value).encode())))(directory/'normalization.json',recipe)
     return paths,recipe

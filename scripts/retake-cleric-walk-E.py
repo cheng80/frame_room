@@ -11,6 +11,7 @@ from PIL import Image, ImageDraw
 from adapters.spritegen import video_provider as vp, video_processing as processing
 from adapters.spritegen.video_normalization import normalize_frames
 from adapters.spritegen.video_finish import finish_frames
+from scripts.project_library import target_project, publish_record
 
 OUT = ROOT / 'output/cleric-quarterview-8way/walk-E-right-hand-v1'
 BASE = OUT.parent / 'bases/E/anchor.png'
@@ -61,6 +62,7 @@ def contacts(paths, prefix, crop=None, per_page=24):
 
 
 def generate():
+    target_project(OUT.parent)
     verify_originals()
     prompt = (
         'Animate this EXACT right-facing female cleric for 3 seconds, natural calm WALK IN PLACE. '
@@ -96,11 +98,13 @@ def generate():
         save(request, params)
     digest = hashlib.sha256((json.dumps(params, sort_keys=True) + BASE_SHA).encode()).hexdigest()
     result = vp.generate(BASE, OUT / 'provider', params, OUT / 'checkpoint.json', digest,
+        save_checkpoint=processing._write,
         on_progress=lambda stage, message: print(stage, message, flush=True))
     save(OUT / 'generation.json', {**result, 'path': str(result['path'])})
     assert read(OUT / 'checkpoint.json')['postCount'] == 1
     if (OUT / 'candidate.json').exists():
         assert read(OUT / 'candidate.json')['sourceSha256'] == sha(result['path'])
+        publish_record(OUT.parent, OUT / 'candidate.json')
         return
     processed = processing.process_clip(result['path'], OUT / 'processing',
         {**params, 'referencePath': str(OUT / 'provider/input-canvas.png'),
@@ -108,8 +112,8 @@ def generate():
         on_progress=lambda stage, message: print(stage, message, flush=True))
     save(OUT / 'processed.json', processed)
     paths, normalization = normalize_frames(processed['frames'], processed['standingHeight'], 112,
-        OUT / 'normalized', bounds_paths=processed['boundsPaths'], source_anchor=processed['anchor'])
-    paths, finish = finish_frames(paths, OUT / 'finished', mode='gif', cell_width=128, cell_height=160)
+        OUT / 'normalized', bounds_paths=processed['boundsPaths'], source_anchor=processed['anchor'], save_metadata=save)
+    paths, finish = finish_frames(paths, OUT / 'finished', mode='gif', cell_width=128, cell_height=160, save_metadata=save)
     frames = [dict(f, path=str(p)) for f, p in zip(processed['frames'], paths)]
     source_sha = sha(result['path'])
     record = dict(name='walk_E', direction='E', state='walk', take='right-hand-v1',
@@ -142,6 +146,7 @@ def generate():
     preview = processing._preview([dict(f, keyedPath=f['path']) for f in frames], OUT, True)
     save(OUT / 'selected-preview.json', preview)
     verify_originals()
+    publish_record(OUT.parent, OUT / 'candidate.json')
     print('INSPECTION_READY', len(raw), 'source frames;', str(OUT / 'candidate.json'), flush=True)
 
 
@@ -164,6 +169,7 @@ def validate(record):
 
 
 def finalize():
+    target_project(OUT.parent)
     count = verify_originals()
     record, review = read(OUT / 'candidate.json'), read(OUT / 'visual-review.json')
     validate(record)
@@ -172,14 +178,16 @@ def finalize():
     record['visualReview'] = review
     record['preservation'] = dict(verifiedFiles=count, baseline=str(OUT / 'original-hashes.json'))
     save(OUT / 'complete.json', record)
+    publish_record(OUT.parent, OUT / 'complete.json')
     print('COMPLETE', str(OUT / 'complete.json'), flush=True)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('stage', choices=['generate', 'finalize'])
+    parser.add_argument('--project-id')
     args = parser.parse_args()
     OUT.mkdir(parents=True, exist_ok=True)
-    vp.s.DATA = OUT
+    target_project(OUT.parent, args.project_id)
     assert not (OUT / 'complete.json').exists(), 'Completed take is immutable'
     {'generate': generate, 'finalize': finalize}[args.stage]()

@@ -1,6 +1,6 @@
 """Generate a separate eight-way deliverable through the project's existing engine.
 
-Original project files are read-only. Receipts prevent accidental re-submission;
+Original files are preserved. Receipts prevent accidental re-submission;
 local processing can be repeated without generating another image or video.
 """
 import argparse
@@ -20,6 +20,7 @@ from alignment.animation_exports import _sheet, write_animation_formats
 from adapters.spritegen import video_provider as vp, video_processing as processing
 from adapters.spritegen.video_normalization import normalize_frames
 from adapters.spritegen.video_finish import finish_frames
+from scripts.project_library import target_project, publish_record, publish_delivery
 
 VIEWS = {'N': ('back', 'right'), 'NE': ('back_diagonal', 'right'),
          'E': ('side', 'right'), 'SE': ('front_diagonal', 'right'),
@@ -36,6 +37,7 @@ def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 def bases(out, directions):
+    target_project(out)
     gen = _engine('gen')
     reference = out / 'source/cleric-original-no-effects.png'
     reference.parent.mkdir(parents=True, exist_ok=True)
@@ -82,6 +84,7 @@ def bases(out, directions):
         print('BASE_DONE', direction, round(result.elapsed_seconds), flush=True)
 
 def clip(out, direction, state, *, take=None):
+    target_project(out)
     published = out / 'motions' / f'{state}_{direction}'
     folder = published / take if take else published
     folder.mkdir(parents=True, exist_ok=True)
@@ -90,6 +93,7 @@ def clip(out, direction, state, *, take=None):
         record = json.loads(complete.read_text())
         if record['baseSha256'] != sha(out / 'bases' / direction / 'anchor.png'):
             raise ValueError(f'{state}_{direction}: archive the previous completed draft before replacing its base.')
+        publish_record(out, complete)
         return record
     view, facing = VIEWS[direction]
     source = out / 'bases' / direction / 'anchor.png'
@@ -120,13 +124,14 @@ def clip(out, direction, state, *, take=None):
     save(folder / 'request.json', params)
     digest = hashlib.sha256((json.dumps(params, sort_keys=True) + sha(source)).encode()).hexdigest()
     print('VIDEO_START', state, direction, flush=True)
-    result = vp.generate(source, folder / 'provider', params, folder / 'checkpoint.json', digest)
+    result = vp.generate(source, folder / 'provider', params, folder / 'checkpoint.json', digest,
+                         save_checkpoint=processing._write)
     save(folder / 'generation.json', {**result, 'path': str(result['path'])})
     processed = processing.process_clip(result['path'], folder / 'processing',
         {**params, 'key': 'magenta', 'referencePath': str(folder / 'provider/input-canvas.png')})
     paths, normalization = normalize_frames(processed['frames'], processed['standingHeight'], 112,
-        folder / 'normalized', bounds_paths=processed['boundsPaths'], source_anchor=processed['anchor'])
-    paths, finish = finish_frames(paths, folder / 'finished', mode='gif', cell_width=128, cell_height=160)
+        folder / 'normalized', bounds_paths=processed['boundsPaths'], source_anchor=processed['anchor'], save_metadata=processing._write)
+    paths, finish = finish_frames(paths, folder / 'finished', mode='gif', cell_width=128, cell_height=160, save_metadata=processing._write)
     record = {'name': f'{state}_{direction}', 'direction': direction, 'state': state,
         'sourceSha256': sha(result['path']), 'baseSha256': sha(source), 'requestId': result['receipt']['requestId'],
         'frames': [dict(f, path=str(p)) for f,p in zip(processed['frames'], paths)],
@@ -134,12 +139,12 @@ def clip(out, direction, state, *, take=None):
         'source': processed['source'], 'processingReport': processed['files'],
         'generationCheckpoint':str(folder/'checkpoint.json'), 'take':take or 'original'}
     save(complete, record)
+    publish_record(out, complete)
     print('VIDEO_DONE', state, direction, len(paths), processed['selection']['durationMs'], flush=True)
     return record
 
 def clips(out, directions):
-    # Isolated adapter output root; never write to the user's application database.
-    vp.s.DATA = out
+    target_project(out)
     vp.login_credential()
     failures = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
@@ -153,13 +158,14 @@ def clips(out, directions):
     if failures: raise SystemExit('Unfinished motions: ' + ', '.join(failures))
 
 def match_walks(out):
-    vp.s.DATA = out
+    target_project(out)
     for direction in VIEWS:
         published = out / 'motions' / f'walk_{direction}'
         complete = published / 'complete.json'
         record = json.loads(complete.read_text())
         aligned = record['selection'].get('cycleAlignment', {})
         if aligned.get('durationMs') == 1000 and len(record['frames']) == 8:
+            publish_record(out, complete)
             continue
         provider = Path(record.get('generationCheckpoint', published / 'checkpoint.json')).parent
         params = json.loads((provider / 'request.json').read_text())
@@ -169,16 +175,18 @@ def match_walks(out):
             {**params, 'key': 'magenta', 'referencePath': str(provider / 'provider/input-canvas.png'),
              'targetFrameCount': 8, 'targetDurationMs': 1000, 'between': 'off'})
         paths, normalization = normalize_frames(processed['frames'], processed['standingHeight'], 112,
-            folder / 'normalized', bounds_paths=processed['boundsPaths'], source_anchor=processed['anchor'])
-        paths, finish = finish_frames(paths, folder / 'finished', mode='gif', cell_width=128, cell_height=160)
+            folder / 'normalized', bounds_paths=processed['boundsPaths'], source_anchor=processed['anchor'], save_metadata=processing._write)
+        paths, finish = finish_frames(paths, folder / 'finished', mode='gif', cell_width=128, cell_height=160, save_metadata=processing._write)
         backup = published / ('before-cycle-match-' + record['baseSha256'][:12] + '.json')
         if not backup.exists(): shutil.copy2(complete, backup)
         save(complete, {**record, 'frames': [dict(f, path=str(p)) for f,p in zip(processed['frames'],paths)],
             'normalization': normalization, 'finish': finish, 'selection': processed['selection'],
             'source': processed['source'], 'processingReport': processed['files']})
+        publish_record(out, complete)
         print('CYCLE_MATCHED', direction, len(paths), 1000, flush=True)
 
 def pack(out):
+    target_project(out)
     target = out / 'delivery'
     target.mkdir(parents=True, exist_ok=True)
     for state in ('walk', 'idle'):
@@ -229,15 +237,18 @@ def pack(out):
         'anchor':{'x':.5,'y':148/160}, 'animations':manifest, 'frameCount':len(cells),
         'mirroredDirections':[], 'imageProvider':'GPT ImageGen via Codex subscription',
         'motionProvider':'Grok video Pro via account login', 'atlasSha256':sha(target/'cleric-atlas.png')})
-    print('PACK_DONE',len(cells),sheet_info,flush=True)
+    publication = publish_delivery(out, target)
+    print('PACK_DONE',len(cells),sheet_info,publication,flush=True)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--stage',choices=['bases','clips','match-walks','pack'],required=True)
     parser.add_argument('--directions',default=','.join(ORDER))
     parser.add_argument('--out',type=Path,default=ROOT/'output/cleric-quarterview-8way')
+    parser.add_argument('--project-id',help='Required once; later stages reuse the saved project binding')
     args = parser.parse_args(); args.out=args.out.resolve()
     dirs=args.directions.split(',')
     if len(dirs)!=len(set(dirs)) or any(d not in VIEWS for d in dirs): parser.error('Use unique N,NE,E,SE,S,SW,W,NW directions')
+    target_project(args.out, args.project_id)
     {'bases':lambda:bases(args.out,dirs),'clips':lambda:clips(args.out,dirs),
      'match-walks':lambda:match_walks(args.out),'pack':lambda:pack(args.out)}[args.stage]()

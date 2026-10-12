@@ -69,6 +69,29 @@ def handle_folder_failure(j,error):
     interrupt_project(j['projectId'],error)
     return True
 
+def validate_animation_publication(result,project):
+    clips=result.get('clips')
+    existing_frames=project.get('frames',[])
+    new_frames=result.get('frames',[])
+    if not isinstance(existing_frames,list) or not isinstance(new_frames,list):
+        raise s.AppError('LIBRARY_PUBLICATION_INCOMPLETE','라이브러리 프레임 결과가 올바르지 않습니다.',424)
+    frames={f.get('frameVersionId') for f in existing_frames if isinstance(f,dict)}
+    frames.update(f.get('frameVersionId') for f in new_frames if isinstance(f,dict))
+    if not isinstance(clips,list) or not clips or any(
+        not isinstance(clip,dict) or not isinstance(clip.get('occurrences'),list) or not clip['occurrences'] or
+        any(not isinstance(slot,dict) or slot.get('frameVersionId') not in frames for slot in clip['occurrences'])
+        for clip in clips
+    ):
+        raise s.AppError('LIBRARY_PUBLICATION_INCOMPLETE','라이브러리 동작과 프레임이 없는 결과는 게시할 수 없습니다.',424)
+
+def validate_published_snapshot(result,project):
+    try:
+        s.validate_snapshot(project)
+        validate_animation_publication(result,project)
+    except s.AppError as exc:
+        if exc.code=='LIBRARY_PUBLICATION_INCOMPLETE': raise
+        raise s.AppError('LIBRARY_PUBLICATION_INCOMPLETE','라이브러리 동작 결과의 프레임 연결이 완전하지 않습니다.',424) from exc
+
 def recover():
     with s.connect() as c: rows=c.execute("SELECT body FROM jobs WHERE status IN ('running','cancel_requested')").fetchall()
     for row in rows:
@@ -126,6 +149,9 @@ def claim():
 def publish(j,payload):
     out=s.job_directory(j['jobId'])/j['attemptId']/'staging'
     result=payload['result']; files=result.get('files',[])
+    if s.get_job(j['jobId']).get('published'): return
+    if j['operation'] in ('generate_video','process_video'):
+        validate_animation_publication(result,j['snapshot'])
     published=s.artifact_directory(j['jobId'])/j['attemptId']
     published.parent.mkdir(parents=True,exist_ok=True)
     # Recover a validated directory rename that completed before its DB transaction.
@@ -178,6 +204,8 @@ def publish(j,payload):
                     for fid,a in result.get('alignments',{}).items(): a['groupRevisionId']=old['groupRevisionId']
                 else: p['alignmentGroups'].append(g)
             p['alignments'].update(result.get('alignments',{})); s.write_project(c,p,j['operation']+' 결과 등록'); result['savedRevision']=p['revision']
+        if j['operation'] in ('generate_video','process_video','apply_follow'):
+            validate_published_snapshot(result,s.get_project(j['projectId'],c))
         current.update(status=result.get('status','succeeded'),step='complete',artifacts=arts,result={k:v for k,v in result.items() if k not in ('assets','frames','alignmentGroups','alignments','generations','clips','files')},checkpoints=[{'step':j['operation'],'inputHash':j['requestHash'],'artifacts':arts}],published=True)
         s.write_job(c,current)
 

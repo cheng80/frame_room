@@ -15,6 +15,7 @@ from PIL import Image, ImageDraw
 from adapters.spritegen import video_provider as vp, video_processing as processing
 from adapters.spritegen.video_normalization import normalize_frames
 from adapters.spritegen.video_finish import finish_frames
+from scripts.project_library import target_project, publish_record
 
 OUT = ROOT / 'output/cleric-quarterview-8way/idle-S-breathing-v1'
 BASE = OUT.parent / 'bases/S/anchor.png'
@@ -54,8 +55,8 @@ def contacts(paths, prefix, crop=None, size=(150, 228), per_page=24, directory=O
 
 
 def generate():
+    target_project(OUT.parent)
     verify_originals()
-    vp.s.DATA = OUT
     prompt = (
         'Animate this exact female cleric in a 3-second standing idle with clearly visible but restrained '
         'secondary motion throughout, not just an eye blink. One slow breathing cycle: gently lift her '
@@ -85,6 +86,7 @@ def generate():
         save(request, params)
     digest = hashlib.sha256((json.dumps(params, sort_keys=True) + BASE_SHA).encode()).hexdigest()
     result = vp.generate(BASE, OUT / 'provider', params, OUT / 'checkpoint.json', digest,
+        save_checkpoint=processing._write,
         credential=vp.login_credential(),
         on_progress=lambda stage, message: print(stage, message, flush=True))
     save(OUT / 'generation.json', {**result, 'path': str(result['path'])})
@@ -107,10 +109,34 @@ def generate():
     contacts(keyed, 'new-keyed', crop)
     contacts(raw, 'new-raw', size=(180, 180))
     verify_originals()
+    directory = OUT / 'automatic-candidate'
+    frames = [dict(f) for f in processed['frames']]
+    record = prepare_record(frames, processed, result, directory, processed['selection'], 'automatic-selection')
+    save(directory / 'candidate.json', record)
+    publish_record(OUT.parent, directory / 'candidate.json')
     print('INSPECTION_READY', str(OUT / 'processed.json'), flush=True)
 
 
+def prepare_record(frames, processed, result, directory, selection, take):
+    keyed = sorted(Path(processed['extraction']['keyedDir']).glob('frame-*.png'))
+    paths, normalization = normalize_frames(frames, processed['standingHeight'], 112,
+        directory / 'normalized', bounds_paths=keyed[:72], source_anchor=processed['anchor'], save_metadata=save)
+    paths, finish = finish_frames(paths, directory / 'finished', mode='gif', cell_width=128, cell_height=160, save_metadata=save)
+    for frame, path in zip(frames, paths):
+        frame['path'] = str(path)
+        with Image.open(path) as image:
+            assert image.getchannel('A').getbbox()
+            assert image.width <= 128 and image.height <= 160
+    return dict(name='idle_S', direction='S', state='idle',
+        sourceSha256=sha(result['path']), baseSha256=sha(BASE), requestId=result['receipt']['requestId'],
+        frames=frames, normalization=normalization, finish=finish, selection=selection,
+        source=processed['source'], processingReport=processed['files'],
+        generationCheckpoint=str(OUT / 'checkpoint.json'), take=take,
+        sourceVideoPath=result['path'], processingRoot=str(OUT / 'processing'))
+
+
 def finalize(indices, closed, directory=OUT, durations=None):
+    target_project(OUT.parent)
     verify_originals()
     assert len(indices) == 8 and indices == sorted(set(indices))
     assert indices[0] == 0 and indices[-1] < 72
@@ -130,14 +156,6 @@ def finalize(indices, closed, directory=OUT, durations=None):
                     'coordinateSpace': 'decoded-video-canvas'}) for k, i in enumerate(indices)]
     assert all(f['durationMs'] > 0 for f in frames)
     assert sum(f['durationMs'] for f in frames) == 3000
-    paths, normalization = normalize_frames(frames, processed['standingHeight'], 112,
-        directory / 'normalized', bounds_paths=keyed[:72], source_anchor=processed['anchor'])
-    paths, finish = finish_frames(paths, directory / 'finished', mode='gif', cell_width=128, cell_height=160)
-    for frame, path in zip(frames, paths):
-        frame['path'] = str(path)
-        with Image.open(path) as image:
-            assert image.getchannel('A').getbbox()
-            assert image.width <= 128 and image.height <= 160
     selection = {**processed['selection'], 'sampledFrameCount': 8, 'durationMs': 3000,
         'sourceDurationMs': 3000, 'sourceFrameCount': 72,
         'manualSourceFrameIndices': indices, 'closedBlinkSourceFrameIndices': closed,
@@ -145,17 +163,14 @@ def finalize(indices, closed, directory=OUT, durations=None):
     if durations is not None:
         selection.update(sampling='reviewed-low-motion-source-frames-retimed',
             playbackDurationsMs=durations, sourceSampleBoundariesMs=selection.pop('sampleBoundariesMs'))
-    record = dict(name='idle_S', direction='S', state='idle',
-        sourceSha256=sha(result['path']), baseSha256=sha(BASE), requestId=result['receipt']['requestId'],
-        frames=frames, normalization=normalization, finish=finish, selection=selection,
-        source=processed['source'], processingReport=processed['files'],
-        generationCheckpoint=str(OUT / 'checkpoint.json'), take='quiet-selection' if durations is not None else 'breathing-v1',
-        sourceVideoPath=result['path'], processingRoot=str(OUT / 'processing'))
+    record = prepare_record(frames, processed, result, directory, selection,
+                            'quiet-selection' if durations is not None else 'breathing-v1')
     save(directory / 'complete.json', record)
     preview = processing._preview(frames, directory, True)
     save(directory / 'selected-preview.json', preview)
-    contacts(paths, 'finished', size=(216, 345), directory=directory)
+    contacts([f['path'] for f in frames], 'finished', size=(216, 345), directory=directory)
     verify_originals()
+    publish_record(OUT.parent, directory / 'complete.json')
     print('COMPLETE', str(directory / 'complete.json'), flush=True)
 
 
@@ -164,9 +179,10 @@ if __name__ == '__main__':
     parser.add_argument('stage', choices=['generate', 'finalize', 'quieten'])
     parser.add_argument('--indices', type=lambda s: [int(i) for i in s.split(',')])
     parser.add_argument('--closed', type=lambda s: [int(i) for i in s.split(',')])
+    parser.add_argument('--project-id')
     args = parser.parse_args()
     OUT.mkdir(parents=True, exist_ok=True)
-    vp.s.DATA = OUT
+    target_project(OUT.parent, args.project_id)
     if args.stage == 'generate':
         generate()
     elif args.stage == 'quieten':

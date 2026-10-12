@@ -17,7 +17,8 @@ sys.path.insert(0, str(ROOT))
 from alignment.pipeline import _engine
 from alignment.animation_exports import _sheet, write_animation_formats
 from adapters.spritegen.video_finish import finish_frames
-from services.api import store as s
+from adapters.spritegen.video_processing import _write
+from scripts.project_library import target_project, publish_delivery
 
 PALETTE = [(176, 121, 67), (201, 148, 82), (228, 178, 108),
            (244, 200, 130), (255, 224, 162), (255, 240, 192)]
@@ -105,12 +106,7 @@ def restore_w_blink(source, target, clip):
     normalized = Image.new('RGBA', scaled.size); normalized.alpha_composite(scaled)
     folder = target/'source-resampling/idle_W'; folder.mkdir(parents=True)
     normalized_path = folder/'frame-0039.png'; normalized.save(normalized_path)
-    previous_data = s.DATA
-    try:
-        s.DATA = target
-        paths, _ = finish_frames([normalized_path], folder/'finished', mode='gif', cell_width=128, cell_height=160)
-    finally:
-        s.DATA = previous_data
+    paths, _ = finish_frames([normalized_path], folder/'finished', mode='gif', cell_width=128, cell_height=160, save_metadata=_write)
     cell = Image.new('RGBA', (128, 160))
     anchor = recipe['anchor']; cell.alpha_composite(Image.open(paths[0]).convert('RGBA'), (round(64-anchor['x']), round(148-anchor['y'])))
     previous = clip['sourceFrameIndices'][slot]; clip['sourceFrameIndices'][slot] = frame_index
@@ -153,6 +149,7 @@ def replace_motion(record_path, clip):
 
 
 def run(source, target, idle_s_record=None, walk_e_record=None):
+    target_project(source.resolve().parent)
     source, target = source.resolve(), target.resolve()
     if target == source or target.is_relative_to(source) or source.is_relative_to(target):
         raise ValueError('Use a separate sibling output directory')
@@ -168,7 +165,7 @@ def run(source, target, idle_s_record=None, walk_e_record=None):
     for item in source.iterdir():
         if item.name in ('animations', 'cleric-atlas.png', 'cleric-atlas.json', 'cleric-manifest.json',
                          'verification.json', 'browser-verification.json', 'visual-review.json',
-                         'pixi-preview.png', 'all-motion-review.png'):
+                         'pixi-preview.png', 'all-motion-review.png', 'library-publication.json'):
             continue
         if item.is_dir():
             shutil.copytree(item, target/item.name)
@@ -286,15 +283,18 @@ def run(source, target, idle_s_record=None, walk_e_record=None):
         '`http://127.0.0.1:8784/`를 엽니다. 방향키/WASD로 이동하고 키를 놓으면 대기합니다. '
         'PixiJS 번들과 MIT 라이선스를 포함합니다. 브라우저 검증은 실행 후 별도 기록됩니다.\n')
     assert sha(source/'cleric-atlas.png') == original_sha
+    publication = publish_delivery(source.resolve().parent, target)
     print(json.dumps({'status': 'passed', 'source': str(source), 'output': str(target),
-                      'frames': len(cells), 'sha256': manifest['atlasSha256']}))
+                      'frames': len(cells), 'sha256': manifest['atlasSha256'], 'library': publication}))
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--source', type=Path, default=ROOT/'output/cleric-quarterview-8way/delivery')
     parser.add_argument('--out', type=Path, required=True)
+    parser.add_argument('--project-id', help='Reuse the source run binding, or bind it explicitly')
     parser.add_argument('--idle-s-record', type=Path, help='Preserved complete.json of the new S idle Grok take')
     parser.add_argument('--walk-e-record', type=Path, help='Preserved complete.json of the right-hand E walk Grok take')
     args = parser.parse_args()
+    target_project(args.source.resolve().parent, args.project_id)
     run(args.source, args.out, args.idle_s_record, args.walk_e_record)

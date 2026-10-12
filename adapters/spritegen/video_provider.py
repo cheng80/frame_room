@@ -92,7 +92,8 @@ def checkpoint_state(job):
     return {'outcomeUnknown':saved.get('phase')=='submitting' and not saved.get('requestId'),
             'resumable':bool(saved.get('requestId') or saved.get('videoId')),'videoId':saved.get('videoId')}
 
-def generate(source,work,params,checkpoint,request_hash,on_progress=lambda *_:None,*,credential=None,call=None,download=None,sleep=None,job_id=None):
+def generate(source,work,params,checkpoint,request_hash,on_progress=lambda *_:None,*,credential=None,call=None,download=None,sleep=None,job_id=None,save_checkpoint=None):
+    write_checkpoint=save_checkpoint or (lambda path,value:s.atomic_bytes(path,s.dumps(value).encode()))
     _engine()
     from sprite_gen.gen import video
     from .video_processing import prepare_still,build_motion_prompt
@@ -110,7 +111,7 @@ def generate(source,work,params,checkpoint,request_hash,on_progress=lambda *_:No
             if saved.get('receipt',{}).get('sha256') not in (None,meta['sha256']): raise ProviderError('VIDEO_CHECKPOINT_HASH','받은 영상의 해시가 다릅니다.')
             receipt=saved.get('receipt') or dict(providerId='grok-video',model=params['model'],modelSource='request',authSource='grok-login',requestId=saved['requestId'],sha256=meta['sha256'],durationRequested=params['durationSeconds'],resolutionRequested=params['resolution'],downloadRecovered=True)
             saved.update(phase='downloaded',receipt=receipt)
-            s.atomic_bytes(checkpoint,s.dumps(saved).encode())
+            write_checkpoint(checkpoint,saved)
             return {'path':local,'receipt':receipt,'preparation':saved.get('preparation'),'prompt':saved.get('prompt')}
     if saved and not saved.get('requestId'):
         if saved.get('phase')=='submitting': raise ProviderError('PROVIDER_OUTCOME_UNKNOWN','영상 접수 여부가 불명확합니다. 자동 재전송하지 않습니다.',outcome_unknown=True)
@@ -125,7 +126,7 @@ def generate(source,work,params,checkpoint,request_hash,on_progress=lambda *_:No
     prompt=build_motion_prompt(params)
     state=saved or {'requestHash':request_hash,'phase':'prepared','postCount':0,'authSource':'grok-login','createdAt':s.now()}
     state.update(localPath=str((work/'original.mp4').resolve()),preparation=preparation,prompt=prompt)
-    def save(): s.atomic_bytes(checkpoint,s.dumps(state).encode())
+    def save(): write_checkpoint(checkpoint,state)
     save()
     def guarded(method,url,token,body=None):
         if method=='POST':

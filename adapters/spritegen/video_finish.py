@@ -12,7 +12,7 @@ from services.api import store as s
 from .video_processing import _engine
 
 
-def finish_frames(paths, directory, *, mode, cell_width, cell_height):
+def finish_frames(paths, directory, *, mode, cell_width, cell_height, save_metadata=None):
     if mode not in ('gif', 'rgba'):
         raise s.AppError('VIDEO_FINISH', '색상 마무리 설정을 확인하세요.')
     directory = Path(directory)
@@ -47,5 +47,5 @@ def finish_frames(paths, directory, *, mode, cell_width, cell_height):
         target = directory / source.name
         rgba.save(target)
         results.append(target)
-    s.atomic_bytes(directory / 'finish.json', s.dumps(recipe).encode())
+    (save_metadata or (lambda path,value:s.atomic_bytes(path,s.dumps(value).encode())))(directory / 'finish.json', recipe)
     return results, recipe
