@@ -253,8 +253,14 @@ def test_delete_project_removes_records_preserves_shared_assets_and_other_projec
     assert deleted_artifacts and len(deleted_jobs)>=2
     assert c.get(url+'/revisions').json()['revisions']
     assert c.get('/v1/exports/'+exported['exportId']).status_code==200
+    root=s.project_folder(pid);other_root=s.project_folder(other['projectId'])
+    other_bytes={path:path.read_bytes() for path in other_root.rglob('*') if path.is_file()}
+    assert (root/'project.sqlite3').is_file() and any((root/'outputs').rglob('*'))
     response=c.request('DELETE',url,json={'expectedRevision':p['revision']})
-    assert response.status_code==200 and response.json()=={'deletedProjectId':pid}
+    assert response.status_code==200 and response.json()=={'deletedProjectId':pid,'folderDeleted':True}
+    # The project's own folder (sources, history DB, jobs, outputs) is gone; nothing beside it remains.
+    assert not root.exists() and not [x for x in root.parent.iterdir() if x.name.startswith('.'+root.name)]
+    assert {path:path.read_bytes() for path in other_root.rglob('*') if path.is_file() and path.name not in ('project.json','project.sqlite3')}=={k:v for k,v in other_bytes.items() if k.name not in ('project.json','project.sqlite3')}
     assert {item['projectId'] for item in c.get('/v1/projects').json()['projects']}=={other['projectId']}
     for suffix in ('','/revisions','/jobs','/exports'):
         response=c.get(url+suffix)
@@ -367,9 +373,11 @@ def test_delete_project_rolls_back_all_dependent_deletes(client):
     run_job(response.json()['jobId']);before=deletion_state()
     with s.connect() as db:
         db.execute("CREATE TRIGGER reject_project_delete BEFORE DELETE ON projects BEGIN SELECT RAISE(ABORT, 'injected delete failure'); END")
+    root=s.project_folder(p['projectId']);folder_before={x:x.read_bytes() for x in root.rglob('*') if x.is_file()}
     with pytest.raises(sqlite3.IntegrityError,match='injected delete failure'):
         c.request('DELETE','/v1/projects/'+p['projectId'],json={'expectedRevision':p['revision']})
     assert deletion_state()==before
+    assert {x:x.read_bytes() for x in root.rglob('*') if x.is_file()}==folder_before
 
 
 @pytest.mark.parametrize('completed',[False,True])

@@ -7,7 +7,9 @@ from __future__ import annotations
 
 import io
 import json
+import os
 from pathlib import Path
+import shutil
 import sqlite3
 import subprocess
 
@@ -196,8 +198,8 @@ def test_cleanup_rechecks_preview_and_atomically_rejects_changed_second_item(mak
 
 
 @pytest.mark.parametrize('status', ['queued', 'running', 'cancel_requested'])
-@pytest.mark.parametrize('operation', ['cleanup', 'detach'])
-def test_active_job_refuses_detach_or_cleanup_without_changes(make_project, isolated_store, status, operation):
+@pytest.mark.parametrize('operation', ['cleanup', 'delete'])
+def test_active_job_refuses_delete_or_cleanup_without_changes(make_project, isolated_store, status, operation):
     first, active = make_project('정상 대상'), make_project('진행 작업')
     with s.transaction() as db:
         job = s.get_job(active['jobId'], db)
@@ -211,7 +213,7 @@ def test_active_job_refuses_detach_or_cleanup_without_changes(make_project, isol
         if operation == 'cleanup':
             folders.cleanup_missing([item_for(first), item_for(active)])
         else:
-            folders.detach_project(active['pid'], active['project']['revision'])
+            folders.delete_project(active['pid'], active['project']['revision'])
     assert error.value.code == 'PROJECT_BUSY' and error.value.status == 409
     assert (index_state(), [tree_bytes(root) for root in roots]) == before
 
@@ -236,16 +238,13 @@ def test_missing_preview_excludes_damaged_files_inside_existing_folder(make_proj
     assert (index_state(), tree_bytes(project['path'])) == before
 
 
-def test_detach_preserves_complete_folder_and_reopen_restores_history_and_outputs(make_project, isolated_store):
-    project = make_project('보관 후 재열기')
+def test_moved_folder_reopens_at_new_location_with_history_and_outputs(make_project, isolated_store):
+    project = make_project('이동 후 재열기')
     original = project['project']
     folder = project['path']
     rows_before = rows_for_project(project['pid'])
     files_before = tree_bytes(folder)
-    assert folders.detach_project(project['pid'], original['revision']) == {'deletedProjectId': project['pid']}
-    assert tree_bytes(folder) == files_before
-    assert all(not rows for rows in rows_for_project(project['pid']).values())
-    assert index_state()['assets'] == [] and index_state()['videos'] == []
+    # Safe move: no delete. Opening the moved folder replaces the missing registration.
     moved = move_away(project, isolated_store)
     reopened = folders.open_project(str(moved / 'project.json'))
     assert {key: value for key, value in reopened.items() if key != 'storage'} == original
@@ -323,3 +322,251 @@ def test_cleanup_rolls_back_after_late_sql_failure(make_project, isolated_store)
     with pytest.raises(sqlite3.IntegrityError, match='injected cleanup failure'):
         folders.cleanup_missing([item_for(first), item_for(second)])
     assert (index_state(), [tree_bytes(root) for root in roots]) == before
+
+
+def leftovers(record):
+    return [x.name for x in record['path'].parent.iterdir() if x.name.startswith('.' + record['path'].name)]
+
+
+def test_delete_removes_own_folder_and_index_preserves_other_project_and_moved_copy(make_project, isolated_store):
+    removed, kept = make_project('삭제 대상'), make_project('다른 프로젝트')
+    backup = isolated_store / 'user-backup-copy'
+    shutil.copytree(removed['path'], backup)
+    before_kept, backup_bytes = (rows_for_project(kept['pid']), tree_bytes(kept['path'])), tree_bytes(backup)
+    assert folders.delete_project(removed['pid'], removed['project']['revision']) == {'deletedProjectId': removed['pid'], 'folderDeleted': True}
+    assert not removed['path'].exists() and leftovers(removed) == []
+    assert all(not rows for rows in rows_for_project(removed['pid']).values())
+    assert (rows_for_project(kept['pid']), tree_bytes(kept['path'])) == before_kept
+    assert tree_bytes(backup) == backup_bytes
+
+
+@pytest.mark.parametrize('ready', [1, 0])
+def test_delete_missing_folder_with_pending_outbox_never_recreates_it(make_project, isolated_store, ready):
+    project = make_project('이미 없는 폴더')
+    moved = move_away(project, isolated_store)
+    moved_bytes = tree_bytes(moved)
+    with s.connect() as db:
+        db.execute('INSERT INTO folder_sync VALUES (?)', (project['pid'],))
+        db.execute('UPDATE project_folders SET ready=? WHERE project_id=?', (ready, project['pid']))
+    assert folders.delete_project(project['pid'], project['project']['revision'])['folderDeleted'] is False
+    assert not project['path'].exists() and leftovers(project) == []
+    assert all(not rows for rows in rows_for_project(project['pid']).values())
+    assert tree_bytes(moved) == moved_bytes
+
+
+@pytest.mark.parametrize('change,code', [
+    ('symlink-root', 'PROJECT_DELETE_UNSAFE'), ('symlink-ancestor', 'PROJECT_DELETE_UNSAFE'),
+    ('other-marker', 'PROJECT_FOLDER_MISMATCH'), ('no-marker', 'PROJECT_DELETE_UNSAFE'),
+    ('file', 'PROJECT_DELETE_UNSAFE'), ('nested-registered', 'PROJECT_DELETE_UNSAFE'),
+    ('nested-copy', 'PROJECT_DELETE_UNSAFE'), ('read-only', 'PROJECT_DELETE_UNSAFE'),
+])
+def test_delete_refuses_unrelated_or_unsafe_folder_without_changes(make_project, isolated_store, change, code):
+    target, other = make_project('검증 대상'), make_project('다른 대상')
+    root, watched = target['path'], isolated_store
+    if change == 'symlink-root':
+        real = move_away(target, isolated_store)
+        root.symlink_to(real, target_is_directory=True)
+    elif change == 'symlink-ancestor':
+        parent = root.parent
+        parent.rename(parent.with_name('projects-real'))
+        parent.symlink_to(parent.with_name('projects-real'), target_is_directory=True)
+    elif change == 'other-marker':
+        marker = json.loads((root / 'project.json').read_text())
+        (root / 'project.json').write_text(json.dumps({**marker, 'projectId': other['pid']}))
+    elif change == 'no-marker':
+        (root / 'project.json').unlink()
+    elif change == 'file':
+        move_away(target, isolated_store)
+        root.write_bytes(b'not a project folder')
+    elif change == 'nested-registered':
+        nested = root / 'kept-inside'
+        other['path'].rename(nested)
+        folders.open_project(str(nested))
+    elif change == 'nested-copy':
+        shutil.copytree(other['path'], root / 'outputs' / 'backup-copy')
+    else:
+        (root / 'videos').chmod(0o555)
+    before = index_state(), {p.relative_to(watched).as_posix(): (p.is_symlink(), None if p.is_symlink() or not p.is_file() else p.read_bytes()) for p in watched.rglob('*') if 'app-index/app.sqlite3' not in p.as_posix()}
+    try:
+        with pytest.raises(s.AppError) as error:
+            folders.delete_project(target['pid'], target['project']['revision'])
+        assert error.value.code == code and error.value.status == 409
+        after = index_state(), {p.relative_to(watched).as_posix(): (p.is_symlink(), None if p.is_symlink() or not p.is_file() else p.read_bytes()) for p in watched.rglob('*') if 'app-index/app.sqlite3' not in p.as_posix()}
+        assert after == before
+    finally:
+        if change == 'read-only':
+            (root / 'videos').chmod(0o755)
+
+
+def test_commit_failure_leaves_folder_bytes_and_index_unchanged(make_project, isolated_store, monkeypatch):
+    project = make_project('커밋 실패')
+    before = index_state(), tree_bytes(project['path'])
+    def failing_commit(self):
+        raise sqlite3.OperationalError('injected commit failure')
+    # A scoped patch: monkeypatch.undo() would also restore the isolated s.DATA.
+    with monkeypatch.context() as patch:
+        patch.setattr(s.StoreConnection, 'commit', failing_commit)
+        with pytest.raises(sqlite3.OperationalError, match='injected commit failure'):
+            folders.delete_project(project['pid'], project['project']['revision'])
+    # Before commit the folder was only renamed aside, so nothing was deleted.
+    assert (index_state(), tree_bytes(project['path'])) == before and leftovers(project) == []
+    assert folders.delete_project(project['pid'], project['project']['revision'])['folderDeleted']
+    assert not project['path'].exists()
+
+
+@pytest.mark.parametrize('retry', ['delete', 'startup'])
+def test_post_commit_removal_failure_is_reported_and_retried_only_on_quarantine(make_project, isolated_store, monkeypatch, retry):
+    project = make_project('삭제 후 실패')
+    original = shutil.rmtree
+    def flaky(path, *args, **kwargs):
+        original(Path(path) / 'videos')  # Some bytes are really gone before the failure.
+        raise PermissionError('injected removal failure')
+    monkeypatch.setattr(folders.shutil, 'rmtree', flaky)
+    with pytest.raises(s.AppError) as error:
+        folders.delete_project(project['pid'], project['project']['revision'])
+    assert error.value.code == 'PROJECT_DELETE_INCOMPLETE' and error.value.status == 503
+    staged = Path(error.value.details['leftoverPath'])
+    assert staged.parent == project['path'].parent and staged.name.startswith('.' + project['path'].name + '.deleting-')
+    assert staged.is_dir() and not (staged / 'videos').exists() and not project['path'].exists()
+    assert all(not rows for rows in rows_for_project(project['pid']).values())  # No false "still listed".
+    with s.connect() as db:
+        record = json.loads(db.execute('SELECT value FROM meta WHERE key=?', ('project_delete:' + project['pid'],)).fetchone()[0])
+    assert record == {'path': str(staged), 'dev': staged.lstat().st_dev, 'ino': staged.lstat().st_ino}
+    # A folder that reappears at the original path is never a retry target.
+    shutil.copytree(project['path'].parent / staged.name, project['path'])
+    reappeared = tree_bytes(project['path'])
+    monkeypatch.setattr(folders.shutil, 'rmtree', original)
+    if retry == 'delete':
+        assert folders.delete_project(project['pid'], project['project']['revision']) == {'deletedProjectId': project['pid'], 'folderDeleted': True}
+    else:
+        s.init()
+    assert not staged.exists() and tree_bytes(project['path']) == reappeared
+    with s.connect() as db:
+        assert db.execute("SELECT 1 FROM meta WHERE key LIKE 'project_delete:%'").fetchone() is None
+
+
+@pytest.mark.parametrize('registered', [True, False])
+def test_retry_preserves_project_moved_into_quarantine(make_project, isolated_store, monkeypatch, registered):
+    project, other = make_project('대기 폴더 재시도'), make_project('대기 폴더 안 프로젝트')
+    with monkeypatch.context() as patch:
+        patch.setattr(folders.shutil, 'rmtree', lambda *args, **kwargs: (_ for _ in ()).throw(PermissionError('injected removal failure')))
+        with pytest.raises(s.AppError) as error:
+            folders.delete_project(project['pid'], project['project']['revision'])
+    staged = Path(error.value.details['leftoverPath'])
+    nested = staged / 'moved-in'
+    other['path'].rename(nested)
+    if registered:
+        folders.open_project(str(nested))
+    before, record = tree_bytes(nested), json.dumps(index_state(), default=str)
+    for retry in (lambda: folders.delete_project(project['pid'], project['project']['revision']), folders.finish_pending_deletions):
+        try:
+            retry()
+        except s.AppError as exc:
+            assert exc.code == 'PROJECT_DELETE_UNSAFE'
+        assert tree_bytes(nested) == before and json.dumps(index_state(), default=str) == record
+    if registered:
+        assert s.project_folder(other['pid']) == nested
+
+
+@pytest.mark.parametrize('replacement', ['other-folder', 'symlink', 'file', 'symlink-ancestor'])
+@pytest.mark.parametrize('retry', ['delete', 'startup'])
+def test_retry_never_deletes_replaced_quarantine(make_project, isolated_store, monkeypatch, replacement, retry):
+    project = make_project('대기 폴더 교체')
+    original = shutil.rmtree
+    def flaky(path, *args, **kwargs):
+        original(Path(path) / 'videos')
+        (Path(path) / 'project.json').unlink(missing_ok=True)  # Partial removal can take the marker too.
+        raise PermissionError('injected removal failure')
+    with monkeypatch.context() as patch:
+        patch.setattr(folders.shutil, 'rmtree', flaky)
+        with pytest.raises(s.AppError) as error:
+            folders.delete_project(project['pid'], project['project']['revision'])
+    staged = Path(error.value.details['leftoverPath'])
+    parent = staged.parent
+    unrelated = isolated_store / 'unrelated-user-folder'
+    unrelated.mkdir()
+    (unrelated / 'keep.txt').write_bytes(b'unrelated bytes')
+    if replacement == 'other-folder':
+        staged.rename(isolated_store / 'real-quarantine')
+        unrelated.rename(staged)
+        watched = staged
+    elif replacement == 'symlink':
+        original(staged)
+        staged.symlink_to(unrelated, target_is_directory=True)
+        watched = unrelated
+    elif replacement == 'file':
+        original(staged)
+        staged.write_bytes(b'unrelated file')
+        watched = unrelated
+    else:
+        parent.rename(parent.with_name('projects-real'))
+        parent.symlink_to(parent.with_name('projects-real'), target_is_directory=True)
+        watched = parent.with_name('projects-real')
+    before = tree_bytes(watched), staged.read_bytes() if replacement == 'file' else None
+    with s.connect() as db:
+        record = db.execute('SELECT value FROM meta WHERE key=?', ('project_delete:' + project['pid'],)).fetchone()
+    if retry == 'delete':
+        with pytest.raises(s.AppError) as refused:
+            folders.delete_project(project['pid'], project['project']['revision'])
+        assert refused.value.code == 'PROJECT_DELETE_UNSAFE' and refused.value.status == 409
+    else:
+        s.init()
+    assert (tree_bytes(watched), staged.read_bytes() if replacement == 'file' else None) == before
+    assert os.path.lexists(staged)
+    with s.connect() as db:  # The owner record stays so nothing is silently forgotten.
+        assert db.execute('SELECT value FROM meta WHERE key=?', ('project_delete:' + project['pid'],)).fetchone() == record
+
+
+@pytest.mark.parametrize('other_copy', [True, False, 'linked-root'])
+def test_delete_repoints_or_protects_resource_still_needed_by_other_project(make_project, isolated_store, other_copy):
+    removed, kept = make_project('공유 원본 삭제'), make_project('공유 원본 사용')
+    shared = removed['historical']
+    with s.transaction() as db:
+        p = s.get_project(kept['pid'], db)
+        p['assets'].append(shared)
+        s.write_project(db, p, '다른 프로젝트 원본 참조')
+    copy = kept['path'] / folders.resource_name('assets', shared['assetId'], shared)
+    assert copy.is_file()
+    with s.connect() as db:  # The shared index row may still point at the removed project's copy.
+        db.execute('UPDATE assets SET path=? WHERE id=?', (s.stored_path(removed['path'] / folders.resource_name('assets', shared['assetId'], shared)), shared['assetId']))
+    if other_copy is not True:
+        copy.unlink()
+        if other_copy == 'linked-root':  # Another registered root is itself an alias of the removed root.
+            with s.connect() as db:
+                db.execute('UPDATE project_folders SET path=? WHERE project_id=?', (str(isolated_store / 'alias'), kept['pid']))
+            (isolated_store / 'alias').symlink_to(removed['path'], target_is_directory=True)
+        before = index_state(), tree_bytes(removed['path'])
+        with pytest.raises(s.AppError) as error:
+            folders.delete_project(removed['pid'], removed['project']['revision'])
+        assert error.value.code == 'PROJECT_RESOURCE_SHARED'
+        assert (index_state(), tree_bytes(removed['path'])) == before
+        return
+    folders.delete_project(removed['pid'], removed['project']['revision'])
+    assert not removed['path'].exists()
+    with s.project_scope(kept['pid']):
+        assert s.asset_path(shared['assetId']) == copy
+    assert s.asset_path(shared['assetId']) == copy
+
+
+def test_delete_refuses_copy_reached_through_linked_folder_of_other_project(isolated_store):
+    removed, kept = s.create_project('공유 원본 삭제', '테스트'), s.create_project('링크 폴더', '테스트')
+    with s.project_scope(removed['projectId']), s.transaction() as db:
+        p = s.get_project(removed['projectId'], db)
+        shared = s.register_asset(png((10, 20, 30, 255)), 'shared.png', c=db)
+        p['assets'].append(shared)
+        s.write_project(db, p, '원본')
+    with s.project_scope(kept['projectId']), s.transaction() as db:
+        p = s.get_project(kept['projectId'], db)
+        p['assets'].append(shared)
+        s.write_project(db, p, '다른 프로젝트 원본 참조')
+    removed_root, kept_root = s.project_folder(removed['projectId']), s.project_folder(kept['projectId'])
+    # The other folder's assets directory is a link back to the only original.
+    shutil.rmtree(kept_root / 'assets')
+    (kept_root / 'assets').symlink_to(removed_root / 'assets', target_is_directory=True)
+    with s.connect() as db:
+        db.execute('UPDATE assets SET path=? WHERE id=?', (s.stored_path(removed_root / folders.resource_name('assets', shared['assetId'], shared)), shared['assetId']))
+    before = index_state(), tree_bytes(removed_root)
+    with pytest.raises(s.AppError) as error:
+        folders.delete_project(removed['projectId'], s.get_project(removed['projectId'])['revision'])
+    assert error.value.code == 'PROJECT_RESOURCE_SHARED'
+    assert (index_state(), tree_bytes(removed_root)) == before

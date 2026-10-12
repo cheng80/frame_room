@@ -88,7 +88,7 @@ export function useStudio(standalone=false){
    setJobs([]);setExports([]);setRevisions([]);jobStates.current='';
   }
   let failed=false;for(const id of ids){try{localStorage.removeItem(`frame-room-draft:${id}`);}catch{failed=true;}}
-  if(failed)setError('목록에서는 제거했지만 이 브라우저에 보관된 일부 초안을 지우지 못했습니다.');
+  if(failed)setError('목록 등록은 정리했지만 이 브라우저에 보관된 일부 초안을 지우지 못했습니다.');
  }
  async function missingProjectFolders(){
   return run(async()=>{const result=await api<{projects:MissingProjectFolder[]}>('/project-folders/missing');return result.projects;});
@@ -106,19 +106,28 @@ export function useStudio(standalone=false){
  }
  async function deleteProject(project:Snapshot){
   return run(async()=>{
-   try{await api(`/projects/${project.projectId}`,'DELETE',{expectedRevision:project.revision});}
+   let result:{folderDeleted:boolean}|null=null;
+   try{result=await api(`/projects/${project.projectId}`,'DELETE',{expectedRevision:project.revision});}
    catch(e){
-    // Another window may already have detached it. Clear only this project's local state.
+    // Registration is gone but part of the folder remains; the server retries that quarantine.
+    if(e instanceof ApiError&&e.code==='PROJECT_DELETE_INCOMPLETE'){
+     forgetProjects([project.projectId]);
+     setError(`${e.message} 남은 폴더: ${(e.details as {leftoverPath?:string}|null)?.leftoverPath??''}`);
+     return true;
+    }
+    // Another window may already have deleted it. Clear only this project's local state.
     if(!(e instanceof ApiError&&e.status===404&&e.code==='PROJECT_NOT_FOUND')){
-     if(e instanceof ApiError&&e.status===409){
+     if(e instanceof ApiError&&(e.status===409||e.status===503)){
       await refreshProjects().catch(()=>{});
-      if(e.code==='REVISION_CONFLICT')throw new Error('프로젝트가 변경되어 목록에서 제거하지 않았습니다. 다시 확인한 뒤 제거해 주세요.');
+      if(e.code==='REVISION_CONFLICT')throw new Error('프로젝트가 변경되어 삭제하지 않았습니다. 다시 확인한 뒤 삭제해 주세요.');
      }
      throw e;
     }
    }
    forgetProjects([project.projectId]);
-   setNotice(`“${project.name}” 프로젝트를 목록에서 제거했습니다. 폴더의 데이터는 모두 유지됩니다.`);
+   setNotice(!result?`“${project.name}” 프로젝트는 이미 삭제되었습니다. 이 브라우저의 초안을 정리했습니다.`
+    :result.folderDeleted?`“${project.name}” 프로젝트와 프로젝트 폴더(원본·편집 이력·작업·출력 파일)를 삭제했습니다.`
+    :`“${project.name}” 프로젝트 폴더가 이미 없어 목록 등록과 이 브라우저의 초안만 지웠습니다.`);
    return true;
   });
  }
