@@ -10,7 +10,7 @@ vi.mock('react', async original => ({
   useState: (initial: unknown) => hooks.current.state(initial),
   useEffect: () => undefined,
 }));
-import {ImageGenerationStep} from '../src/SourceSteps';
+import {ImageGenerationStep} from '../src/GenerationStep';
 import {VideoBasePreset} from '../src/VideoBasePreset';
 
 type Node = ReactElement<any>;
@@ -26,7 +26,7 @@ function text(tree: any): string {
 }
 class Harness {
   slots: any[] = []; cursor = 0; tree: any;
-  constructor(public s: Studio, public assetMode = false) { this.render(); }
+  constructor(public s: Studio, public assetMode = false, public initialReferenceRevisionId?: string) { this.render(); }
   state(initial: unknown) {
     const index = this.cursor++;
     this.slots[index] ??= {value: typeof initial === 'function' ? initial() : initial};
@@ -34,7 +34,7 @@ class Harness {
       this.slots[index].value = typeof next === 'function' ? next(this.slots[index].value) : next;
     }];
   }
-  render() { this.cursor = 0; hooks.current = this; this.tree = ImageGenerationStep({s: this.s, assetMode: this.assetMode}); hooks.current = null; }
+  render() { this.cursor = 0; hooks.current = this; this.tree = ImageGenerationStep({s: this.s, assetMode: this.assetMode, initialReferenceRevisionId: this.initialReferenceRevisionId}); hooks.current = null; }
   field(label: string) { return nodes(this.tree).find(n => n.props.label === label)!; }
   change(label: string, value: unknown) { this.field(label).props.onChange(value); this.render(); }
   videoBase(changes: object) {
@@ -108,6 +108,26 @@ describe('image preparation for Grok video', () => {
     expect(h.field('Grok 영상 사용').props.value).toBe('frames');
     await h.click('새 후보 생성');
     expect(s.job).toHaveBeenCalledExactlyOnceWith('generate', [], expect.objectContaining({prompt: 'Character standing', frameCount: 8, scope: 'states'}));
+  });
+  it('uses a selected saved draft reference for generation without creating approval records', async () => {
+    s.snapshot!.references = [
+      {referenceRevisionId: 'ref', identityAssetId: 'identity', approval: 'draft'},
+      {referenceRevisionId: 'saved', identityAssetId: 'identity', approval: 'draft'},
+    ] as any;
+    s.snapshot!.activeReferenceRevisionId = 'ref';
+    const h = new Harness(s);
+    h.change('이번 생성에 사용할 저장 기준', {target: {value: 'saved'}});
+    await h.click('새 후보 생성');
+    expect(s.job).toHaveBeenCalledExactlyOnceWith('generate', [], expect.objectContaining({referenceRevisionId: 'saved'}));
+    expect(s.edit).not.toHaveBeenCalled();
+  });
+  it('uses the selected clip reference before the project active reference', async () => {
+    s.snapshot!.references.push({referenceRevisionId: 'clip-reference', identityAssetId: 'clip-identity', approval: 'draft'} as any);
+    s.snapshot!.assets.push({assetId: 'clip-identity', url: '/clip.png'} as any);
+    const h = new Harness(s, false, 'clip-reference');
+    expect(h.field('이번 생성에 사용할 저장 기준').props.value).toBe('clip-reference');
+    await h.click('새 후보 생성');
+    expect(s.job).toHaveBeenCalledWith('generate', [], expect.objectContaining({referenceRevisionId: 'clip-reference'}));
   });
   it('submits one base picture with selected view, equipment and no effects, without a Grok request', async () => {
     const h = new Harness(s);

@@ -2,7 +2,7 @@ import {describe, expect, it} from 'vitest';
 import {assetProvenanceLabel} from '../src/assetProvenance';
 import type {Asset, Clip, Job, Snapshot, Video} from '../src/types';
 import {
-  approvedVideoReference, defaultVideoAssetId, defaultVideoProcessing, imageProviders,
+  videoReference, defaultVideoAssetId, defaultVideoProcessing, imageProviders,
   validateVideoUpload, VIDEO_UPLOAD_LIMIT, videoGenerationRequest, videoProcessingParams,
   videoProcessingRequest, videoProvenanceLabel, videoRetryLabel, type VideoGenerationSettings,
   videoBeforeFinishSnapshot, videoClipColorLabel, videoJobStep, videoRangeBoundary,
@@ -73,11 +73,11 @@ describe('video request boundaries', () => {
     expect(videoGenerationRequest(snapshot, {...generation(), bodyPlan: ' the rider=biped; the horse=quadruped ', equipment: ' sword:right; shield:left '}, defaultVideoProcessing()).params)
       .toMatchObject({bodyPlan: 'the rider=biped; the horse=quadruped', equipment: 'sword:right; shield:left'});
   });
-  it('defaults to an approved identity even when the active reference is a draft', () => {
-    expect(defaultVideoAssetId(snapshot)).toBe('approved');
-    expect(approvedVideoReference(snapshot)?.referenceRevisionId).toBe('ref');
+  it('defaults to the active saved identity even when its reference is a draft', () => {
+    expect(defaultVideoAssetId(snapshot)).toBe('unreviewed');
+    expect(videoReference(snapshot)?.referenceRevisionId).toBe('draft');
   });
-  it('builds exactly one generation operation with an approved reference and low default settings', () => {
+  it('builds exactly one generation operation with a saved reference and low default settings', () => {
     expect(videoGenerationRequest(snapshot, generation(), defaultVideoProcessing())).toEqual({
       operation: 'generate_video', assetIds: ['approved'], params: {
         state: 'walk', key: 'auto', loopMode: 'auto', maxFrames: 8, bodyHeight: 94, cellWidth: 64, cellHeight: 128, finishMode: 'gif', repairMode: 'off', between: 'auto', startFoot: 'auto',
@@ -86,10 +86,19 @@ describe('video request boundaries', () => {
       },
     });
   });
-  it('does not attach an unrelated or unapproved reference when another image is selected', () => {
-    const request = videoGenerationRequest(snapshot, {...generation(), assetId: 'unreviewed'}, defaultVideoProcessing());
+  it('does not attach an unrelated reference when an image has no saved reference', () => {
+    const project = {...snapshot, assets: [...snapshot.assets, {assetId: 'plain'}]};
+    const request = videoGenerationRequest(project, {...generation(), assetId: 'plain'}, defaultVideoProcessing());
     expect(request.params).not.toHaveProperty('referenceRevisionId');
-    expect(request.assetIds).toEqual(['unreviewed']);
+    expect(request.assetIds).toEqual(['plain']);
+  });
+  it('attaches a saved draft reference to a video request and its batch without changing project records', () => {
+    const before = structuredClone(snapshot);
+    const settings = {...generation(), assetId: 'unreviewed'};
+    const request = videoGenerationRequest(snapshot, settings, defaultVideoProcessing());
+    expect(request.params.referenceRevisionId).toBe('draft');
+    expect(videoBatchRequest(snapshot, [videoBatchItem(snapshot, settings, defaultVideoProcessing())], 'key').items[0].params.referenceRevisionId).toBe('draft');
+    expect(snapshot).toEqual(before);
   });
   it.each(['gif', 'rgba'] as const)('sends %s color finishing into the actual generate and process requests', finishMode => {
     const settings = {...defaultVideoProcessing(), finishMode};
@@ -156,7 +165,7 @@ describe('video request boundaries', () => {
     expect(() => videoGenerationRequest(snapshot, {...generation(), model: 'other'}, defaultVideoProcessing())).toThrow();
   });
   it('supports schema 1 projects without videos and rejects stale video/image IDs', () => {
-    expect(defaultVideoAssetId({...snapshot, videos: undefined})).toBe('approved');
+    expect(defaultVideoAssetId({...snapshot, videos: undefined})).toBe('unreviewed');
     expect(() => videoProcessingRequest({...snapshot, videos: undefined}, 'v', defaultVideoProcessing())).toThrow();
     expect(() => videoGenerationRequest(snapshot, {...generation(), assetId: 'gone'}, defaultVideoProcessing())).toThrow();
   });
@@ -190,10 +199,10 @@ describe('atomic video batch planning', () => {
     expect(() => videoBatchRequest(snapshot, Array(17).fill(item), 'key')).toThrow('1~16');
     expect(() => videoBatchRequest(snapshot, [], 'key')).toThrow('1~16');
   });
-  it('requires current project assets and valid captured reference approval before first submission', () => {
+  it('requires current project assets and a valid captured reference before first submission', () => {
     const item = videoBatchItem(snapshot, generation(), defaultVideoProcessing());
     expect(() => videoBatchRequest({...snapshot, assets: []}, [item], 'key')).toThrow('기준 이미지');
-    expect(() => videoBatchRequest({...snapshot, references: []}, [item], 'key')).toThrow('승인');
+    expect(() => videoBatchRequest({...snapshot, references: []}, [item], 'key')).toThrow('기준 그림이 프로젝트에서 변경되었습니다');
     expect(() => videoBatchRequest(snapshot, [item], '')).toThrow('식별자');
   });
 });

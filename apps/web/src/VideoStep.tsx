@@ -1,5 +1,5 @@
 import {assetLabel} from './assetProvenance';
-import {useId, useMemo, useRef, useState, type FormEvent} from 'react';
+import {useEffect, useId, useMemo, useRef, useState, type FormEvent} from 'react';
 import {api} from './api';
 import {EditorCanvas} from './Canvas';
 import {VideoBatchPlan} from './VideoBatchPlan';
@@ -8,7 +8,7 @@ import type {Studio} from './useStudio';
 import type {Snapshot, Video} from './types';
 import {Empty, Field, Input, Select} from './ui';
 import {
-  approvedVideoReference, defaultVideoAssetId, defaultVideoProcessing, isVideoJob,
+  videoReference, defaultVideoAssetId, defaultVideoProcessing, isVideoJob,
   validateVideoUpload, VIDEO_DIRECTIONS, VIDEO_MODELS, VIDEO_STATES, videoGenerationRequest,
   videoProcessingRequest, videoProvenanceLabel, type VideoGenerationSettings, type VideoProcessingSettings,
   videoBeforeFinishSnapshot, videoClipColorLabel, videoRangeBoundary, videoRangeSource, videoHasExactTimes,
@@ -16,9 +16,10 @@ import {
 } from './videoWorkflow';
 import {stripViewInstructions} from './viewDirection';
 import {BodyPlanField} from './BodyPlanField';
+import {SpriteImage,SpriteViewport} from './SpriteViewport';
 import './video-tools.css';
 
-export function VideoStep({s, onSelectClip}: {s: Studio; onSelectClip?: (clipId: string) => void}) {
+export function VideoStep({s, onSelectClip, initialReferenceRevisionId}: {s: Studio; onSelectClip?: (clipId: string) => void; initialReferenceRevisionId?: string}) {
   const p = s.snapshot!;
   const id = useId();
   const fileInput = useRef<HTMLInputElement>(null);
@@ -26,10 +27,13 @@ export function VideoStep({s, onSelectClip}: {s: Studio; onSelectClip?: (clipId:
   const submitting = useRef(false);
   const [pane, setPane] = useState<'preview' | 'settings'>('settings');
   const [mode, setMode] = useState<'generate' | 'process'>('generate');
+  const initialReference = p.references.find(r => r.referenceRevisionId === initialReferenceRevisionId);
+  const initialAssetId = initialReference?.identityAssetId ?? defaultVideoAssetId(p);
   const [generation, setGeneration] = useState<VideoGenerationSettings>(() => ({
-    assetId: defaultVideoAssetId(p), model: VIDEO_MODELS[0].id, durationSeconds: '3', resolution: '480p',
-    ...videoAssetSettings(p, defaultVideoAssetId(p)), motionPrompt: '',
+    assetId: initialAssetId, model: VIDEO_MODELS[0].id, durationSeconds: '3', resolution: '480p',
+    ...videoAssetSettings(p, initialAssetId), motionPrompt: '',
   }));
+  const [selectedReferenceRevisionId, setSelectedReferenceRevisionId] = useState(initialReference?.referenceRevisionId ?? videoReference(p, initialAssetId)?.referenceRevisionId ?? '');
   const [processing, setProcessing] = useState(defaultVideoProcessing);
   const [videoId, setVideoId] = useState('');
   const [spillReference, setSpillReference] = useState({videoId: '', assetId: ''});
@@ -48,7 +52,7 @@ export function VideoStep({s, onSelectClip}: {s: Studio; onSelectClip?: (clipId:
     'referenceAssetId' in videoProvenance && typeof videoProvenance.referenceAssetId === 'string' && !!videoProvenance.referenceAssetId;
   const missingSpillReference = !!spillReferenceAssetId && !p.assets.some(a => a.assetId === spillReferenceAssetId);
   const asset = p.assets.find(a => a.assetId === generation.assetId);
-  const reference = approvedVideoReference(p, generation.assetId);
+  const reference = videoReference(p, generation.assetId);
   const provider = s.providers.find(item => item.providerId === 'grok-video' && item.mediaKind === 'video');
   const rife = provider?.capabilities?.rife;
   const rifeAvailable = rife?.available === true;
@@ -73,6 +77,18 @@ export function VideoStep({s, onSelectClip}: {s: Studio; onSelectClip?: (clipId:
   const missingMatchClip = !!processing.matchClipId && !matchClips.some(clip => clip.clipId === processing.matchClipId);
   const setGenerationField = <K extends keyof VideoGenerationSettings>(key: K, value: VideoGenerationSettings[K]) => setGeneration(previous => ({...previous, [key]: value}));
   const setProcessingField = <K extends keyof VideoProcessingSettings>(key: K, value: VideoProcessingSettings[K]) => setProcessing(previous => ({...previous, [key]: value}));
+
+  useEffect(() => {
+    const reference = p.references.find(r => r.referenceRevisionId === initialReferenceRevisionId);
+    if (!reference) return;
+    setSelectedReferenceRevisionId(reference.referenceRevisionId);
+    setGeneration(previous => ({...previous, assetId: reference.identityAssetId}));
+  }, [initialReferenceRevisionId]);
+
+  function chooseGenerationAsset(assetId: string) {
+    setGeneration(previous => ({...previous, assetId, ...videoAssetSettings(p, assetId)}));
+    setSelectedReferenceRevisionId(videoReference(p, assetId)?.referenceRevisionId ?? '');
+  }
 
   function changeMode(next: 'generate' | 'process') {
     setMode(next); setError('');
@@ -122,6 +138,9 @@ export function VideoStep({s, onSelectClip}: {s: Studio; onSelectClip?: (clipId:
       const request = mode === 'generate'
         ? videoGenerationRequest(p, generation, processing)
         : videoProcessingRequest(p, video?.videoId ?? '', {...processing, spillReferenceAssetId});
+      if (mode === 'generate' && selectedReferenceRevisionId && p.references.some(reference => reference.referenceRevisionId === selectedReferenceRevisionId && reference.identityAssetId === generation.assetId)) {
+        (request.params as Record<string, unknown>).referenceRevisionId = selectedReferenceRevisionId;
+      }
       submitting.current = true;
       const result = await s.job(request.operation, request.assetIds, request.params);
       if (result) setPane('preview');
@@ -152,8 +171,8 @@ export function VideoStep({s, onSelectClip}: {s: Studio; onSelectClip?: (clipId:
         <h2 className="source-tool-heading">{mode === 'generate' ? '영상에 사용할 기준 이미지' : '보관된 원본 영상'}</h2>
         <div className="source-tool-scroll">
           {mode === 'generate' ? <>
-            {asset ? <div className="video-reference checker"><img src={asset.url} alt={`영상 기준 · ${assetLabel(asset)}`}/></div> : <Empty title="기준 이미지를 선택해 주세요"/>}
-            {asset ? <p className="caption">{assetLabel(asset)} · {reference ? '승인된 외형 기준 사용' : '선택한 이미지 사용'}</p> : null}
+            {asset ? <SpriteImage src={asset.url} alt={`영상 기준 · ${assetLabel(asset)}`} width={asset.width} height={asset.height} className="video-reference checker"/> : <Empty title="기준 이미지를 선택해 주세요"/>}
+            {asset ? <p className="caption">{assetLabel(asset)} · {reference ? '저장된 외형 기준 사용' : '선택한 이미지 사용'}</p> : null}
             {reference?.fixedTraits ? <p className="video-traits">{stripViewInstructions(reference.fixedTraits)}</p> : null}
           </> : <>
             <Select label="처리할 원본 영상" value={video?.videoId ?? ''} onChange={e => chooseVideo(e.target.value)}>
@@ -161,7 +180,7 @@ export function VideoStep({s, onSelectClip}: {s: Studio; onSelectClip?: (clipId:
               {videos.map(v => <option key={v.videoId} value={v.videoId}>{v.originalFilename} · {(v.durationMs / 1000).toFixed(2)}초</option>)}
             </Select>
             {video ? <>
-              <video ref={originalPlayer} key={video.videoId} className="video-original" src={video.url} controls playsInline preload="metadata" aria-label={`원본 영상 · ${video.originalFilename}`}/>
+              <SpriteViewport width={video.width} height={video.height} label={`원본 영상 · ${video.originalFilename}`} className="video-original-viewport"><video ref={originalPlayer} key={video.videoId} className="video-original" src={video.url} controls playsInline preload="metadata" aria-label={`원본 영상 · ${video.originalFilename}`}/></SpriteViewport>
               <p className="caption">{videoProvenanceLabel(video)} · {video.width} × {video.height} · {video.fps.toFixed(2)}fps · {video.frameCount}프레임</p>
               <a className="button" href={video.url} download={video.originalFilename}>원본 MP4 다운로드</a>
               <div className="video-range-actions" role="group" aria-label="영상 위치로 추출 구간 지정">
@@ -178,7 +197,7 @@ export function VideoStep({s, onSelectClip}: {s: Studio; onSelectClip?: (clipId:
               {clips.map(c => <option key={c.clipId} value={c.clipId}>{c.name} · {c.occurrences.length}프레임</option>)}
             </Select>
             {mode === 'generate' && resultVideo ? <details className="video-result-source"><summary>이 동작의 원본 영상과 비교</summary>
-              <video key={resultVideo.videoId} className="video-original" src={resultVideo.url} controls playsInline preload="metadata" aria-label={`결과의 원본 영상 · ${resultVideo.originalFilename}`}/>
+              <SpriteViewport width={resultVideo.width} height={resultVideo.height} label={`결과의 원본 영상 · ${resultVideo.originalFilename}`} className="video-original-viewport"><video key={resultVideo.videoId} className="video-original" src={resultVideo.url} controls playsInline preload="metadata" aria-label={`결과의 원본 영상 · ${resultVideo.originalFilename}`}/></SpriteViewport>
               <p className="caption">{videoProvenanceLabel(resultVideo)} · {resultVideo.originalFilename}</p>
             </details> : null}
             <p className="video-color-info">{colorLabel}</p>
@@ -190,7 +209,7 @@ export function VideoStep({s, onSelectClip}: {s: Studio; onSelectClip?: (clipId:
               <EditorCanvas key={selectedClip.clipId} snapshot={comparing ? beforeFinish! : p} clip={selectedClip} selected={occurrenceId} onSelect={setOccurrenceId}/>
             </div>
             <p className="caption">{comparing ? '마무리 전 PNG에 같은 정렬·편집값을 적용한 비교 화면입니다. 저장된 후보는 바뀌지 않습니다.' : '현재 PNG 후보를 편집 캔버스로 재생합니다. 저장된 색상과 현재 정렬·픽셀 편집·재생 시간이 반영됩니다.'}</p>
-            <p className="caption">{selectedClip.occurrences.reduce((sum, o) => sum + o.durationMs, 0)}ms · 원본의 표시 시간 유지 · 후보·앵커·반복 검수 필요</p>
+            <p className="caption">{selectedClip.occurrences.reduce((sum, o) => sum + o.durationMs, 0)}ms · 원본의 표시 시간 유지 · 후보·앵커·반복 상태 확인</p>
             <Select label="결과 동작의 재생 종료" value={selectedClip.loop ? 'loop' : 'once'} disabled={s.busy || !!s.conflict || active} onChange={e => s.edit({type: 'updateClip', clipId: selectedClip.clipId, changes: {loop: e.target.value === 'loop', endBehavior: 'hold-last'}})}>
               <option value="loop">끝에서 처음으로 반복</option><option value="once">한 번 재생 · 마지막 프레임 유지</option>
             </Select>
@@ -212,10 +231,11 @@ export function VideoStep({s, onSelectClip}: {s: Studio; onSelectClip?: (clipId:
           <h2 className="source-tool-heading">{mode === 'generate' ? '생성 설정 · 1회 요청' : '후보 추출 · 추가 생성 없음'}</h2>
           <div className="source-tool-scroll">
             {mode === 'generate' ? <>
-              <Select label="기준 이미지" value={generation.assetId} required onChange={e => setGeneration(previous => ({...previous, assetId: e.target.value, ...videoAssetSettings(p, e.target.value)}))}>
+              <Select label="기준 이미지" value={generation.assetId} required onChange={e => chooseGenerationAsset(e.target.value)}>
                 <option value="">이미지 선택</option>
-                {p.assets.map(a => <option key={a.assetId} value={a.assetId}>{assetLabel(a)}{approvedVideoReference(p, a.assetId) ? ' · 승인 기준' : ''}</option>)}
+                {p.assets.map(a => <option key={a.assetId} value={a.assetId}>{assetLabel(a)}{videoReference(p, a.assetId) ? ' · 저장 기준' : ''}</option>)}
               </Select>
+              <p className="caption">프로젝트의 active 기준 그림을 기본으로 선택합니다. 다른 이미지를 고르면 해당 이미지에 연결된 저장 기준을 사용합니다.</p>
               <Select label="영상 모델" value={generation.model} onChange={e => setGenerationField('model', e.target.value)}>
                 {VIDEO_MODELS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
               </Select>
@@ -330,7 +350,7 @@ export function VideoStep({s, onSelectClip}: {s: Studio; onSelectClip?: (clipId:
               {numericField('cellWidth', '셀 너비 (px)', 32, 1024)}
               {numericField('cellHeight', '셀 높이 (px)', 32, 1024)}
             </div>
-            <p className="caption">선택 구간에서 순서대로 추출하며 표시 시간을 유지합니다. 새 후보와 동작은 검수 대기로 추가됩니다.</p>
+            <p className="caption">선택 구간에서 순서대로 추출하며 표시 시간을 유지합니다. 새 후보와 동작을 프로젝트에 추가합니다.</p>
             {mode === 'process' ? <p className="caption">보관된 원본을 다시 사용합니다. 모델 호출 없이 구간·배경·크기를 조정할 수 있습니다.</p> : null}
             <VideoBatchPlan key={p.projectId} s={s} generation={generation} processing={processing} available={available} active={active} visible={mode === 'generate'} onSubmitted={() => {setPane('preview'); setAllJobs(true);}}/>
           </div>

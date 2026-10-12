@@ -57,7 +57,7 @@ describe('review invalidation contract shared with the API',()=>{
   expect(result.clips[0].occurrences[0].transform).toMatchObject({dx:3,scaleX:1});expect(result.clips[0].occurrences[0].durationMs).toBe(100);expect(result.outline.mode).toBe('preview-only');
  });
 });
-describe('export approval and selection gates',()=>{
+describe('export structure and selection gates',()=>{
  const ready=()=>structuredClone(transitions.snapshot) as unknown as Snapshot;
  it('accepts approved selection and blocks missing or duplicate clip IDs',()=>{
   expect(exportGates(ready(),['c'],false)).toEqual([]);
@@ -67,17 +67,17 @@ describe('export approval and selection gates',()=>{
  });
  it('blocks stale anchors even when approved and requires the proper group',()=>{
   const s=ready();s.alignments.f.groupRevisionId='stale';
-  expect(exportGates(s,['c'],false).join(' ')).toContain('현재 정렬 기준의 앵커 승인');
+  expect(exportGates(s,['c'],false).join(' ')).toContain('현재 크기·발 정렬');
   s.alignments.f.groupRevisionId='gr';s.frames[0].nativeScaleGroupId='missing';
-  expect(exportGates(s,['c'],false).join(' ')).toContain('현재 정렬 기준의 앵커 승인');
+  expect(exportGates(s,['c'],false).join(' ')).toContain('현재 크기·발 정렬');
  });
  it('blocks stale FPS duration and permits explicit duration',()=>{
   const s=ready();s.clips[0].occurrences[0].durationMs=90;
   expect(exportGates(s,['c'],false).join(' ')).toContain('FPS와 표시 시간이 다릅니다.');
   s.clips[0].occurrences[0].timingMode='explicit';expect(exportGates(s,['c'],false)).toEqual([]);
  });
- it('reapproval alone cannot bypass missing frame and anchor approvals',()=>{
+ it('accepts pending records without rewriting legacy approval values',()=>{
   const s=ready();s.frames[0].review='pending';s.alignments.f.approval='pending';
-  const issues=exportGates(s,['c'],false).join(' ');expect(issues).toContain('후보 수동 승인');expect(issues).toContain('앵커 승인');
+  s.clips[0].review='pending';s.references[0].approval='draft';const before=structuredClone(s);expect(exportGates(s,['c'],false)).toEqual([]);expect(s).toEqual(before);
  });
 });

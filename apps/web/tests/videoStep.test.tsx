@@ -9,12 +9,14 @@ vi.mock('react', async original => ({
   ...await original<typeof import('react')>(),
   useState: (initial: unknown) => hooks.current.state(initial),
   useRef: (initial: unknown) => hooks.current.ref(initial),
+  useEffect: () => undefined,
   useId: () => 'video-test',
   useMemo: (factory: () => unknown) => factory(),
 }));
 vi.mock('../src/api', async original => ({...await original<typeof import('../src/api')>(), api: vi.fn()}));
 import {api, ApiError} from '../src/api';
 import {VideoStep} from '../src/VideoStep';
+import {GenerationStep,ImageGenerationStep} from '../src/GenerationStep';
 import {JobCard} from '../src/FinishSteps';
 import {EditorCanvas} from '../src/Canvas';
 import {VideoBatchPlan} from '../src/VideoBatchPlan';
@@ -37,13 +39,13 @@ function text(tree: any): string {
 }
 class Harness {
   slots: any[] = []; cursor = 0; tree: any;
-  constructor(public s: Studio, public onSelectClip = vi.fn(), public customRender?: () => Node) { this.render(); }
+  constructor(public s: Studio, public onSelectClip = vi.fn(), public customRender?: () => Node, public initialReferenceRevisionId?: string) { this.render(); }
   state(initial: unknown) {
     const i = this.cursor++, slot = this.slots[i] ??= {value: typeof initial === 'function' ? initial() : initial};
     return [slot.value, (next: any) => { slot.value = typeof next === 'function' ? next(slot.value) : next; }];
   }
   ref(value: unknown) { return this.slots[this.cursor++] ??= {current: value}; }
-  render() { this.cursor = 0; hooks.current = this; this.tree = this.customRender ? this.customRender() : VideoStep({s: this.s, onSelectClip: this.onSelectClip}); hooks.current = null; }
+  render() { this.cursor = 0; hooks.current = this; this.tree = this.customRender ? this.customRender() : VideoStep({s: this.s, onSelectClip: this.onSelectClip, initialReferenceRevisionId: this.initialReferenceRevisionId}); hooks.current = null; }
   button(label: string) {
     const node = nodes(this.tree).find(n => n.type === 'button' && text(n) === label);
     if (!node) throw new Error(`No button: ${label}`); return node;
@@ -198,6 +200,17 @@ describe('video batch controls', () => {
 afterEach(() => vi.restoreAllMocks());
 
 describe('video source tool events', () => {
+  it('keeps both generation forms mounted while switching modes', () => {
+    const h = new Harness(s, vi.fn(), () => GenerationStep({s, initialReferenceRevisionId: 'reference-1'}));
+    const panels=()=>nodes(h.tree).filter(n=>n.props.className==='generation-mode-panel');
+    const keys=()=>panels().map(panel=>(panel.props.children as Node).key);
+    expect(keys()).toEqual(['project:image','project:video']);
+    expect(panels().map(panel=>panel.props.hidden)).toEqual([false,true]);
+    h.button('영상으로 만들기').props.onClick();h.render();
+    expect(keys()).toEqual(['project:image','project:video']);
+    expect(panels().map(panel=>panel.props.hidden)).toEqual([true,false]);
+    expect((panels()[0].props.children as Node).props.initialReferenceRevisionId).toBe('reference-1');
+  });
   it('prominently defaults to eight and lets twelve or a manual count replace only the next request', async () => {
     const original = structuredClone(s.snapshot), h = new Harness(s);
     expect(text(h.tree)).toContain('한 주기 기본 8장');
@@ -243,13 +256,24 @@ describe('video source tool events', () => {
     await h.click('현재 위치를 시작으로'); expect(h.field('시작 프레임 · 포함').props.value).toBe('1');
     expect(s.job).not.toHaveBeenCalled();
   });
-  it('shows cost-sensitive choices before one generation and supplies its approved base image', async () => {
+  it('uses the active saved base image without requiring manual approval', async () => {
+    s.snapshot!.references[0].approval = 'draft';
     const h = new Harness(s);
     expect(text(h.tree)).toContain('Grok Pro · 3초 · 480p · 생성 1회');
+    expect(text(h.tree)).toContain('저장된 외형 기준 사용');
     expect(h.field('기준 이미지').props.value).toBe('image-1');
     await h.submit();
     expect(s.job).toHaveBeenCalledOnce();
     expect(s.job).toHaveBeenCalledWith('generate_video', ['image-1'], expect.objectContaining({referenceRevisionId: 'reference-1', durationSeconds: 3, resolution: '480p', maxFrames: 8, bodyHeight: 94, cellWidth: 64, cellHeight: 128, finishMode: 'gif'}));
+    expect(text(h.tree)).not.toContain('승인');
+  });
+  it('starts from the selected clip reference instead of the project active reference', async () => {
+    s.snapshot!.references.push({referenceRevisionId: 'clip-reference', identityAssetId: 'clip-image', approval: 'draft'} as any);
+    s.snapshot!.assets.push({assetId: 'clip-image', originalFilename: 'clip.png', url: '/clip.png'} as any);
+    const h = new Harness(s, vi.fn(), undefined, 'clip-reference');
+    expect(h.field('기준 이미지').props.value).toBe('clip-image');
+    await h.submit();
+    expect(s.job).toHaveBeenCalledWith('generate_video', ['clip-image'], expect.objectContaining({referenceRevisionId: 'clip-reference'}));
   });
   it('defaults to GIF-equivalent PNG colors and sends RGBA only when selected', async () => {
     const h = new Harness(s);

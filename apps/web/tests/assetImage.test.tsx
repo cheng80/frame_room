@@ -9,6 +9,7 @@ vi.mock('../src/VideoStep',()=>({VideoStep:()=>null}));
 import {AssetNameInput} from '../src/AssetNameInput';
 import {AssetsStep} from '../src/SourceSteps';
 import {EditorDialog} from '../src/EditorDialog';
+import {SpriteImage} from '../src/SpriteViewport';
 import {applyDraft} from '../src/draft';
 
 type Node=ReactElement<any>;
@@ -61,12 +62,12 @@ describe('asset image names and preview',()=>{
   expect(nodes(h.tree).some(n=>n.props['aria-label']==='자료 이미지 크게 보기 · 직접 이름')).toBe(true);
   const original=structuredClone(s.snapshot!.assets);
   h.click('자료 이미지 크게 보기 · sprite.png');
-  expect(h.dialog).toBeDefined();expect(text(h.dialog)).toContain('원본 파일: sprite.png · 32 × 24');expect(text(h.dialog)).toContain('가져온 원본');expect(nodes(h.dialog).some(n=>n.type==='img'&&n.props.src==='/assets/a.png')).toBe(true);
+  expect(h.dialog).toBeDefined();expect(text(h.dialog)).toContain('원본 파일: sprite.png · 32 × 24');expect(text(h.dialog)).toContain('가져온 원본');expect(nodes(h.dialog).some(n=>n.type===SpriteImage&&n.props.src==='/assets/a.png'&&n.props.width===32&&n.props.height===24)).toBe(true);
   h.dialog!.props.onClose();h.render();expect(h.dialog).toBeUndefined();
   const details=h.find(n=>n.type==='details'&&String(n.props.className).includes('source-tool-video-results'));
   for(const video of videos){
    h.click(`자료 이미지 크게 보기 · ${video.originalFilename}`);
-   expect(h.dialog).toBeDefined();expect(nodes(h.dialog).some(n=>n.type==='img'&&n.props.src===video.url)).toBe(true);
+   expect(h.dialog).toBeDefined();expect(nodes(h.dialog).some(n=>n.type===SpriteImage&&n.props.src===video.url)).toBe(true);
    h.dialog!.props.onClose();h.render();
   }
   expect(text(details)).toContain('영상 처리 결과');expect(s.snapshot!.assets).toEqual(original);

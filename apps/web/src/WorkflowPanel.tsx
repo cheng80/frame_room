@@ -8,7 +8,7 @@ export function InspectionPanel({s,clip,onNavigate}:{s:Studio;clip?:Clip;onNavig
  const p=s.snapshot!,report=inspectionState(p,s.jobs,!!s.commands.length||!!s.conflict,clip?.clipId);
  const unavailable=s.busy||!!s.commands.length||!!s.conflict||!clip?.occurrences.length||s.service?.worker!=='ready'||report.state==='running';
  return <section className="workflow-inspection" aria-label="자동 검사 결과">
-  <PropertyHeading title="자동 검사" description="저장된 동작의 픽셀·셀 경계·구조 문제를 검사합니다. 초안을 먼저 저장해야 하며, 검사 후 편집하면 이전 보고서는 과거 결과가 됩니다. 외형과 동작의 품질은 직접 확인하세요."/><p className="caption">픽셀·경계·구조 검사입니다. 외형과 동작의 예술적 품질, 수동 승인을 대신하지 않습니다.</p>
+  <PropertyHeading title="자동 검사" description="저장된 동작의 픽셀·셀 경계·구조 문제를 검사합니다. 초안을 먼저 저장해야 하며, 검사 후 편집하면 이전 보고서는 과거 결과가 됩니다. 외형과 동작의 품질은 직접 확인하세요."/><p className="caption">픽셀·경계·구조 검사입니다. 외형과 동작의 품질은 미리보기를 보며 확인하세요.</p>
   <p role="status" className={`workflow-status ${report.state==='current'&&!report.issues.length?'success-text':''}`}>{report.label}</p>
   {report.job&&<small>검사 입력 v{report.job.inputRevision} · 현재 저장 v{p.revision}{s.commands.length?' + 미저장 초안':''}</small>}
   <button disabled={unavailable} onClick={()=>clip&&s.job('inspect',[],{clipIds:[clip.clipId]})}>선택 동작 자동 검사 실행</button>
@@ -18,7 +18,7 @@ export function InspectionPanel({s,clip,onNavigate}:{s:Studio;clip?:Clip;onNavig
    const c=p.clips.find(c=>c.clipId===issue.clipId),slot=c?.occurrences.findIndex(o=>o.occurrenceId===issue.occurrenceId)??-1;
    const candidate=p.frames.findIndex(f=>f.frameVersionId===issue.frameVersionId);
    const targetExists=(!issue.clipId||!!c)&&(!issue.occurrenceId||slot>=0)&&(!issue.frameVersionId||candidate>=0);
-   return <li key={issue.key}><strong>{issue.severity==='error'?'검사 오류':issue.severity==='warning'?'검사 경고':'수동 승인 조건'}</strong><p>{issue.message}</p><small>{c?.name}{slot>=0?` · 슬롯 ${slot+1}`:''}{candidate>=0?` · 후보 ${candidate+1}`:''}</small>{issue.location&&<small>{issue.location}</small>}{onNavigate&&<button disabled={!targetExists} onClick={()=>onNavigate(issue.target)}>{targetExists?'해당 프레임·도구로 이동':'현재 편집에서 찾을 수 없음'}</button>}<details><summary>검사 코드</summary><code>{issue.code}</code></details></li>;
+   return <li key={issue.key}><strong>{issue.severity==='error'?'검사 오류':issue.severity==='warning'?'검사 경고':'이전 승인 기록'}</strong><p>{issue.message}</p><small>{c?.name}{slot>=0?` · 슬롯 ${slot+1}`:''}{candidate>=0?` · 후보 ${candidate+1}`:''}</small>{issue.location&&<small>{issue.location}</small>}{onNavigate&&<button disabled={!targetExists} onClick={()=>onNavigate(issue.target)}>{targetExists?'해당 프레임·도구로 이동':'현재 편집에서 찾을 수 없음'}</button>}<details><summary>검사 코드</summary><code>{issue.code}</code></details></li>;
   })}</ul>}
  </section>;
 }

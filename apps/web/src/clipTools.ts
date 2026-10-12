@@ -96,4 +96,4 @@ export function regionFromDrag(start: [number, number], end: [number, number], w
   return [(x1 + x2) / 2, (y1 + y2) / 2, Math.abs(x1 - x2) / 2, Math.abs(y1 - y2) / 2];
 }
 export const frameStartMs = (durations: number[], index: number) => durations.slice(0, index).reduce((sum, duration) => sum + duration, 0);
-export const handedWarning = (report: HandedReport) => report.framesShown === 0 || report.verdict === 'inconclusive' ? '표식을 충분히 찾지 못해 판단할 수 없습니다. 표식 색과 기준 그림을 확인하세요.' : report.verdict === 'suspect' ? '장비 위치가 의심되는 프레임을 직접 확인하세요.' : '표식 색 기준으로 의심 항목이 없습니다. 수동 승인은 별도로 진행하세요.';
+export const handedWarning = (report: HandedReport) => report.framesShown === 0 || report.verdict === 'inconclusive' ? '표식을 충분히 찾지 못해 판단할 수 없습니다. 표식 색과 기준 그림을 확인하세요.' : report.verdict === 'suspect' ? '장비 위치가 의심되는 프레임을 직접 확인하세요.' : '표식 색 기준으로 의심 항목이 없습니다.';

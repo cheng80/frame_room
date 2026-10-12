@@ -6,6 +6,7 @@ import {AssetNameInput} from './AssetNameInput';
 import {EditorDialog} from './EditorDialog';
 import {Select,Empty} from './ui';
 import {SourceTool,SourcePane} from './SourceToolLayout';
+import {SpriteImage} from './SpriteViewport';
 
 export function AssetsStep({ s, onNext, onGenerate }: {
     s: Studio;
@@ -74,7 +75,7 @@ export function AssetsStep({ s, onNext, onGenerate }: {
       </details>}
       {!p.assets.length && <Empty title="등록한 이미지가 없습니다"><p>파일을 선택해 가져오세요. 완성 PNG는 생성 없이 편집할 수 있습니다.</p></Empty>}
       <EditorDialog open={!!previewAsset} title="자료 이미지 크게 보기" onClose={()=>setPreviewAssetId('')} className="asset-image-dialog" actions={<button type="button" disabled={s.busy||!s.commands.length||!!s.conflict} onClick={()=>s.save()}>저장</button>}>
-        {previewAsset&&<figure className="asset-image-full"><div className="checker"><img src={previewAsset.url} alt={assetLabel(previewAsset)}/></div><figcaption><AssetNameInput s={s} asset={previewAsset}/><strong>{assetLabel(previewAsset)}</strong><p>원본 파일: {previewAsset.originalFilename} · {previewAsset.width} × {previewAsset.height}</p><p>{assetProvenanceLabel(previewAsset,assetById,videoById).label}</p><p>이름을 바꾼 뒤 상단 저장으로 확정합니다. 원본 파일명과 이미지는 유지됩니다.</p></figcaption></figure>}
+        {previewAsset&&<figure className="asset-image-full"><SpriteImage src={previewAsset.url} alt={assetLabel(previewAsset)} width={previewAsset.width} height={previewAsset.height} className="asset-image-viewport"/><figcaption><AssetNameInput s={s} asset={previewAsset}/><strong>{assetLabel(previewAsset)}</strong><p>원본 파일: {previewAsset.originalFilename} · {previewAsset.width} × {previewAsset.height}</p><p>{assetProvenanceLabel(previewAsset,assetById,videoById).label}</p><p>이름을 바꾼 뒤 상단 저장으로 확정합니다. 원본 파일명과 이미지는 유지됩니다.</p></figcaption></figure>}
       </EditorDialog>
     </SourcePane>} settings={<SourcePane title="가져오기 설정" footer={<>
       {!!s.commands.length && <p className="warning">현재 초안을 저장한 뒤 파일을 가져와 주세요.</p>}

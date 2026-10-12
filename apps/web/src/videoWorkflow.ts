@@ -55,13 +55,13 @@ export const defaultVideoProcessing = (): VideoProcessingSettings => ({
   between: 'auto', startFoot: 'auto', startIndex: '', frameSelection: 'vision',
 });
 export const imageProviders = (providers: Provider[]) => providers.filter(p => p.mediaKind !== 'video');
-export function approvedVideoReference(snapshot: Snapshot, assetId?: string) {
-  const references = snapshot.references.filter(r => r.approval === 'approved' &&
+export function videoReference(snapshot: Snapshot, assetId?: string) {
+  const references = snapshot.references.filter(r =>
     (!assetId || r.identityAssetId === assetId) && snapshot.assets.some(a => a.assetId === r.identityAssetId));
   return references.find(r => r.referenceRevisionId === snapshot.activeReferenceRevisionId) ?? references.at(-1);
 }
 export function defaultVideoAssetId(snapshot: Snapshot) {
-  return approvedVideoReference(snapshot)?.identityAssetId ?? snapshot.assets[0]?.assetId ?? '';
+  return videoReference(snapshot)?.identityAssetId ?? snapshot.assets[0]?.assetId ?? '';
 }
 export function videoAssetSettings(snapshot: Snapshot, assetId: string): Pick<VideoGenerationSettings, 'direction' | 'facing' | 'bodyPlan' | 'equipment'> {
   const asset = snapshot.assets.find(a => a.assetId === assetId);
@@ -70,7 +70,7 @@ export function videoAssetSettings(snapshot: Snapshot, assetId: string): Pick<Vi
     (value as {generationVersionId?: string})?.generationVersionId === provenance.generationVersionId,
   ) as {requestSnapshot?: {params?: Record<string, unknown>}} | undefined : undefined;
   const params = generation?.requestSnapshot?.params;
-  const reference = approvedVideoReference(snapshot, assetId);
+  const reference = videoReference(snapshot, assetId);
   // Legacy base pictures recorded the view in their generated prompt, before viewDirection existed.
   const description = typeof params?.prompt === 'string' ? params.prompt : reference?.fixedTraits ?? '';
   const oldViews = [...description.matchAll(/앞 대각선(?: 45도)?|뒤 대각선(?: 45도)?|정확한 (?:오른쪽 |왼쪽 )?측면|정확한 정면|정확한 뒷면/g)];
@@ -149,7 +149,7 @@ export function videoGenerationRequest(snapshot: Snapshot, settings: VideoGenera
   const bodyPlan = (settings.bodyPlan ?? '').trim();
   const equipment = (settings.equipment ?? '').trim();
   validateMatchClip(snapshot, processing.matchClipId);
-  const reference = approvedVideoReference(snapshot, settings.assetId);
+  const reference = videoReference(snapshot, settings.assetId);
   return {
     operation: 'generate_video', assetIds: [settings.assetId],
     params: {
@@ -175,7 +175,7 @@ export function videoBatchRequest(snapshot: Snapshot, items: readonly VideoBatch
   if (!idempotencyKey.trim()) throw new Error('묶음 요청 식별자가 없습니다.');
   for (const item of items) {
     if (!snapshot.assets.some(asset => asset.assetId === item.assetId)) throw new Error('묶음에 담은 기준 이미지가 없습니다. 해당 항목을 제거한 뒤 다시 추가해 주세요.');
-    if (item.params.referenceRevisionId && !snapshot.references.some(reference => reference.referenceRevisionId === item.params.referenceRevisionId && reference.approval === 'approved' && reference.identityAssetId === item.assetId)) throw new Error('묶음에 담은 외형 기준의 승인이 달라졌습니다. 해당 항목을 다시 추가해 주세요.');
+    if (item.params.referenceRevisionId && !snapshot.references.some(reference => reference.referenceRevisionId === item.params.referenceRevisionId && reference.identityAssetId === item.assetId)) throw new Error('묶음에 담은 기준 그림이 프로젝트에서 변경되었습니다. 해당 항목을 다시 추가해 주세요.');
     if (typeof item.params.matchClipId === 'string') validateMatchClip(snapshot, item.params.matchClipId);
   }
   return {inputRevision: snapshot.revision, items: items.map(item => ({assetId: item.assetId, params: {...item.params}})), idempotencyKey};
@@ -209,10 +209,10 @@ const videoSteps: Record<string, string> = {
   prepare: '기준 이미지와 설정 준비', submit: '영상 생성 요청 접수', poll: '접수한 영상 생성 결과 조회',
   download: '완료된 원본 영상 저장', extract: '프레임 추출·배경 제거', select_cycle: '동작 구간 선택',
   finish_frames: '편집·출력용 색상과 투명도 마무리',
-  import_candidates: '새 후보와 동작 등록', complete: '완료 · 후보 검수 대기',
+  import_candidates: '새 후보와 동작 등록', complete: '완료 · 후보 등록됨',
 };
 export function videoJobStep(job: Job) {
-  if (job.status === 'needs_review') return '완료 · 후보 검수 대기';
+  if (job.status === 'needs_review') return '완료 · 후보 등록됨';
   if (['succeeded', 'completed'].includes(job.status)) return '처리 완료';
   return videoSteps[job.step || ''] || (job.status === 'queued' ? '처리 대기' : '작업 상태 확인');
 }

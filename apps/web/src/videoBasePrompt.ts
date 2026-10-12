@@ -18,7 +18,7 @@ export function buildVideoBasePrompt({direction, facing, pose, bodyPlan, equipme
     back_diagonal: `뒤 대각선 45도. 몸과 머리를 화면 위 ${side}으로 함께 돌린다. 얼굴을 숨기고 뒤돌아보지 않는다. 발끝은 화면 위 ${side} 대각선을 향하며 신발 뒤쪽이 보인다.`,
   };
   return [
-    '영상 시작용 2D 게임 캐릭터 그림 한 장. 승인된 참조의 외형·의상·색·머리·신체 비율·화풍을 유지한다.',
+    '영상 시작용 2D 게임 캐릭터 그림 한 장. 선택한 참조의 외형·의상·색·머리·신체 비율·화풍을 유지한다.',
     biped ? views[direction] : `${VIDEO_DIRECTIONS.find(view => view.id === direction)?.label}. 몸 전체가 같은 보기 방향을 유지한다.${['side', 'front_diagonal', 'back_diagonal'].includes(direction) ? ` 몸 전체는 ${side}을 향한다.` : ''}`,
     !biped ? `신체 구조: ${bodyPlan.trim()}. ${anatomy?.imageText ?? '각 대상은 지정한 구조와 지지 방식을 유지하고 없는 팔다리를 만들지 않는다.'} ${pose === 'walk' ? '자신의 구조에 맞는 자연스러운 이동 중간 자세.' : '자신의 구조에 맞는 편안한 대기 자세.'}` : pose === 'walk'
       ? '걷기의 중간 걸음 자세. 한 발은 자기 골반 바로 아래에 평평하게 딛고, 다른 발은 자기 골반 아래에서 무릎을 조금 굽혀 살짝 든다. 두 다리는 골반 너비로 떨어지고 사이에 빈틈이 보인다. 어깨와 골반은 선택한 방향을 유지하고 팔은 다리와 반대로 작게 움직인다.'

@@ -5,16 +5,16 @@ type RecordValue=Record<string,unknown>;
 const record=(value:unknown):RecordValue=>value&&typeof value==='object'&&!Array.isArray(value)?value as RecordValue:{};
 const rows=(value:unknown):RecordValue[]=>Array.isArray(value)?value.map(record):[];
 const str=(value:unknown)=>typeof value==='string'?value:undefined;
-export type WorkAction='save'|'conflict'|'assets'|'reference'|'extract'|'align'|'frame-review'|'clip-review'|'clip-settings'|'candidates'|'create-clip'|'inspect'|'export'|'pixel';
+export type WorkAction='save'|'conflict'|'assets'|'reference'|'extract'|'generate'|'align'|'frame-review'|'clip-review'|'clip-settings'|'candidates'|'create-clip'|'inspect'|'export'|'pixel';
 export interface WorkTarget {action:WorkAction;clipId?:string;frameVersionId?:string;occurrenceId?:string;assetId?:string}
 export interface WorkItem extends WorkTarget {id:string;label:string;detail:string}
 export interface InspectionIssue {key:string;code:string;message:string;severity:'error'|'warning'|'approval';clipId?:string;frameVersionId?:string;occurrenceId?:string;location?:string;target:WorkTarget}
-const approvalCodes=new Set(['FRAME_UNAPPROVED','ANCHOR_UNAPPROVED','CLIP_UNAPPROVED','REFERENCE_UNAPPROVED','BODY_MEASUREMENT_UNAPPROVED','STALE_ALIGNMENT','STALE_REFERENCE','STALE_BODY_SCALE']);
+const approvalCodes=new Set(['FRAME_UNAPPROVED','ANCHOR_UNAPPROVED','CLIP_UNAPPROVED','REFERENCE_UNAPPROVED','BODY_MEASUREMENT_UNAPPROVED']);
 
 export function approvalLabel(status:string,reason?:string){return status==='approved'?'수동 승인됨':status==='rejected'?'거절됨':reason?'변경 후 재확인 필요':'승인 대기';}
 
 export function issueTarget(code:string,ids:{clipId?:string;frameVersionId?:string;occurrenceId?:string;assetId?:string}):WorkTarget {
- const action:WorkAction=/ALPHA/.test(code)?'pixel':/ANCHOR|ALIGNMENT|BODY|SCALE|OVERFLOW|GEOMETRY/.test(code)?'align':/REFERENCE/.test(code)?'clip-settings':code==='FRAME_UNAPPROVED'?'frame-review':code==='CLIP_UNAPPROVED'?'clip-review':/EXTRACTION/.test(code)?'extract':/ASSET/.test(code)?'assets':'clip-settings';
+ const action:WorkAction=/ALPHA/.test(code)?'pixel':/ANCHOR|ALIGNMENT|BODY|SCALE|OVERFLOW|GEOMETRY/.test(code)?'align':/REFERENCE/.test(code)?'clip-settings':['FRAME_UNAPPROVED','FRAME_REJECTED'].includes(code)?'frame-review':code==='CLIP_UNAPPROVED'?'clip-review':/EXTRACTION/.test(code)?'extract':/ASSET/.test(code)?'assets':'clip-settings';
  return {action,...ids};
 }
 
@@ -63,24 +63,25 @@ export function nextWork(s:Snapshot,clip:Clip|undefined,dirty:boolean,jobs:Job[]
  const items:WorkItem[]=[];
  const add=(id:string,label:string,detail:string,target:WorkTarget)=>items.push({id,label,detail,...target});
  if(conflict)add('conflict','저장 충돌 해결','서버 버전과 보존된 초안을 비교하세요.',{action:'conflict'});
- else if(dirty)add('save','편집 초안 저장','검사와 동작 승인은 저장된 버전을 기준으로 합니다.',{action:'save'});
- if(!s.assets.length)add('assets','기준·원본 이미지 가져오기','제작할 캐릭터 자료를 먼저 등록하세요.',{action:'assets'});
- const reference=s.references.find(r=>r.referenceRevisionId===(clip?.referenceRevisionId||s.activeReferenceRevisionId)&&r.approval==='approved');
- if(!reference){const available=s.references.some(r=>r.approval==='approved');add('reference',available&&clip?'동작에 승인 기준 연결':'외형 기준 확인·승인',available&&clip?'슬롯 속성에서 이 동작의 기준 버전을 선택하세요.':'외형 기준에서 이미지와 고정 특징을 확인하세요.',{action:available&&clip?'clip-settings':'reference',clipId:clip?.clipId});}
- if(!s.frames.length&&s.assets.length)add('extract','원본에서 프레임 추출','프레임 나누기에서 영역을 확인하고 후보를 만드세요.',{action:'extract'});
- if(!clip)add('create','편집할 동작 만들기','라이브러리에서 동작을 만든 뒤 후보를 넣으세요.',{action:'create-clip'});
+ else if(dirty)add('save','편집 초안 저장','검사와 출력은 저장된 버전을 사용합니다.',{action:'save'});
+ if(!s.assets.length)add('assets','자료 가져오기','제작할 캐릭터 자료를 등록하세요.',{action:'assets'});
+ const reference=s.references.find(r=>r.referenceRevisionId===(clip?.referenceRevisionId||s.activeReferenceRevisionId));
+ if(!reference)add('reference','캐릭터 기준 연결','기준 이미지와 고정 특징을 정하고 동작에 연결하세요.',{action:s.references.length&&clip?'clip-settings':'reference',clipId:clip?.clipId});
+ if(!s.frames.length&&s.assets.length)add('extract','원본에서 프레임 추출','동작 만들기에서 기존 이미지의 영역을 나누세요.',{action:'extract'});
+ if(!clip)add('create','편집할 동작 만들기','프레임 편집에서 동작을 만든 뒤 후보를 넣으세요.',{action:'create-clip'});
  else if(!clip.occurrences.length)add('candidates','재생 순서에 후보 추가','후보를 선택하고 순서에 추가하세요.',{action:'candidates',clipId:clip.clipId});
  if(clip?.occurrences.length){
   const used=[...new Set(clip.occurrences.map(o=>o.frameVersionId))];
-  const pending=used.filter(id=>s.frames.find(f=>f.frameVersionId===id)?.review!=='approved');
-  const anchors=used.filter(id=>{const f=s.frames.find(f=>f.frameVersionId===id),a=s.alignments[id],g=s.alignmentGroups.find(g=>g.alignmentGroupId===f?.nativeScaleGroupId);return !g||a?.approval!=='approved'||a.groupRevisionId!==g.groupRevisionId;});
-  if(pending.length)add('frames',`사용 후보 ${pending.length}개 수동 승인`, '외형·장비·추출 영역을 확인하세요. 사용하지 않는 후보는 제외합니다.',{action:'frame-review',clipId:clip.clipId,frameVersionId:pending[0]});
-  if(anchors.length)add('anchors',`사용 후보 앵커 ${anchors.length}개 확인`, '공통 배율과 접지·공중 기준을 직접 확인하세요.',{action:'align',clipId:clip.clipId,frameVersionId:anchors[0]});
-  if(clip.review!=='approved')add('clip','동작 수동 승인', '관련 변경을 저장한 뒤 순서·시간·반복 체크리스트를 확인하세요.',{action:'clip-review',clipId:clip.clipId});
+  const anchors=used.filter(id=>{const f=s.frames.find(f=>f.frameVersionId===id),a=s.alignments[id],g=s.alignmentGroups.find(g=>g.alignmentGroupId===f?.nativeScaleGroupId&&g.frameVersionIds.includes(id));return !g||!a||a.frameVersionId!==id||a.groupRevisionId!==g.groupRevisionId;});
+  if(anchors.length)add('anchors',`사용 후보 ${anchors.length}개 정렬 확인`,'크기·발 정렬에서 현재 후보의 위치를 맞추세요.',{action:'align',clipId:clip.clipId,frameVersionId:anchors[0]});
+  const excluded=used.find(id=>s.frames.find(f=>f.frameVersionId===id)?.review==='rejected');
+  if(excluded)add('frames','제외한 후보 교체·다시 사용','후보 확인에서 제외 사유를 확인하세요.',{action:'frame-review',clipId:clip.clipId,frameVersionId:excluded});
   const inspection=inspectionState(s,jobs,dirty,clip.clipId);
-  if(inspection.state!=='current')add('inspect',inspection.label, '저장 후 선택 동작의 자동 검사를 실행하세요.',{action:'inspect',clipId:clip.clipId});
-  else if(inspection.issues.some(i=>i.severity!=='approval'))add('issues','자동 검사 문제 확인',inspection.label+' · 결과에서 해당 슬롯·도구로 이동할 수 있습니다.',{action:'inspect',clipId:clip.clipId});
-  if(!dirty&&!conflict&&reference&&!pending.length&&!anchors.length&&clip.review==='approved'&&!exportGates(s,[clip.clipId],false).length&&!inspection.issues.some(i=>i.severity==='error'))add('export','게임용 파일 출력','수동 승인 조건이 충족되었습니다. 출력 시 서버가 다시 검사합니다.',{action:'export',clipId:clip.clipId});
+  if(inspection.state!=='current')add('inspect',inspection.label,'저장 후 결과 확인에서 검사·미리보기를 만드세요.',{action:'inspect',clipId:clip.clipId});
+  else if(inspection.issues.some(i=>i.severity!=='approval'))add('issues','자동 검사 문제 확인',inspection.label+' · 해당 프레임으로 돌아가 수정할 수 있습니다.',{action:'inspect',clipId:clip.clipId});
+  const gates=exportGates(s,[clip.clipId],false);
+  if(gates.length&&!anchors.length&&!excluded&&reference)add('settings','동작 설정 확인',gates.join(' '),{action:'clip-settings',clipId:clip.clipId});
+  if(!dirty&&!conflict&&!gates.length&&inspection.state==='current'&&!inspection.issues.some(i=>i.severity==='error'))add('export','게임용 파일 출력','출력 시 서버가 파일·픽셀·경계를 다시 검사합니다.',{action:'export',clipId:clip.clipId});
  }
  return items;
 }

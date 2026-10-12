@@ -8,21 +8,24 @@ import {buildVideoBasePrompt,DEFAULT_VIDEO_BASE_SETTINGS,type VideoBaseSettings}
 import {imageProviders} from './videoWorkflow';
 import {stripViewInstructions} from './viewDirection';
 import {SourceTool,SourcePane} from './SourceToolLayout';
+import {SpriteImage} from './SpriteViewport';
 
-export function GenerationStep({ s, onSelectClip }: { s: Studio; onSelectClip?: (clipId: string) => void }) {
+export function GenerationStep({ s, onSelectClip, initialReferenceRevisionId }: { s: Studio; onSelectClip?: (clipId: string) => void; initialReferenceRevisionId?: string }) {
     const [mode, setMode] = useState<'image' | 'video'>('image');
     return <div className="generation-tool">
       <div className="generation-mode" role="group" aria-label="동작 생성 방식">
         <button type="button" aria-pressed={mode === 'image'} onClick={() => setMode('image')}>이미지로 만들기</button>
         <button type="button" aria-pressed={mode === 'video'} onClick={() => setMode('video')}>영상으로 만들기</button>
       </div>
-      {mode === 'video' ? <VideoStep key={s.snapshot!.projectId} s={s} onSelectClip={onSelectClip}/> : <ImageGenerationStep key={s.snapshot!.projectId} s={s}/>}
+      <div className="generation-mode-panel" hidden={mode !== 'image'}><ImageGenerationStep key={`${s.snapshot!.projectId}:image`} s={s} initialReferenceRevisionId={initialReferenceRevisionId}/></div>
+      <div className="generation-mode-panel" hidden={mode !== 'video'}><VideoStep key={`${s.snapshot!.projectId}:video`} s={s} onSelectClip={onSelectClip} initialReferenceRevisionId={initialReferenceRevisionId}/></div>
     </div>;
 }
-export function ImageGenerationStep({ s, assetMode = false, onBack }: {
+export function ImageGenerationStep({ s, assetMode = false, onBack, initialReferenceRevisionId }: {
     s: Studio;
     assetMode?: boolean;
     onBack?: () => void;
+    initialReferenceRevisionId?: string;
 }) {
     const p = s.snapshot!;
     const settings: Record<string, unknown> = assetMode ? {} : p.generationSettings;
@@ -52,7 +55,12 @@ export function ImageGenerationStep({ s, assetMode = false, onBack }: {
     const requestScope = assetMode ? 'asset' : grokVideo ? 'states' : scope;
     const provider = providers.find(p => p.providerId === providerId);
     const models = provider?.models || [];
-    const approved = p.references.some(r => r.referenceRevisionId === p.activeReferenceRevisionId && r.approval === 'approved');
+    const initialReferenceId = [initialReferenceRevisionId, settings.referenceRevisionId, p.activeReferenceRevisionId, p.references.at(-1)?.referenceRevisionId].find(id => typeof id === 'string' && p.references.some(r => r.referenceRevisionId === id));
+    const [referenceRevisionId, setReferenceRevisionId] = useState(String(initialReferenceId || ''));
+    useEffect(() => {
+        if (initialReferenceRevisionId && p.references.some(r => r.referenceRevisionId === initialReferenceRevisionId)) setReferenceRevisionId(initialReferenceRevisionId);
+    }, [initialReferenceRevisionId]);
+    const activeReference = p.references.find(r => r.referenceRevisionId === referenceRevisionId);
     const available = provider?.available !== false && provider?.loginReady !== false && !!provider;
     const singleFrame = assetMode || grokVideo || scope === 'frame' || frameCount === 1;
     useEffect(() => {
@@ -71,39 +79,41 @@ export function ImageGenerationStep({ s, assetMode = false, onBack }: {
         ...(!assetMode && provider?.capabilities?.resolution ? {resolution} : {}),
         ...(!assetMode && provider?.capabilities?.quality ? {quality} : {}),
         scope: requestScope,
+        ...(!assetMode && activeReference ? {referenceRevisionId: activeReference.referenceRevisionId} : {}),
         ...(requestScope === 'frame' ? {frameVersionId} : {}),
     };
-    const activeReference = p.references.find(r => r.referenceRevisionId === p.activeReferenceRevisionId && r.approval === 'approved');
     const identityAsset = p.assets.find(a => a.assetId === activeReference?.identityAssetId);
     const {viewDirection: _direction, viewFacing: _facing, bodyPlan: _body, equipment: _equipment, ...savedParams} = params;
-    return (<SourceTool name={assetMode ? '자료 이미지 생성' : '동작 생성'} previewLabel={assetMode ? '생성 안내' : '승인 기준'} toolbar={assetMode && onBack ? <div className="source-tool-filebar"><button type="button" onClick={onBack}>자료 가져오기로 돌아가기</button></div> : undefined} preview={assetMode ? <SourcePane title="새 자료 이미지">
-      <Empty title="설명으로 새 이미지를 만듭니다"><p>기준 그림 없이 GPT ImageGen으로 한 장 생성합니다. 결과 원본은 라이브러리의 자료에 보관됩니다.</p><p>그림을 확인한 뒤 외형 기준으로 선택하고 승인할 수 있습니다.</p></Empty>
+    return (<SourceTool name={assetMode ? '자료 이미지 생성' : '동작 생성'} previewLabel={assetMode ? '생성 안내' : '외형 기준'} toolbar={assetMode && onBack ? <div className="source-tool-filebar"><button type="button" onClick={onBack}>자료 가져오기로 돌아가기</button></div> : undefined} preview={assetMode ? <SourcePane title="새 자료 이미지">
+      <Empty title="설명으로 새 이미지를 만듭니다"><p>기준 그림 없이 GPT ImageGen으로 한 장 생성합니다. 결과 원본은 라이브러리의 자료에 보관됩니다.</p><p>그림을 확인한 뒤 외형 기준으로 사용할 수 있습니다.</p></Empty>
     </SourcePane> : <SourcePane title={referenceLabel(p,activeReference?.referenceRevisionId)} className="source-tool-identity-pane">
-    <div className="source-tool-canvas checker">{identityAsset ? <img src={identityAsset.url} alt="승인된 외형 기준"/> : <Empty title="승인한 외형 기준이 없습니다"><p>기준 도구에서 외형을 승인해 주세요.</p></Empty>}</div>
-    <section className="source-tool-traits" tabIndex={0} aria-label="승인된 고정 특징">
+    <div className="source-tool-canvas checker">{identityAsset ? <SpriteImage src={identityAsset.url} alt="외형 기준" width={identityAsset.width} height={identityAsset.height} className="source-tool-sprite"/> : <Empty title="외형 기준이 없습니다"><p>기준 도구에서 저장 기준을 만들어 주세요.</p></Empty>}</div>
+    <section className="source-tool-traits" tabIndex={0} aria-label="외형 기준 특징">
       <h3>{grokVideo ? '이번 생성에 유지할 특징' : '고정 특징'}</h3><p>{activeReference?.fixedTraits ? (grokVideo ? stripViewInstructions(activeReference.fixedTraits) : activeReference.fixedTraits) : '등록한 외형 이미지 기준'}</p>
       {activeReference?.allowedChanges && <><h3>변경 가능</h3><p>{grokVideo ? stripViewInstructions(activeReference.allowedChanges) : activeReference.allowedChanges}</p></>}
       {activeReference?.forbiddenTransfers && <><h3>가져오면 안 되는 특징</h3><p>{activeReference.forbiddenTransfers}</p></>}
     </section>
   </SourcePane>} settings={<SourcePane title={assetMode ? '자료 이미지 생성 설정' : '동작과 생성 설정'} footer={<>
-    {!assetMode && !approved && <p className="warning">외형 기준을 먼저 승인해 주세요.</p>}
+    {!assetMode && !activeReference && <p className="warning">사용할 저장 기준을 선택해 주세요.</p>}
     {!!s.commands.length && <p className="warning">{assetMode ? '현재 편집 초안을 저장한 뒤 생성해 주세요.' : '설정을 저장한 뒤 생성해 주세요.'}</p>}
     {!assetMode && <button className="full" onClick={() => s.edit({ type: 'setGenerationSettings', settings: { ...savedParams, prompt, frameCount, scope, frameVersionId, layoutGuide, imageUse, videoBase } })}>설정을 초안에 적용</button>}
-    <button className="primary full" disabled={(!assetMode && !approved) || !available || !prompt.trim() || s.busy || !!s.commands.length || s.service?.worker !== 'ready' || requestScope === 'frame' && !frameVersionId} onClick={() => s.job('generate', [], params)}>{assetMode ? '자료 이미지 1장 생성' : '새 후보 생성'}</button>
+    <button className="primary full" disabled={(!assetMode && !activeReference) || !available || !prompt.trim() || s.busy || !!s.commands.length || s.service?.worker !== 'ready' || requestScope === 'frame' && !frameVersionId} onClick={() => s.job('generate', [], params)}>{assetMode ? '자료 이미지 1장 생성' : '새 후보 생성'}</button>
   </>}>
     {!assetMode && <>
+    <Select label="이번 생성에 사용할 저장 기준" value={referenceRevisionId} onChange={e=>setReferenceRevisionId(e.target.value)}><option value="">기준 선택</option>{p.references.map(r=><option key={r.referenceRevisionId} value={r.referenceRevisionId}>{referenceLabel(p,r.referenceRevisionId)}</option>)}</Select>
+    <p className="caption">현재 동작의 기준을 기본으로 불러오며, 연결된 기준이 없으면 프로젝트의 active 기준을 사용합니다. 이 선택은 이번 생성 요청에만 적용하며 프로젝트 기준 포인터는 바꾸지 않습니다.</p>
     <Select label="Grok 영상 사용" value={imageUse} onChange={e => setImageUse(e.target.value)}>
       <option value="frames">사용 안 함 · 이미지 프레임 생성</option>
       <option value="grok-video">사용함 · 영상용 기준 그림 1장</option>
     </Select>
     </>}
-    <Field label={assetMode ? '만들 이미지 설명' : '동작과 포즈 설명'}><textarea className="source-tool-prompt" value={prompt} maxLength={assetMode ? 20000 : undefined} onChange={e => setPrompt(e.target.value)} placeholder={assetMode ? '예: SD 3등신 여성 힐러. 효과 없는 황금색 스태프를 든 정면 모습, 선명한 2D 픽셀 아트.' : '제자리에서 걷는 캐릭터. 승인 기준의 의상과 장비를 유지해 주세요.'}/></Field>
+    <Field label={assetMode ? '만들 이미지 설명' : '동작과 포즈 설명'}><textarea className="source-tool-prompt" value={prompt} maxLength={assetMode ? 20000 : undefined} onChange={e => setPrompt(e.target.value)} placeholder={assetMode ? '예: SD 3등신 여성 힐러. 효과 없는 황금색 스태프를 든 정면 모습, 선명한 2D 픽셀 아트.' : '제자리에서 걷는 캐릭터. 선택한 외형 기준의 의상과 장비를 유지해 주세요.'}/></Field>
     {!assetMode && (grokVideo ? <>
       <p className="caption">선택한 이미지 제공자로 영상용 기준 그림 1장을 새 동작 후보로 생성합니다. Grok 영상은 자동 생성하지 않습니다.</p>
       <VideoBasePreset value={videoBase} onChange={setVideoBase}/>
-      <details className="source-tool-details">
+        <details className="source-tool-details">
         <summary>방향이 반영된 생성 설명 보기</summary>
-        <p className="caption">원래 설명과 승인 기준은 보존합니다. 이번 요청에서는 기존 보기 방향 표현을 정리하고 아래 방향을 적용합니다.</p>
+      <p className="caption">원래 설명과 저장 기준은 보존합니다. 이번 요청에서는 기존 보기 방향 표현을 정리하고 아래 방향을 적용합니다.</p>
         <Field label="방향이 반영된 생성 설명"><textarea className="source-tool-prompt" readOnly value={params.prompt}/></Field>
       </details>
     </> : <>

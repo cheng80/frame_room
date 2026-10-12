@@ -4,6 +4,7 @@ import type {Rect} from './types';
 import {assetLabel} from './assetProvenance';
 import {Select,Num,Check,Empty} from './ui';
 import {SourceTool,SourcePane} from './SourceToolLayout';
+import {SpriteViewport} from './SpriteViewport';
 
 export function ExtractStep({ s, initialAssetId }: {
     s: Studio;
@@ -88,13 +89,13 @@ export function ExtractStep({ s, initialAssetId }: {
         setSelected([]);
     };
     return (<SourceTool name="프레임 추출" preview={<SourcePane title="원본과 추출 영역" className="source-tool-visual-pane" footer={<p className="caption">{asset?.alphaStats?.transparent ? '실제 투명 픽셀 포함' : '배경과 장비 경계를 확인하세요.'} · 원시 crop과 추출 좌표 보존</p>}>
-    {asset ? <div className="source-tool-canvas checker"><div className="source-tool-overlay" style={{ aspectRatio: `${asset.width} / ${asset.height}` }}>
+    {asset ? <SpriteViewport key={asset.assetId} width={asset.width} height={asset.height} label="원본과 추출 영역" className="source-tool-sprite-viewport"><div className="source-tool-overlay">
       <img src={asset.url} alt="프레임을 추출할 원본"/>
       <svg viewBox={`0 0 ${asset.width} ${asset.height}`} aria-label="추출 영역 미리보기" role="img">
         {mode === 'grid' && Array.from({ length: Math.min(rows * columns, 1024) }, (_, i) => <rect key={i} x={i % columns * asset.width / columns} y={Math.floor(i / columns) * asset.height / rows} width={asset.width / columns} height={asset.height / rows}/>)}
         {mode === 'regions' && regions.map((r, i) => <g key={i}><rect {...r} className={selected.includes(i) ? 'is-selected' : ''}/><text x={r.x + 3} y={r.y + 16}>{i + 1}</text></g>)}
       </svg>
-    </div></div> : <Empty title="먼저 이미지를 가져와 주세요"/>}
+    </div></SpriteViewport> : <Empty title="먼저 이미지를 가져와 주세요"/>}
   </SourcePane>} settings={<SourcePane title="추출 설정" footer={<>
     <button className="primary full" disabled={disabled || !asset || mode === 'regions' && !regions.length} onClick={() => s.job('extract', [assetId], { mode, rows, columns, regions, minArea, ...(groupId ? { groupId } : {}) })}>프레임 후보 추출</button>
     {disabled && <p className="caption">저장 완료·작업 처리기 연결 후 실행할 수 있습니다.</p>}

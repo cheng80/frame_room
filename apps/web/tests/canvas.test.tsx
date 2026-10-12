@@ -21,6 +21,7 @@ vi.mock('../src/render',async importOriginal=>({
 }));
 import {EditorCanvas,RuntimePlayer,canvasTimelineKey,fitCanvasZoom,startCanvasPlayback} from '../src/Canvas';
 import {drawOccurrence} from '../src/render';
+import {SpriteViewport,SpriteImage} from '../src/SpriteViewport';
 import {Check} from '../src/ui';
 
 type Node=ReactElement<any>;
@@ -38,6 +39,10 @@ function text(tree:any):string{
  return text(tree.props?.children);
 }
 const stage={clientWidth:344,clientHeight:224};
+function fakeCanvas(){
+ const ctx:any={globalAlpha:1,globalCompositeOperation:'source-over',fillStyle:'',imageSmoothingEnabled:true,clearRect:vi.fn(),fillRect:vi.fn(function(this:any,...args:any[]){this.fillStates.push({args,composite:this.globalCompositeOperation,fillStyle:this.fillStyle});}),fillStates:[],drawImage:vi.fn(function(this:any,...args:any[]){this.drawStates.push({args,alpha:this.globalAlpha,composite:this.globalCompositeOperation});}),drawStates:[]};
+ return {width:16,height:12,ctx,getContext:vi.fn(()=>ctx)};
+}
 const mounted:any[]=[];
 class Harness {
  slots:any[]=[];cursor=0;dirty=false;tree:any;props:any;layouts:(()=>void)[]=[];effects:(()=>void)[]=[];
@@ -54,7 +59,7 @@ class Harness {
  render(next?:any){if(next)this.props=next;let iterations=0;
   do{if(++iterations>20)throw new Error('unit harness render loop');this.dirty=false;this.cursor=0;this.layouts=[];this.effects=[];
    hooks.current=this;this.tree=this.component(this.props);hooks.current=null;
-   for(const node of nodes(this.tree)){const ref=node.props.ref;if(ref&&typeof ref==='object')ref.current=node.type==='canvas'?{}:stage;}
+   for(const node of nodes(this.tree)){const ref=node.props.ref;if(ref&&typeof ref==='object')ref.current=node.type==='canvas'?(ref.current?.getContext?ref.current:fakeCanvas()):stage;}
    this.layouts.forEach(run=>run());this.effects.forEach(run=>run());
   }while(this.dirty);
  }
@@ -73,6 +78,7 @@ class ResizeObserverFake {
  resize(width:number,height:number){this.callback([{target:this.target,contentRect:{width,height}}] as any,this as any);}
 }
 function tick(time:number){now=time;const callbacks=[...queue.values()];queue.clear();callbacks.forEach(callback=>callback(now));}
+async function settleCanvas(){for(let i=0;i<10;i++)await Promise.resolve();}
 const timeline={id:'idle',loop:true,slots:[{id:'a',durationMs:80},{id:'b',durationMs:120},{id:'c',durationMs:200}]};
 function editorProps(){
  const clip={clipId:'idle',loop:true,occurrences:timeline.slots.map(s=>({occurrenceId:s.id,durationMs:s.durationMs,frameVersionId:'frame'}))} as Clip;
@@ -83,7 +89,7 @@ function runtimeData():Runtime{return {schemaVersion:1,exportId:'export',project
 
 beforeEach(()=>{
  now=0;nextRaf=1;queue=new Map();observers=[];
- vi.mocked(drawOccurrence).mockClear();
+ vi.mocked(drawOccurrence).mockReset().mockImplementation(()=>new Promise(()=>{}));
  vi.spyOn(performance,'now').mockImplementation(()=>now);
  vi.stubGlobal('requestAnimationFrame',vi.fn((fn:FrameRequestCallback)=>{const id=nextRaf++;queue.set(id,fn);return id;}));
  vi.stubGlobal('cancelAnimationFrame',vi.fn((id:number)=>queue.delete(id)));
@@ -126,11 +132,11 @@ describe('canvas viewport and dock',()=>{
   expect(host.canvas().props.style.width).toBe(200);expect(window.addEventListener).toHaveBeenCalledWith('resize',expect.any(Function));
   host.unmount();expect(window.removeEventListener).toHaveBeenCalledWith('resize',expect.any(Function));mounted.splice(mounted.indexOf(host),1);
  });
- it('scopes every docking rule to the animation workspace shell',()=>{
+ it('scopes docking rules to their canvas shells',()=>{
   const css=readFileSync(new URL('../src/canvas-dock.css',import.meta.url),'utf8').replace(/\/\*[\s\S]*?\*\//g,'');
   const rules=[...css.matchAll(/([^{}]+)\{([^{}]+)\}/g)];
   expect(rules.length).toBeGreaterThan(3);
-  for(const [,selector] of rules)for(const part of selector.split(','))expect(part.trim()).toMatch(/^(?:\.animation-workspace \.canvas-shell(?:\s|$)|\.editor-canvas-shell \.canvas-)/);
+  for(const [,selector] of rules)for(const part of selector.split(','))expect(part.trim()).toMatch(/^(?:\.animation-workspace \.canvas-shell(?:\s|$)|\.editor-canvas-shell \.canvas-|\.runtime-canvas-shell > \.stage)/);
   const stageRule=rules.find(([,selector])=>selector.includes('> .stage'))![2];
   expect(stageRule).toContain('flex: 1 1 0');expect(stageRule).toContain('min-height: 0');expect(stageRule).toContain('overflow: auto');
  });
@@ -178,6 +184,91 @@ describe('cell guides and team outline controls',()=>{
   expect(vi.mocked(drawOccurrence).mock.calls.at(-1)?.[2]).toBe(false);
   expect(host.all('svg').find(n=>n.props.className==='canvas-bounds')).toBeDefined();
   expect(props.snapshot.outline.enabled).toBe(true);
+ });
+});
+
+describe('shared sprite viewing controls',()=>{
+ it('enlarges a small sprite from FIT beyond the previous 800% limit and restores 1:1 or FIT',()=>{
+  const host=new Harness(SpriteViewport,{width:16,height:16,label:'작은 후보',children:null});
+  const frame=()=>host.all('div').find(n=>n.props.className==='sprite-frame')!;
+  expect(frame().props.style).toEqual({width:200,height:200});
+  host.click('확대');expect(frame().props.style).toEqual({width:400,height:400});
+  host.click('축소');expect(frame().props.style.width).toBe(200);
+  host.click('1:1');expect(frame().props.style).toEqual({width:16,height:16});
+  observers[0].resize(120,80);host.render();expect(frame().props.style.width).toBe(16);
+  host.click('맞춤');expect(frame().props.style).toEqual({width:80,height:80});
+  expect(host.all('button').every(n=>n.props.type==='button')).toBe(true);
+ });
+ it('can magnify even a one-pixel FIT image without making it smaller',()=>{
+  const host=new Harness(SpriteViewport,{width:1,height:1,label:'작은 원본',children:null});
+  host.click('확대');expect(host.all('div').find(n=>n.props.className==='sprite-frame')?.props.style.width).toBe(400);
+ });
+ it('uses actual image dimensions when metadata is unavailable and replaces stale dimensions on a new source',()=>{
+  const host=new Harness(SpriteImage,{src:'/first.webp',alt:'검사 보드'});
+  host.all('img')[0].props.onLoad({currentTarget:{naturalWidth:640,naturalHeight:128}});host.render();
+  expect(host.tree.props).toMatchObject({width:640,height:128,label:'검사 보드'});
+  host.render({src:'/second.webp',alt:'검사 보드'});expect(host.tree.props).toMatchObject({width:1,height:1});
+  host.all('img')[0].props.onLoad({currentTarget:{naturalWidth:32,naturalHeight:64}});host.render();
+  expect(host.tree.props).toMatchObject({width:32,height:64});
+  host.render({src:'/second.webp',alt:'검사 보드',width:96,height:128});expect(host.tree.props).toMatchObject({width:96,height:128});
+ });
+ it('announces an image load failure and permits a different source',()=>{
+  const host=new Harness(SpriteImage,{src:'/broken.png',alt:'후보'});
+  host.all('img')[0].props.onError();host.render();expect(host.all('p')[0].props.role).toBe('alert');
+  host.render({src:'/valid.png',alt:'후보'});expect(host.all('img')[0].props.src).toBe('/valid.png');
+ });
+ it('offers the same zoom buttons on exported animation playback',()=>{
+  const host=new Harness(RuntimePlayer,{runtime:runtimeData(),atlasUrl:'/atlas.png'});
+  host.click('확대');expect(host.canvas().props.style.width).toBe(1024);
+  host.click('축소');expect(host.canvas().props.style.width).toBe(512);
+  host.click('1:1');expect(host.canvas().props.style.width).toBe(512);
+  host.click('맞춤');expect(host.canvas().props.style.width).toBe(200);
+ });
+});
+
+describe('editor onion skin',()=>{
+ it.each([
+  ['a',[],[['b','#38bdf8']]],
+  ['b',[['a','#fb923c']],[['c','#38bdf8']]],
+  ['c',[['b','#fb923c']],[]],
+ ] as const)('tints only existing neighbors for selected slot %s',async(selected,previous,next)=>{
+  const props=editorProps();props.selected=selected;
+  const before=structuredClone(props.snapshot),original=fakeCanvas(),ghosts=[...previous,...next].map(()=>fakeCanvas());
+  const results=[original,...ghosts];
+  vi.mocked(drawOccurrence).mockReset()
+   .mockImplementation(async()=>results.shift() as any);
+  const host=new Harness(EditorCanvas,{...props,onion:true});await settleCanvas();
+  const calls=vi.mocked(drawOccurrence).mock.calls;
+  expect(calls).toHaveLength(1+ghosts.length);
+  [...previous,...next].forEach(([id,color],i)=>{
+   const ghostCall=calls.find(call=>call[1].occurrenceId===id);
+   expect(ghostCall?.[2]).toBe(false);
+   expect(ghosts[i].ctx.globalCompositeOperation).toBe('source-over');
+   expect(ghosts[i].ctx.fillStyle).toBe(color);
+   expect(ghosts[i].ctx.fillStates).toEqual([{args:[0,0,ghosts[i].width,ghosts[i].height],composite:'source-in',fillStyle:color}]);
+   expect(ghosts[i].ctx.fillRect).toHaveBeenCalledWith(0,0,ghosts[i].width,ghosts[i].height);
+  });
+  const main=host.canvas().props.ref.current;
+  const draws=main.ctx.drawStates;
+  expect(draws.slice(0,-1).map((call:any)=>call.args[0])).toEqual(ghosts);
+  expect(draws.slice(0,-1).map((call:any)=>call.alpha)).toEqual(ghosts.map(()=>.2));
+  expect(main.ctx.globalAlpha).toBe(1);
+  expect(draws.at(-1)?.args[0]).toBe(original);
+  expect(draws.at(-1)?.alpha).toBe(1);
+  expect(draws.slice(0,-1).every((call:any)=>call.args[0]!==original)).toBe(true);
+  expect(original.ctx.fillRect).not.toHaveBeenCalled();
+  expect(props.snapshot).toEqual(before);
+  expect(text(host.tree)).toContain('이전: 주황색 · 다음: 하늘색 · 현재: 원래 색상');
+ });
+
+ it('does not draw or describe neighbors when onion skin is off',async()=>{
+  const props=editorProps(),before=structuredClone(props.snapshot),original=fakeCanvas();
+  vi.mocked(drawOccurrence).mockReset().mockResolvedValue(original as any);
+  const host=new Harness(EditorCanvas,props);await settleCanvas();
+  expect(vi.mocked(drawOccurrence)).toHaveBeenCalledTimes(1);
+  expect(text(host.tree)).not.toContain('이전: 주황색 · 다음: 하늘색 · 현재: 원래 색상');
+  expect(host.canvas().props.ref.current.ctx.drawStates[0]).toMatchObject({args:[original,0,0],alpha:1});
+  expect(props.snapshot).toEqual(before);
  });
 });
 

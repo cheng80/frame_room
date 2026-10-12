@@ -80,8 +80,7 @@ export function exportGates(s:Snapshot,clipIds:string[],dirty:boolean):string[]{
  }
  for(const c of s.clips.filter(c=>clipIds.includes(c.clipId))){
   if(!c.occurrences.length)issues.push(`${c.name}: 재생 순서가 비어 있습니다.`);
-  if(c.review!=='approved')issues.push(`${c.name}: 동작 수동 승인이 필요합니다.`);
-  if(!s.references.some(r=>r.referenceRevisionId===c.referenceRevisionId&&r.approval==='approved'))issues.push(`${c.name}: 승인된 기준을 연결해 주세요.`);
+  if(!s.references.some(r=>r.referenceRevisionId===c.referenceRevisionId))issues.push(`${c.name}: 캐릭터 기준을 연결해 주세요.`);
   if(!Number.isFinite(c.defaultFps)||c.defaultFps<1||c.defaultFps>60)issues.push(`${c.name}: FPS는 1–60이어야 합니다.`);
   if(c.endBehavior&&c.endBehavior!=='hold-last')issues.push(`${c.name}: 지원하지 않는 재생 종료 방식입니다.`);
   const occurrenceIds=new Set<string>();
@@ -93,11 +92,10 @@ export function exportGates(s:Snapshot,clipIds:string[],dirty:boolean):string[]{
    if(!Number.isInteger(o.durationMs)||o.durationMs<1||o.durationMs>60000)issues.push(`${c.name}: 표시 시간은 1–60000ms여야 합니다.`);
    const f=s.frames.find(f=>f.frameVersionId===o.frameVersionId);
    if(!f){issues.push(`${c.name}: 누락된 후보를 교체해 주세요.`);continue;}
-   if(f.review==='rejected')issues.push(`${c.name}: 거절된 후보입니다.${f.reviewReason?` ${f.reviewReason}`:' 재검수 후 승인해 주세요.'}`);
-   else if(f.review!=='approved')issues.push(`${c.name}: 후보 수동 승인이 필요합니다.`);
+   if(f.review==='rejected')issues.push(`${c.name}: 거절된 후보입니다.${f.reviewReason?` ${f.reviewReason}`:' 후보 확인에서 다시 사용하거나 교체해 주세요.'}`);
    const a=s.alignments[f.frameVersionId];
    const g=s.alignmentGroups.find(g=>g.alignmentGroupId===f.nativeScaleGroupId&&g.frameVersionIds.includes(f.frameVersionId));
-   if(!g||a?.approval!=='approved'||a.groupRevisionId!==g.groupRevisionId||a.frameVersionId!==f.frameVersionId)issues.push(`${c.name}: 현재 정렬 기준의 앵커 승인이 필요합니다.`);
+   if(!g||!a||a.groupRevisionId!==g.groupRevisionId||a.frameVersionId!==f.frameVersionId)issues.push(`${c.name}: 현재 크기·발 정렬을 확인해 주세요.`);
    if(a?.contactMode==='airborne'&&!a.rootAnchor)issues.push(`${c.name}: 공중 자세의 루트 앵커가 필요합니다.`);
   }
  }

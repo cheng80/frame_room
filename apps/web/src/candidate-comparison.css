@@ -1,4 +1,4 @@
-.comparison-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.comparison-grid figure{margin:0;min-width:0;display:grid;grid-template-rows:subgrid;grid-row:span 3;row-gap:0}.comparison-grid figcaption{display:flex;flex-direction:column;gap:8px;justify-content:flex-start;align-items:flex-start;margin-bottom:9px;font-size:12px;flex-wrap:wrap}.comparison-grid figure>small{display:block;margin-top:7px;font-size:10px;overflow-wrap:anywhere}.comparison-image{height:280px;overflow:auto;border:1px solid #43515e;border-radius:6px;padding:12px;display:flex;align-items:flex-start}.comparison-image img{image-rendering:pixelated;max-width:none;flex-shrink:0;margin:auto}.comparison-image.fit img{width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain}.comparison-image p{margin:auto;color:#b7c4cf;font-size:12px;padding:12px}
+.comparison-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.comparison-grid figure{margin:0;min-width:0;display:grid;grid-template-rows:subgrid;grid-row:span 3;row-gap:0}.comparison-grid figcaption{display:flex;flex-direction:column;gap:8px;justify-content:flex-start;align-items:flex-start;margin-bottom:9px;font-size:12px;flex-wrap:wrap}.comparison-grid figure>small{display:block;margin-top:7px;font-size:10px;overflow-wrap:anywhere}.comparison-image{height:280px;min-width:0;overflow:hidden;border:1px solid #43515e;border-radius:6px;padding:0}.comparison-image .comparison-sprite-viewport{height:100%;min-height:0;border:0;border-radius:0}.comparison-image p{margin:auto;color:#b7c4cf;font-size:12px;padding:12px}.comparison-zoom-controls{display:flex;align-items:center;flex:1 1 auto;min-width:max-content}.comparison-zoom-controls .sprite-zoom-controls{border:0;padding:0}.comparison-zoom-controls > .muted{display:none}.comparison-zoom-label{font-size:11px;color:var(--muted);white-space:nowrap}
 .candidate-review .comparison-grid figcaption>span{min-width:0;overflow-wrap:anywhere}
 .animation-workspace .aw-inspector .comparison-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
 .animation-workspace .aw-inspector .comparison-grid figcaption{font-size:9px;gap:2px;margin-bottom:4px}
@@ -14,7 +14,7 @@
 .candidate-comparison-dialog .comparison-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
 .candidate-comparison-dialog .comparison-grid figcaption{font-size:12px;gap:4px;margin-bottom:9px}
 .candidate-comparison-dialog .comparison-grid figure>small{font-size:12px}
-.candidate-comparison-dialog .comparison-image{height:clamp(180px,50dvh,560px);padding:12px;border-radius:6px}
+.candidate-comparison-dialog .comparison-image{height:clamp(180px,50dvh,560px);padding:0;border-radius:6px}
 @media(max-width:600px){
  .candidate-comparison-dialog .comparison-controls{align-items:stretch;gap:0}
  .candidate-comparison-dialog .comparison-controls>.field{flex-basis:100%}

@@ -1,0 +1,17 @@
+.production-workflow{display:grid;grid-template-rows:auto auto minmax(0,1fr) auto;height:100%;min-height:0;min-width:0;overflow:hidden}
+.production-tabs{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;padding:10px 12px;border-bottom:1px solid var(--border);overflow-x:auto}
+.production-tabs button{display:flex;align-items:center;gap:8px;text-align:left;min-width:125px;padding:9px;min-height:54px}
+.production-tabs button[aria-selected=true]{border-color:var(--mint);background:#243b2e}
+.production-tabs strong,.production-tabs small{display:block}.production-tabs strong{font-size:12px}.production-tabs small{margin-top:4px;font-size:11px;color:var(--muted)}
+.production-tabs [data-status="수정 필요"] small{color:#ffca80}.production-tabs [data-status="준비됨"] small,.production-tabs [data-status="출력 완료"] small{color:var(--mint)}
+.production-step-number{display:grid;place-items:center;border:1px solid var(--border);border-radius:50%;width:24px;height:24px;flex:none;font-size:12px}
+.production-heading{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border)}
+.production-heading h2{font-size:14px;margin:0}.production-heading p{font-size:12px;color:var(--muted);margin:4px 0 0}.production-heading label{display:flex;align-items:center;gap:8px;font-size:12px;white-space:nowrap}.production-heading select{max-width:240px}
+.production-panels,.production-panel{height:100%;min-height:0;min-width:0;overflow:hidden}.production-panel[hidden],.production-source [hidden]{display:none!important}
+.production-panel>.source-tool,.production-source>div:not(.production-source-switch){height:100%;min-height:0;overflow:hidden}
+.production-source{display:grid;grid-template-rows:auto minmax(0,1fr);height:100%;min-height:0}.production-source-switch{padding:8px 12px;border-bottom:1px solid var(--border)}
+.production-source-switch button[aria-pressed=true]{border-color:var(--mint);background:#243b2e}.production-panel>.export-workspace{padding:10px;box-sizing:border-box}
+.production-panel .export-workspace[data-mode=review] .export-settings{max-height:100%}
+.production-footer{display:flex;align-items:center;gap:12px;justify-content:space-between;padding:8px 12px;border-top:1px solid var(--border);font-size:12px}.production-footer span{flex:1;color:var(--muted)}
+@media(max-width:850px){.production-tabs{grid-template-columns:repeat(6,145px)}.production-heading .row button{font-size:11px}.production-footer{gap:6px}.production-footer span{font-size:11px}}
+@media(max-width:600px){.production-heading p{display:none}.production-heading select{max-width:150px}.production-footer button{font-size:11px;padding:6px}}

@@ -111,4 +111,4 @@ export function buildCandidateHistory(snapshot: Snapshot, jobs: Job[], includeHi
   return {groups: [...groups.values()], runs};
 }
 
-export const candidateApprovalLabel = (review: string) => review === 'approved' ? '수동 승인됨' : review === 'rejected' ? '거절됨' : '승인 대기';
+export const candidateStatusLabel = (review: string) => review === 'approved' ? '기존 승인 기록' : review === 'rejected' ? '제외됨' : '사용 가능';

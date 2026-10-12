@@ -82,3 +82,5 @@
   overflow: auto;
   margin: 0;
 }
+
+.runtime-canvas-shell > .stage {align-items:safe center;justify-content:safe center;}

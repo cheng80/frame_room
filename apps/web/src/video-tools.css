@@ -2,15 +2,16 @@
 .generation-mode { display: flex; flex: 0 0 auto; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--border); }
 .generation-mode button { min-height: 36px; }
 .generation-mode button[aria-pressed=true] { background: #243b2e; border-color: #77ab8c; color: #c6f2d5; }
-.generation-tool > .source-tool { flex: 1 1 0; height: auto; }
+.generation-mode-panel { flex: 1 1 0; height: 100%; min-width: 0; min-height: 0; overflow: hidden; }
+.generation-mode-panel > .source-tool { height: 100%; min-width: 0; min-height: 0; }
 .video-tool .video-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 8px 12px; }
 .video-tool .video-toolbar .source-tool-segments { padding: 0; }
 .video-tool .video-upload { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; margin-left: auto; }
 .video-tool .video-upload .field { margin: 0; max-width: 240px; }
 .video-tool .video-upload input { width: 100%; }
-.video-tool .video-reference { height: clamp(150px, 28vh, 320px); display: grid; place-items: center; border-radius: 4px; }
-.video-tool .video-reference img { width: 100%; height: 100%; min-height: 0; object-fit: contain; image-rendering: pixelated; }
-.video-tool .video-original { display: block; width: 100%; max-height: 360px; background: #111; border-radius: 4px; }
+.video-tool .video-reference { height: clamp(150px, 28vh, 320px); width: 100%; border-radius: 4px; }
+.video-tool .video-original-viewport { max-width: 100%; }
+.video-tool .video-original { display: block; width: 100%; height: 100%; background: #111; border-radius: 4px; }
 .video-tool .video-traits { white-space: pre-wrap; font-size: 12px; }
 .video-tool .video-result, .video-tool .video-jobs { margin-top: 16px; }
 .video-tool .video-range-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }

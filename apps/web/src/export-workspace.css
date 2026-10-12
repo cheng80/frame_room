@@ -93,12 +93,15 @@
 }
 
 .export-workspace .export-settings {
-  flex: 0 1 auto;
-  max-height: 60%;
+  flex: 1 1 0;
   overflow: auto;
   scrollbar-gutter: stable;
   overscroll-behavior: contain;
 }
+.export-workspace .export-sidebar-tabs { display: flex; gap: 6px; flex: 0 0 auto; }
+.export-workspace .export-sidebar-tabs button { flex: 1; font-size: 12px; min-height: 36px; }
+.export-workspace .export-sidebar-tabs button[aria-selected=true] { background: #243b2e; color: #c8f4d8; border-color: var(--mint); }
+.export-workspace .export-sidebar > [hidden] { display: none !important; }
 
 .export-workspace .export-settings > .panel-heading { margin-bottom: 8px; }
 .export-workspace .export-settings > p { font-size: 12px; }
@@ -107,29 +110,41 @@
 .export-workspace .export-format-help { margin: 8px 0; }
 .export-workspace .export-format-help .deliverables { font-size: 11px; }
 .export-workspace .export-settings .gate-list { font-size: 11px; padding: 8px 8px 8px 24px; }
+.export-workspace .export-destination { margin: 10px 0; }
+.export-workspace .export-destination input { min-width: 0; width: 100%; box-sizing: border-box; }
+.export-workspace .export-destination button { margin-top: 6px; font-size: 12px; }
+.export-workspace .export-clip-options { margin: 8px 0; }
+.export-workspace .export-clip-options summary { cursor: pointer; font-size: 12px; }
+.export-workspace .export-timestamps { display: grid; gap: 4px; color: var(--muted); }
+.export-workspace .export-record-location { margin: 8px 0; }
+.export-workspace .export-record-location p { overflow-wrap: anywhere; user-select: text; }
 
 .export-workspace .export-history {
   flex: 1 1 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.export-workspace .export-history > .panel-heading { flex: 0 0 auto; margin-bottom: 8px; }
-.export-workspace .export-history-list {
-  flex: 1 1 0;
-  min-height: 0;
-  min-width: 0;
   overflow: auto;
   scrollbar-gutter: stable;
   overscroll-behavior: contain;
 }
+
+.export-workspace .export-history > .panel-heading { flex: 0 0 auto; margin-bottom: 8px; }
+.export-workspace .export-history-list {
+  min-width: 0;
+}
 .export-workspace .export-history-list .list-card { margin: 0 0 8px; padding: 10px; font-size: 11px; overflow-wrap: anywhere; }
 .export-workspace .export-history-list .row { gap: 6px; }
+.export-workspace .export-history-list > details > summary { cursor: pointer; }
+.export-workspace .export-history-list > details > summary .row { display: inline-flex; }
+.export-workspace .export-record-time { display: block; margin-top: 6px; color: var(--muted); }
 .export-workspace .export-history-list .button,
 .export-workspace .export-history-list button { max-width: 100%; font-size: 11px; min-height: 32px; padding: 5px 8px; overflow-wrap: anywhere; }
 .export-workspace .export-history-list .export-current { border-color: var(--mint); }
 .export-workspace .export-history-list .empty { padding: 20px 8px; }
+
+@media (max-width: 600px), (max-height: 700px) {
+  .export-workspace[data-mode=review] > .export-preview { overflow: auto; }
+  .export-workspace[data-mode=review] .canvas-shell { flex: 0 0 auto; overflow: visible; }
+  .export-workspace[data-mode=review] .canvas-shell > .stage { flex: none; height: 200px; }
+}
 
 @media (max-width: 600px) {
   .export-workspace { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); gap: 8px; }

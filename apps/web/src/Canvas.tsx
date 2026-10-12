@@ -1,18 +1,14 @@
 import {useEffect,useLayoutEffect,useRef,useState} from 'react';
-import {Play,Pause,ChevronLeft,ChevronRight,ZoomIn,ZoomOut} from 'lucide-react';
+import {Play,Pause,ChevronLeft,ChevronRight} from 'lucide-react';
 import {drawOccurrence,loadImage,occurrenceAt,validateRuntime} from './render';
 import {Check,Select,Panel,Empty,short} from './ui';
 import type {Snapshot,Clip,Point,Runtime} from './types';
 import './canvas-dock.css';
 
-type Zoom = 'fit' | number;
+import {ZoomControls,useCanvasViewport,type Zoom} from './SpriteViewport';
+export {fitCanvasZoom} from './SpriteViewport';
+const onionPreviousColor='#fb923c',onionNextColor='#38bdf8';
 export type CanvasTimeline = {id:string;loop:boolean;slots:{id:string;durationMs:number}[]};
-
-/** FIT uses the stage's content box (padding is not usable canvas space). */
-export function fitCanvasZoom(width:number,height:number,availableWidth:number,availableHeight:number){
- if(![width,height,availableWidth,availableHeight].every(v=>Number.isFinite(v)&&v>0))return 0;
- return Math.min(availableWidth/width,availableHeight/height);
-}
 
 /** Only a semantic timeline change may restart playback, not an immutable clone. */
 export function canvasTimelineKey(timeline:CanvasTimeline){
@@ -48,39 +44,6 @@ function usePlayback(playing:boolean,key:string,index:number,speed:number,onFram
  },[playing,key,speed]);
 }
 
-function useCanvasViewport(width:number,height:number,initialZoom:Zoom='fit'){
- const stage=useRef<HTMLDivElement>(null);
- const [mode,setMode]=useState<Zoom>(initialZoom),[size,setSize]=useState({width:0,height:0});
- useLayoutEffect(()=>{
-  const element=stage.current;if(!element)return;
-  const update=(w:number,h:number)=>setSize(old=>old.width===w&&old.height===h?old:{width:Math.max(0,w),height:Math.max(0,h)});
-  const measure=()=>{
-   const css=getComputedStyle(element),number=(value:string)=>parseFloat(value)||0;
-   update(element.clientWidth-number(css.paddingLeft)-number(css.paddingRight),element.clientHeight-number(css.paddingTop)-number(css.paddingBottom));
-  };
-  measure();
-  if(typeof ResizeObserver==='undefined'){window.addEventListener('resize',measure);return()=>window.removeEventListener('resize',measure);}
-  const observer=new ResizeObserver(entries=>{
-   for(const entry of entries)if(entry.target===element)update(entry.contentRect.width,entry.contentRect.height);
-  });
-  observer.observe(element);
-  return()=>observer.disconnect();
- },[]);
- const zoom=mode==='fit'?fitCanvasZoom(width,height,size.width,size.height):mode;
- return {stage,mode,zoom,setZoom:setMode};
-}
-
-function ZoomControls({width,mode,zoom,setZoom}:{width:number;mode:Zoom;zoom:number;setZoom:(zoom:Zoom)=>void}){
- return <>
-  <button title="축소" aria-label="축소" onClick={()=>setZoom(Math.max(.125,(zoom||1)/2))}><ZoomOut size={16}/></button>
-  <button aria-pressed={mode==='fit'} onClick={()=>setZoom('fit')}>맞춤</button>
-  <button aria-pressed={mode===1} onClick={()=>setZoom(1)}>1:1</button>
-  <button aria-pressed={mode===128/width} onClick={()=>setZoom(128/width)}>게임 128px</button>
-  <button title="확대" aria-label="확대" onClick={()=>setZoom(Math.min(8,(zoom||1)*2))}><ZoomIn size={16}/></button>
-  <span className="muted">{mode==='fit'?'맞춤 · ':''}{Math.round(zoom*100)}%</span>
- </>;
-}
-
 export function EditorCanvas({snapshot,clip,selected,onSelect,onPixel,tool='select',onion=false}:{snapshot:Snapshot;clip?:Clip;selected:string;onSelect:(id:string)=>void;onPixel?:(p:Point)=>void;tool?:string;onion?:boolean}){
  const canvas=useRef<HTMLCanvasElement>(null);
  const [playing,setPlaying]=useState(false),[background,setBackground]=useState('checker'),[speed,setSpeed]=useState(1),[showOutline,setShowOutline]=useState(true),[showBounds,setShowBounds]=useState(true),[error,setError]=useState('');
@@ -97,8 +60,12 @@ export function EditorCanvas({snapshot,clip,selected,onSelect,onPixel,tool='sele
    if(!active||!canvas.current)return;
    const c=canvas.current;c.width=im.width;c.height=im.height;
    const ctx=c.getContext('2d')!;ctx.imageSmoothingEnabled=false;ctx.clearRect(0,0,c.width,c.height);
-   if(onion){for(const neighbor of [occurrences[index-1],occurrences[index+1]].filter(Boolean)){
-    const ghost=await drawOccurrence(snapshot,neighbor,false);if(!active)return;ctx.globalAlpha=.2;ctx.drawImage(ghost,0,0);
+   if(onion){for(const [neighbor,color] of [[occurrences[index-1],onionPreviousColor],[occurrences[index+1],onionNextColor]] as const){
+    if(!neighbor)continue;
+    const ghost=await drawOccurrence(snapshot,neighbor,false);if(!active)return;
+    const ghostContext=ghost.getContext('2d')!;
+    ghostContext.globalCompositeOperation='source-in';ghostContext.fillStyle=color;ghostContext.fillRect(0,0,ghost.width,ghost.height);
+    ghostContext.globalCompositeOperation='source-over';ctx.globalAlpha=.2;ctx.drawImage(ghost,0,0);
    }}
    ctx.globalAlpha=1;ctx.drawImage(im,0,0);
   }catch(e){if(active)setError((e as Error).message);}})();
@@ -109,7 +76,7 @@ export function EditorCanvas({snapshot,clip,selected,onSelect,onPixel,tool='sele
   <div className="canvas-toolbar">
    <span className="badge">편집 미리보기</span>
    <Select label="보기 배경" value={background} onChange={e=>setBackground(e.target.value)}><option value="checker">투명 격자</option><option value="dark">어두운 배경</option><option value="light">밝은 배경</option><option value="green">게임 배경</option></Select>
-   <ZoomControls width={width} {...viewport}/>
+   <ZoomControls width={width} {...viewport} gamePreview/>
   </div>
   <div ref={viewport.stage} className={`stage ${background}`} tabIndex={0} aria-label="애니메이션 편집 캔버스. Space 재생, 좌우 프레임 이동, Home 처음, End 마지막" onKeyDown={e=>{
    if(e.target!==e.currentTarget)return;
@@ -143,8 +110,9 @@ export function EditorCanvas({snapshot,clip,selected,onSelect,onPixel,tool='sele
    <Check label="셀 경계·안전 여백" checked={showBounds} onChange={setShowBounds}/>
    <Check label="팀 테두리 보기" checked={snapshot.outline.enabled&&showOutline} onChange={setShowOutline} disabled={!snapshot.outline.enabled}/>
   </div>
+  {occ&&onion&&<p className="caption"><span style={{color:onionPreviousColor}}>이전: 주황색</span> · <span style={{color:onionNextColor}}>다음: 하늘색</span> · 현재: 원래 색상</p>}
   {occ&&showBounds&&<p className="caption">민트 실선: 셀 경계{edge>0?` · 노란 점선 안쪽: 안전 영역 · 노란 띠: 사방 ${edge}px 여백`:' · 안전 여백 0px'}. 경계 표시는 출력 이미지에 포함되지 않습니다.</p>}
-  {!snapshot.outline.enabled&&<p className="caption">팀 테두리 사용이 꺼져 있습니다. 속성의 수동 승인 탭에서 팀 테두리를 설정하세요.</p>}
+  {!snapshot.outline.enabled&&<p className="caption">팀 테두리 사용이 꺼져 있습니다. 속성에서 팀 테두리를 설정할 수 있습니다.</p>}
   <p className="caption">빠른 편집 화면입니다. 최종 픽셀·경계 검수는 출력 결과에서 확인하세요.</p>
  </div>;
 }
@@ -172,7 +140,8 @@ export function RuntimePlayer({runtime,atlasUrl,initialZoom=1}:{runtime:Runtime;
  return <div className="canvas-shell runtime-canvas-shell">
   <div className="canvas-toolbar row">
    <Select label="재생 동작" value={clip?.id} onChange={e=>setClipId(e.target.value)}>{runtime.clips.map(c=><option key={c.id} value={c.id}>{c.name||c.id}</option>)}</Select>
-   <Select label="표시 크기" value={viewport.mode} onChange={e=>viewport.setZoom(e.target.value==='fit'?'fit':+e.target.value)}><option value="fit">맞춤</option>{[.25,.5,1,2,4].map(z=><option key={z} value={z}>{z*100}%</option>)}</Select>
+   <Select label="표시 크기" value={viewport.mode} onChange={e=>viewport.setZoom(e.target.value==='fit'?'fit':+e.target.value)}><option value="fit">맞춤</option>{Array.from(new Set([.125,.25,.5,1,2,4,8,16,32,64,...(typeof viewport.mode==='number'?[viewport.mode]:[])])).sort((a,b)=>a-b).map(z=><option key={z} value={z}>{z*100}%</option>)}</Select>
+   <ZoomControls width={f?.rect.width||512} {...viewport} gamePreview/>
    <span className="badge success">출력 결과 재생 · 버전 {runtime.projectRevision}</span>
   </div>
   <div ref={viewport.stage} className="stage checker">{f&&<canvas ref={canvas} style={{width:f.rect.width*viewport.zoom,height:f.rect.height*viewport.zoom}} aria-label="출력 아틀라스 프레임"/>}</div>

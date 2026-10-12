@@ -12,12 +12,16 @@ vi.mock('react', async original => {
     useState: (initial: unknown) => hooks.current ? hooks.current.state(initial) : actual.useState(initial),
     useRef: (initial: unknown) => hooks.current ? hooks.current.ref(initial) : actual.useRef(initial),
     useEffect: (setup: () => unknown, deps: unknown[]) => hooks.current ? hooks.current.effect(setup, deps) : actual.useEffect(setup as any, deps),
+    useLayoutEffect: (setup: () => unknown, deps: unknown[]) => hooks.current ? hooks.current.effect(setup, deps) : actual.useLayoutEffect(setup as any, deps),
     useId: () => hooks.current ? 'clip-test' : actual.useId(),
   };
 });
 vi.mock('../src/render', async original => ({...await original<typeof import('../src/render')>(), drawOccurrence: vi.fn(), loadImage: vi.fn()}));
 import {ClipTools, ClipToolComparison, RegionSelector} from '../src/ClipToolsPanel';
 import {drawOccurrence, loadImage} from '../src/render';
+import {SpriteImage, SpriteViewport, ZoomControls} from '../src/SpriteViewport';
+import {AlignmentStep} from '../src/EditSteps';
+import {ExtractStep} from '../src/ExtractStep';
 import {assetProvenanceLabel} from '../src/assetProvenance';
 import {artifactUrl, defaultFollow, defaultHanded, followParams, handedParams, jobSucceeded, previewMatches, readClipToolResult, regionFromDrag, settingsKey, sourceOf, validateClipSource, type ClipToolResult, type FollowFields, type ToolRequest} from '../src/clipTools';
 
@@ -25,7 +29,7 @@ type Node = ReactElement<any>;
 function nodes(tree: any): Node[] {
   if (Array.isArray(tree)) return tree.flatMap(nodes);
   if (!tree || typeof tree !== 'object' || !tree.props) return [];
-  return [tree, ...nodes(tree.props.children)];
+  return [tree, ...nodes(tree.props.children), ...nodes(tree.props.preview), ...nodes(tree.props.settings), ...nodes(tree.props.footer)];
 }
 function text(tree: any): string {
   if (typeof tree === 'string' || typeof tree === 'number') return String(tree);
@@ -55,6 +59,7 @@ class Harness {
       this.cursor = 0; this.dirty = false; this.effects = []; hooks.current = this;
       try {this.tree = this.component(this.props);} finally {hooks.current = null;}
       for (const node of nodes(this.tree)) if (node.type === 'canvas' && node.props.ref) node.props.ref.current = {getContext: () => this.context};
+      for (const node of nodes(this.tree)) if (node.props.className === 'sprite-stage checker' && node.props.ref) node.props.ref.current = {clientWidth: 320, clientHeight: 160};
       this.effects.forEach(run => run());
     } while (this.dirty);
   }
@@ -89,11 +94,13 @@ function setRegion(h: Harness) {['중심 X', '중심 Y', '반지름 X', '반지�
 async function preview(h: Harness) {vi.mocked(s.job).mockResolvedValueOnce({jobId: 'preview-1', status: 'queued'}); setRegion(h); await h.submit(); s.jobs = [resultJob()]; h.render();}
 function request(job = resultJob()): ToolRequest {return {job, source: sourceOf(project, clip), settingsKey: settingsKey(validFields())};}
 beforeEach(() => {
+  vi.stubGlobal('getComputedStyle', () => ({paddingLeft: '0', paddingRight: '0', paddingTop: '0', paddingBottom: '0'}));
+  vi.stubGlobal('ResizeObserver', class {observe() {} disconnect() {}});
   vi.mocked(drawOccurrence).mockReset().mockResolvedValue({width: 64, height: 64} as HTMLCanvasElement);
   vi.mocked(loadImage).mockReset().mockImplementation(async url => ({width: 256, height: 64, src: url}) as HTMLImageElement);
   s = {base: structuredClone(project), snapshot: structuredClone(project), commands: [], conflict: null, busy: false, service: {worker: 'ready'}, jobs: [], resolveId: (id: string) => id, job: vi.fn(async () => ({jobId: 'queued', status: 'queued'})), edit: vi.fn()} as unknown as Studio;
 });
-afterEach(() => {mounted.splice(0).forEach(h => h.unmount()); vi.restoreAllMocks();});
+afterEach(() => {mounted.splice(0).forEach(h => h.unmount()); vi.restoreAllMocks(); vi.unstubAllGlobals();});
 
 describe('saved clip request validation', () => {
   it('sends the four region coordinates and all follow controls from the saved clip', async () => {
@@ -205,7 +212,7 @@ describe('diagnostic output and exact frame navigation', () => {
   async function checked() {const h = studioHarness(); h.change('보완·검사 도구', 'handed'); h.change('장비 이름', '시계'); vi.mocked(s.job).mockResolvedValueOnce({jobId: 'check-1'}); await h.submit(); s.jobs = [resultJob('handed')]; h.render(); return h;}
   it('uses report occurrence IDs for suspect navigation and renders Korean unchecked reasons', async () => {
     const h = await checked(); await h.click('슬롯 3 선택'); expect(h.props.onSelectOccurrence).toHaveBeenCalledWith('slot-2');
-    expect(text(h.tree)).toContain('장비가 반대쪽'); expect(text(h.tree)).toContain('검사하지 못했습니다'); expect(text(h.tree)).toContain('자동 수정·승인 없음');
+    expect(text(h.tree)).toContain('장비가 반대쪽'); expect(text(h.tree)).toContain('검사하지 못했습니다'); expect(text(h.tree)).toContain('자동 수정 없음');
     const comparison = nodes(h.tree).find(n => n.type === ClipToolComparison)!; comparison.props.onSelectFrame(1); expect(h.props.onSelectOccurrence).toHaveBeenLastCalledWith('slot-1');
     s.base!.revision++; h.render(); await h.click('슬롯 3 선택', true); expect(h.props.onSelectOccurrence).toHaveBeenCalledTimes(2);
   });
@@ -222,7 +229,7 @@ describe('diagnostic output and exact frame navigation', () => {
     expect(calls[0].slice(1)).toEqual([128, 0, 64, 64, 0, 0, 64, 64]); expect(calls[1].slice(1)).toEqual([128, 0, 64, 64, 64, 0, 64, 64]);
     expect(text(h.tree)).toContain('원본 시점 200ms · 이 슬롯 100ms · 전체 500ms');
     await h.click('이 프레임을 재생 순서에서 선택'); expect(h.props.onSelectFrame).toHaveBeenCalledWith(2);
-    const images = nodes(h.tree).filter(n => n.type === 'img').map(n => n.props.src); expect(images).toEqual([artifactUrl(job, result.preview.before), artifactUrl(job, result.preview.after)]);
+    const images = nodes(h.tree).filter(n => n.type === SpriteImage).map(n => n.props.src); expect(images).toEqual([artifactUrl(job, result.preview.before), artifactUrl(job, result.preview.after)]);
   });
   it('maps the board name to its artifact URL and rejects malformed occurrence mappings', () => {
     const job = resultJob('handed'), result = readClipToolResult(job)!;
@@ -237,12 +244,15 @@ describe('diagnostic output and exact frame navigation', () => {
 });
 
 describe('first-slot region selection and provenance', () => {
-  it('draws the saved first occurrence without outline and converts pointer bounds to cell coordinates', async () => {
+  it.each([0.5, 1, 2, 4])('draws the saved first occurrence and maps a %sx scrolled view to cell coordinates', async scale => {
     const selected = vi.fn(), h = new Harness(RegionSelector, {snapshot: project, clip, fields: defaultFollow(), enabled: true, disabled: false, onRegion: selected}); await h.flush();
     expect(drawOccurrence).toHaveBeenCalledWith(project, clip.occurrences[0], false);
-    const svg = nodes(h.tree).find(n => n.type === 'svg')!, target = {getBoundingClientRect: () => ({left: 10, top: 20, width: 128, height: 128}), setPointerCapture: vi.fn(), releasePointerCapture: vi.fn()};
-    svg.props.onPointerDown({pointerId: 1, button: 0, clientX: 42, clientY: 52, currentTarget: target, preventDefault: vi.fn()});
-    svg.props.onPointerUp({pointerId: 1, clientX: 106, clientY: 116, currentTarget: target});
+    const viewport = nodes(h.tree).find(n => n.type === SpriteViewport)!;
+    expect(viewport.props).toMatchObject({width: 64, height: 64});
+    expect(viewport.props.children.props.style?.aspectRatio).toBeUndefined();
+    const svg = nodes(h.tree).find(n => n.type === 'svg')!, target = {getBoundingClientRect: () => ({left: -30, top: -50, width: 64 * scale, height: 64 * scale}), setPointerCapture: vi.fn(), releasePointerCapture: vi.fn()};
+    svg.props.onPointerDown({pointerId: 1, button: 0, clientX: -30 + 16 * scale, clientY: -50 + 16 * scale, currentTarget: target, preventDefault: vi.fn()});
+    svg.props.onPointerUp({pointerId: 1, clientX: -30 + 48 * scale, clientY: -50 + 48 * scale, currentTarget: target});
     expect(selected).toHaveBeenLastCalledWith(['32', '32', '16', '16']); expect(regionFromDrag([50, 60], [-10, 90], 64, 64)).toEqual([25, 62, 25, 2]);
   });
   it('cancels old image draws when the input changes', async () => {
@@ -255,5 +265,129 @@ describe('first-slot region selection and provenance', () => {
       const asset = {...project.assets[0], provenance: {kind}}; expect(assetProvenanceLabel(asset, new Map()).label).toBe(label);
     }
     expect(jobSucceeded({operation: 'apply_follow', status: 'needs_review'} as Job)).toBe(true); expect(jobSucceeded({operation: 'preview_follow', status: 'needs_review'} as Job)).toBe(false);
+  });
+});
+
+// Exercise the real shared zoom controls with source-coordinate consumers.
+function viewportHarness(tree: any) {return new Harness(SpriteViewport, nodes(tree).find(n => n.type === SpriteViewport)!.props);}
+function zoom(h: Harness, label: string) {
+  const controls = nodes(h.tree).find(n => n.type === ZoomControls)!;
+  const button = nodes(ZoomControls(controls.props)).find(n => n.type === 'button' && (n.props['aria-label'] === label || text(n) === label))!;
+  expect(button.props.type).toBe('button'); expect(button.props.disabled).not.toBe(true); button.props.onClick(); h.render();
+  return nodes(h.tree).find(n => n.props.className === 'sprite-frame')!.props.style;
+}
+
+describe('source-coordinate zoom integration', () => {
+  it('keeps zoom outside the disabled fieldset for unsaved drafts while blocking region edits', async () => {
+    s.commands = [{operation: {type: 'updateClip'}}];
+    const panel = studioHarness();
+    panel.tree.props.onToggle({currentTarget: {open: true}}); panel.render();
+    const form = nodes(panel.tree).find(n => n.type === 'form')!;
+    const fieldset = nodes(form).find(n => n.type === 'fieldset')!;
+    const selector = nodes(form).find(n => n.type === RegionSelector)!;
+    expect(fieldset.props.disabled).toBe(true);
+    expect(nodes(fieldset).some(n => n.type === RegionSelector)).toBe(false);
+    expect(form.props.children.indexOf(selector)).toBeLessThan(form.props.children.indexOf(fieldset));
+    expect(selector.props.disabled).toBe(true);
+    const onRegion = vi.fn(), region = new Harness(RegionSelector, {...selector.props, onRegion}); await region.flush();
+    const view = viewportHarness(region.tree);
+    zoom(view, '1:1'); expect(zoom(view, '확대')).toEqual({width: 128, height: 128});
+    expect(zoom(view, '축소')).toEqual({width: 64, height: 64}); zoom(view, '맞춤');
+    const svg = nodes(region.tree).find(n => n.type === 'svg')!;
+    expect(svg.props['aria-disabled']).toBe(true);
+    const target = {setPointerCapture: vi.fn()};
+    const event = {pointerId: 1, button: 0, currentTarget: target, preventDefault: vi.fn()};
+    svg.props.onPointerDown(event); svg.props.onPointerMove(event); svg.props.onPointerUp(event);
+    expect(target.setPointerCapture).not.toHaveBeenCalled(); expect(onRegion).not.toHaveBeenCalled();
+    expect(s.edit).not.toHaveBeenCalled(); expect(s.job).not.toHaveBeenCalled();
+  });
+  it('keeps anchor clicks in original pixels through zoom, 1:1, fit and scroll', () => {
+    const snapshot = structuredClone(project);
+    Object.assign(snapshot.assets[0], {width: 128, height: 64});
+    Object.assign(snapshot.alignmentGroups[0], {sharedScale: 1, targetAnchor: {x: 32, y: 60}});
+    s.snapshot = snapshot;
+    const before = structuredClone(snapshot), h = new Harness(AlignmentStep, {s}), view = viewportHarness(h.tree);
+    const source = nodes(h.tree).find(n => n.props.className === 'alignment-source-image')!;
+    for (const label of ['1:1', '확대', '확대', '축소', '맞춤']) {
+      vi.mocked(s.edit).mockClear();
+      const size = zoom(view, label);
+      expect(s.edit).not.toHaveBeenCalled(); expect(s.job).not.toHaveBeenCalled();
+      const bounds = {left: -85, top: -42, ...size};
+      source.props.onPointerDown({currentTarget: {getBoundingClientRect: () => bounds}, clientX: bounds.left + size.width * .25, clientY: bounds.top + size.height * .75});
+      expect(s.edit).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({type: 'setAlignment', alignment: expect.objectContaining({sourceAnchor: {x: 32, y: 48}})}));
+      expect(nodes(source).find(n => n.type === 'svg')!.props.viewBox).toBe('0 0 128 64');
+      expect(snapshot).toEqual(before);
+    }
+  });
+  it('applies anchor edits without approval and calculates group scale from valid body coordinates', async () => {
+    const snapshot = structuredClone(project);
+    Object.assign(snapshot.alignmentGroups[0], {mode: 'shared-scale-foot-anchor', sharedScale: 1, targetAnchor: {x: 32, y: 60}, cell: {width: 64, height: 64, edge: 2}, bodyMeasurement: {topY: 10, bottomY: 50, targetHeight: 80, approved: false}});
+    snapshot.alignments = {frame: {frameVersionId: 'frame', groupRevisionId: 'group-r1', sourceAnchor: {x: 32, y: 48}, anchorSpace: 'crop', method: 'manual', contactMode: 'grounded', authoredOffsetPx: {x: 0, y: 0}, approval: 'approved'}} as any;
+    s.snapshot = snapshot;
+    const h = new Harness(AlignmentStep, {s});
+    const anchorX = nodes(h.tree).find(n => n.type.name === 'Num' && n.props.label === '앵커 X (px)')!;
+    anchorX.props.onChange(24); h.render();
+    expect(s.edit).toHaveBeenCalledWith(expect.objectContaining({type: 'setAlignment', alignment: expect.objectContaining({sourceAnchor: {x: 24, y: 48}, approval: 'approved'})}));
+    expect(nodes(h.tree).some(n => n.type === 'button' && text(n) === '이 후보 앵커 승인')).toBe(false);
+    expect(nodes(h.tree).some(n => n.type === 'input' && n.props.type === 'checkbox')).toBe(false);
+    await h.click('공통 배율·셀');
+    expect(h.button('공통 배율 계산·적용').props.disabled).toBe(false);
+    await h.click('공통 배율 계산·적용');
+    expect(s.edit).toHaveBeenLastCalledWith({type: 'setAlignmentGroup', alignmentGroupId: 'group', changes: {mode: 'shared-scale-foot-anchor', bodyMeasurement: {topY: 10, bottomY: 50, targetHeight: 80, approved: true}}});
+
+    snapshot.alignmentGroups[0].bodyMeasurement = {topY: 50, bottomY: 10, targetHeight: 0, approved: true};
+    s.snapshot = snapshot;
+    const invalid = new Harness(AlignmentStep, {s});
+    await invalid.click('공통 배율·셀');
+    expect(invalid.button('공통 배율 계산·적용').props.disabled).toBe(true);
+  });
+  it('zooms the ellipse hit area with its frame while keeping the saved cell and drag coordinates', async () => {
+    const selected = vi.fn(), before = structuredClone(project);
+    const h = new Harness(RegionSelector, {snapshot: project, clip, fields: validFields(), enabled: true, disabled: false, onRegion: selected}); await h.flush();
+    const view = viewportHarness(h.tree), svg = nodes(h.tree).find(n => n.type === 'svg')!;
+    zoom(view, '1:1'); const size = zoom(view, '확대');
+    expect(size).toEqual({width: 128, height: 128}); expect(selected).not.toHaveBeenCalled();
+    const target = {getBoundingClientRect: () => ({left: -40, top: -60, ...size}), setPointerCapture: vi.fn(), releasePointerCapture: vi.fn()};
+    svg.props.onPointerDown({pointerId: 3, button: 0, clientX: -8, clientY: -28, currentTarget: target, preventDefault: vi.fn()});
+    svg.props.onPointerMove({pointerId: 3, clientX: 56, clientY: 36, currentTarget: target});
+    svg.props.onPointerUp({pointerId: 3, clientX: 56, clientY: 36, currentTarget: target});
+    expect(selected).toHaveBeenLastCalledWith(['32', '32', '16', '16']);
+    expect(target.releasePointerCapture).toHaveBeenCalledWith(3);
+    expect(nodes(h.tree).find(n => n.type === 'canvas')!.props).toMatchObject({width: 64, height: 64});
+    expect(nodes(svg).find(n => n.type === 'ellipse')!.props).toMatchObject({cx: 32, cy: 32, rx: 10, ry: 12});
+    expect(project).toEqual(before); expect(s.edit).not.toHaveBeenCalled(); expect(s.job).not.toHaveBeenCalled();
+  });
+  it('keeps extraction SVG regions and job parameters in original coordinates after zoom', () => {
+    const before = structuredClone(s.snapshot), h = new Harness(ExtractStep, {s, initialAssetId: 'asset'});
+    h.change('추출 방식', 'regions');
+    h.field('왼쪽 X').props.onChange(8); h.render();
+    h.field('위쪽 Y').props.onChange(12); h.render();
+    h.field('너비').props.onChange(24); h.render();
+    h.field('높이').props.onChange(16); h.render();
+    h.button('영역 추가').props.onClick(); h.render();
+    const view = viewportHarness(h.tree);
+    zoom(view, '1:1'); expect(zoom(view, '확대')).toEqual({width: 128, height: 128});
+    const svg = nodes(view.tree).find(n => n.type === 'svg')!;
+    expect(svg.props.viewBox).toBe('0 0 64 64');
+    expect(nodes(svg).find(n => n.type === 'rect')!.props).toMatchObject({x: 8, y: 12, width: 24, height: 16});
+    expect(s.edit).not.toHaveBeenCalled(); expect(s.job).not.toHaveBeenCalled(); expect(s.snapshot).toEqual(before);
+    h.button('프레임 후보 추출').props.onClick();
+    expect(s.job).toHaveBeenCalledExactlyOnceWith('extract', ['asset'], {mode: 'regions', rows: 1, columns: 1, regions: [{x: 8, y: 12, width: 24, height: 16}], minArea: 4});
+  });
+  it.each(['follow', 'handed'] as const)('makes %s comparison media zoomable without changing frame pixels', async tool => {
+    const job = resultJob(tool), result = readClipToolResult(job)!;
+    const h = new Harness(ClipToolComparison, {job, result, enabled: true, canNavigate: true, onSelectFrame: vi.fn()}); await h.flush();
+    const view = viewportHarness(h.tree), originalDraws = h.context.drawImage.mock.calls.length;
+    zoom(view, '1:1'); const size = zoom(view, '확대');
+    expect(size).toEqual({width: tool === 'follow' ? 256 : 128, height: 128});
+    expect(h.context.drawImage).toHaveBeenCalledTimes(originalDraws); expect(h.props.onSelectFrame).not.toHaveBeenCalled();
+    const images = nodes(h.tree).filter(n => n.type === SpriteImage);
+    expect(images[0].props).toMatchObject({width: 64, height: 64, src: artifactUrl(job, result.preview.before)});
+    if (tool === 'handed') {
+      expect(images[1].props).toMatchObject({src: artifactUrl(job, result.preview.board)});
+      expect(images[1].props.width).toBeUndefined();
+      expect(nodes(h.tree).filter(n => n.type === 'a').every(a => !nodes(a).some(n => n.type === SpriteImage))).toBe(true);
+    } else expect(images[1].props).toMatchObject({width: 64, height: 64, src: artifactUrl(job, result.preview.after)});
+    expect(s.edit).not.toHaveBeenCalled(); expect(s.job).not.toHaveBeenCalled();
   });
 });

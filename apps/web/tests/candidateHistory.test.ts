@@ -2,7 +2,7 @@ import {describe, expect, it} from 'vitest';
 import {createElement} from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
 import {CandidateLibrary} from '../src/CandidateLibrary';
-import {buildCandidateHistory, candidateApprovalLabel} from '../src/candidateHistory';
+import {buildCandidateHistory, candidateStatusLabel} from '../src/candidateHistory';
 import type {Asset, Clip, Frame, Job, Snapshot} from '../src/types';
 
 const asset = (id: string, provenance: unknown = {kind: 'imported'}) => ({assetId: id, originalFilename: 'same.png', provenance}) as Asset;
@@ -106,10 +106,10 @@ describe('candidate history with explicit lineage', () => {
     expect(groups[1].entries.map(e => e.uses[0].slot)).toEqual([1, 2, 3, 4, 5, 6]);
     expect(runs.filter(r => r.operation === 'extract').map(r => r.revision)).toEqual([9, 8]);
   });
-  it('labels approval independently of automated inspection', () => {
-    expect(['pending', 'approved', 'rejected', 'unknown'].map(candidateApprovalLabel)).toEqual(['승인 대기', '수동 승인됨', '거절됨', '승인 대기']);
+  it('shows candidate availability while preserving legacy approval and exclusion records', () => {
+    expect(['pending', 'approved', 'rejected', 'unknown'].map(candidateStatusLabel)).toEqual(['사용 가능', '기존 승인 기록', '제외됨', '사용 가능']);
   });
-  it('renders recorded lineage, collapsed usage details, source actions and manual approval wording', () => {
+  it('renders recorded lineage, collapsed usage details and source actions without manual approval wording', () => {
     const p = savedExample();
     const html = renderToStaticMarkup(createElement(CandidateLibrary, {
       snapshot: p, jobs: [], includeHidden: false,
@@ -118,8 +118,9 @@ describe('candidate history with explicit lineage', () => {
     }));
     expect(html).toContain('aw-scroll aw-candidate-list');
     expect(html).toContain('추출 실행 연결 미기록');
-    expect(html).toContain('승인 대기');
-    expect(html).toContain('수동 승인됨');
+    expect(html).toContain('사용 가능');
+    expect(html).toContain('기존 승인 기록');
+    expect(html).not.toContain('수동 승인은');
     expect(html).not.toContain('검수됨');
     expect(html).toContain('슬롯 6로 이동');
     expect(html).toContain('/v1/jobs/synthetic-generation-job');

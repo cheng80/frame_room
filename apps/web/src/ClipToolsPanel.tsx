@@ -11,6 +11,7 @@ import {
   toolBlockReason, validateClipSource, type ClipToolResult, type FollowFields, type HandedFields, type ToolRequest,
 } from './clipTools';
 import './clip-tools.css';
+import {SpriteImage, SpriteViewport} from './SpriteViewport';
 
 interface Props {s: Studio; clipId: string; onClip: (id: string) => void; onSelectOccurrence: (id: string) => void}
 type Session = {selection: string; mode: 'follow' | 'handed'; follow: FollowFields; handed: HandedFields; preview?: ToolRequest; check?: ToolRequest; apply?: ToolRequest; sending: boolean; error: string};
@@ -96,10 +97,10 @@ export function ClipTools({s, clipId, onClip, onSelectOccurrence}: Props) {
     {snapshot && clip ? <>
       <p className="caption">입력: {clip.name} · 저장 버전 {snapshot.revision} · {clip.occurrences.length}슬롯 · {clip.occurrences.reduce((sum, o) => sum + o.durationMs, 0)}ms</p>
       {state.mode === 'follow' ? <form onSubmit={event => {event.preventDefault(); void submit('preview_follow');}}>
+        <p className="caption">첫 슬롯에서 흔들 부위를 드래그하거나 타원 좌표를 입력하세요. 모든 프레임에서 움직이는 타원이 셀 안에 있어야 합니다. 밖으로 나가면 영역을 줄이거나 옮기세요.</p>
+        <RegionSelector key={selection} snapshot={snapshot} clip={clip} fields={state.follow} enabled={open} disabled={locked} onRegion={region => updateFollow('region', region)}/>
         <fieldset disabled={locked}>
           <legend>부위 흔들림 설정</legend>
-          <p className="caption">첫 슬롯에서 흔들 부위를 드래그하거나 타원 좌표를 입력하세요. 모든 프레임에서 움직이는 타원이 셀 안에 있어야 합니다. 밖으로 나가면 영역을 줄이거나 옮기세요.</p>
-          <RegionSelector key={selection} snapshot={snapshot} clip={clip} fields={state.follow} enabled={open} disabled={locked} onRegion={region => updateFollow('region', region)}/>
           <div className="clip-tools-grid">{(['중심 X', '중심 Y', '반지름 X', '반지름 Y'] as const).map((label, index) => <Input key={label} label={label} type="number" required step="any" min={index > 1 ? 0.01 : 0} value={state.follow.region[index]} onChange={event => {const region = [...state.follow.region] as FollowFields['region']; region[index] = event.target.value; updateFollow('region', region);}}/>)}</div>
           <div className="clip-tools-grid">
             <Input label="흔들림 강도" type="number" required min={0} max={8} step="any" value={state.follow.gain} onChange={event => updateFollow('gain', event.target.value)}/>
@@ -139,7 +140,7 @@ export function ClipTools({s, clipId, onClip, onSelectOccurrence}: Props) {
           {shownResult.report.unchanged ? <p className="warning">움직임 변화가 없습니다. 선택 영역과 강도를 확인하세요.</p> : null}
         </> : <>
           <p className={shownResult.report.verdict === 'clear' && shownResult.report.framesShown > 0 ? 'caption' : 'warning'} role="status">{handedWarning(shownResult.report)}</p>
-          <p className="caption">표식 확인 {shownResult.report.framesShown} / {shownResult.report.frameCount}프레임 · 자동 수정·승인 없음</p>
+          <p className="caption">표식 확인 {shownResult.report.framesShown} / {shownResult.report.frameCount}프레임 · 자동 수정 없음</p>
           {shownResult.report.unchecked.length ? <div className="warning"><strong>검사하지 못한 항목</strong><ul>{shownResult.report.unchecked.map((reason, i) => <li key={i}>{reason}</li>)}</ul></div> : null}
           <ul className="clip-tools-suspects" aria-label="의심 프레임">{shownResult.report.suspectFrames.map(frame => <li key={frame.occurrenceId}><button type="button" disabled={!canNavigate} onClick={() => selectResultFrame(shownResult, frame.index)}>슬롯 {frame.index + 1} 선택</button><span>{frame.reasons.join(' · ') || '표식 위치를 확인하세요.'}</span></li>)}</ul>
         </>}
@@ -147,7 +148,7 @@ export function ClipTools({s, clipId, onClip, onSelectOccurrence}: Props) {
       </> : null}
       {state.mode === 'follow' && previewJob ? <>
         <button type="button" className="primary aw-wide" disabled={!canSave} onClick={() => void submit('apply_follow')}>새 동작으로 저장</button>
-        <p className="caption">확인한 미리보기를 새 동작으로 저장합니다. 새 프레임과 동작은 검수 대기 상태입니다.</p>
+        <p className="caption">확인한 미리보기를 새 동작으로 저장합니다.</p>
         <ToolJobStatus job={applyJob}/>
         {newClipId ? <p role="status">새 동작을 저장했습니다.{snapshot.clips.some(c => c.clipId === newClipId) ? <button type="button" disabled={!!block} onClick={() => onClip(newClipId)}>새 동작 열기</button> : ' 저장된 동작 목록을 확인하고 있습니다.'}</p> : null}
       </> : null}
@@ -189,7 +190,7 @@ export function RegionSelector({snapshot, clip, fields, enabled, disabled, onReg
     onRegion(regionFromDrag(drag.current.start, point(event), width, height).map(String) as FollowFields['region']);
   }
   return <div className="clip-tools-region">
-    <div className="clip-tools-cell checker" style={{aspectRatio: `${width} / ${height}`}}>
+    <SpriteViewport width={width} height={height} label="흔들림 영역 선택"><div className="clip-tools-cell checker">
       <canvas ref={canvas} width={width} height={height} aria-label="저장된 첫 슬롯, 팀 테두리 제외"/>
       <svg viewBox={`0 0 ${width} ${height}`} aria-label="흔들림 영역 드래그 선택" aria-disabled={disabled || !ready} onPointerDown={event => {
         if (disabled || !ready || event.button !== 0) return;
@@ -197,7 +198,7 @@ export function RegionSelector({snapshot, clip, fields, enabled, disabled, onReg
       }} onPointerMove={update} onPointerUp={event => {update(event); if (drag.current?.id === event.pointerId) {drag.current = null; event.currentTarget.releasePointerCapture(event.pointerId);}}} onPointerCancel={() => {drag.current = null;}} onLostPointerCapture={() => {drag.current = null;}}>
         {valid ? <ellipse cx={values[0]} cy={values[1]} rx={values[2]} ry={values[3]}/> : null}
       </svg>
-    </div>
+    </div></SpriteViewport>
     <p className="caption">저장된 첫 슬롯 · {width} × {height}px · 변형·정렬·픽셀 편집 반영, 팀 테두리 제외</p>
     {error ? <p className="warning" role="status">{error}</p> : null}
   </div>;
@@ -226,18 +227,18 @@ export function ClipToolComparison({job, result, enabled, canNavigate, onSelectF
   const missing = !beforeUrl || !beforeStrip || after && (!afterUrl || !afterStrip);
   return <section className="clip-tools-comparison" aria-label="처리 전후 비교">
     <div className="clip-tools-previews">
-      {beforeUrl ? <figure><figcaption>저장된 원본 동작</figcaption><img className="checker" src={beforeUrl} alt="처리 전 원본 동작 WebP"/></figure> : null}
-      {after && afterUrl ? <figure><figcaption>흔들림 미리보기</figcaption><img className="checker" src={afterUrl} alt="흔들림 적용 후 동작 WebP"/></figure> : null}
+      {beforeUrl ? <figure><figcaption>저장된 원본 동작</figcaption><SpriteImage src={beforeUrl} width={preview.width} height={preview.height} alt="처리 전 원본 동작 WebP"/></figure> : null}
+      {after && afterUrl ? <figure><figcaption>흔들림 미리보기</figcaption><SpriteImage src={afterUrl} width={preview.width} height={preview.height} alt="흔들림 적용 후 동작 WebP"/></figure> : null}
     </div>
     {missing ? <p className="warning" role="alert">비교 산출물을 찾지 못했습니다. 미리보기를 다시 실행하세요.</p> : null}
     <p className="caption">아래 프레임 비교는 원본 표시 시간을 기준으로 맞춥니다.{after ? ' 왼쪽: 이전 · 오른쪽: 이후' : ''}</p>
-    <canvas className="clip-tools-strip checker" ref={canvas} width={preview.width * (after ? 2 : 1)} height={preview.height} aria-label={`슬롯 ${index + 1} ${after ? '이전·이후 동시 비교' : '원본 프레임'}`}/>
+    <SpriteViewport width={preview.width * (after ? 2 : 1)} height={preview.height} label="슬롯 프레임 비교"><canvas className="clip-tools-strip checker" ref={canvas} width={preview.width * (after ? 2 : 1)} height={preview.height} aria-label={`슬롯 ${index + 1} ${after ? '이전·이후 동시 비교' : '원본 프레임'}`}/></SpriteViewport>
     {error ? <p className="warning" role="status">{error}</p> : null}
     <label htmlFor={id}>비교 프레임 {index + 1} / {preview.frameCount}</label>
     <input id={id} type="range" min={0} max={preview.frameCount - 1} step={1} value={index} aria-label="비교 프레임" onChange={event => {const next = Number(event.target.value); if (Number.isInteger(next) && next >= 0 && next < preview.frameCount) setIndex(next);}}/>
     <p className="caption">원본 시점 {frameStartMs(preview.durationsMs, index)}ms · 이 슬롯 {preview.durationsMs[index]}ms · 전체 {preview.durationsMs.reduce((sum, duration) => sum + duration, 0)}ms</p>
     <button type="button" disabled={!canNavigate} onClick={() => onSelectFrame(index)}>이 프레임을 재생 순서에서 선택</button>
     <details><summary>원본 슬롯별 표시 시간</summary><ol>{preview.durationsMs.map((duration, i) => <li key={i}>슬롯 {i + 1}: {duration}ms</li>)}</ol></details>
-    {board ? <figure><figcaption>장비 좌우 검사 보드</figcaption><a href={board} target="_blank" rel="noreferrer"><img src={board} alt="장비 표식 위치와 의심 프레임 검사 보드"/></a><a href={board} download>검사 보드 PNG 다운로드</a></figure> : null}
+    {board ? <figure><figcaption>장비 좌우 검사 보드</figcaption><SpriteImage src={board} alt="장비 표식 위치와 의심 프레임 검사 보드"/><a href={board} target="_blank" rel="noreferrer">검사 보드 새 창에서 보기</a> <a href={board} download>검사 보드 PNG 다운로드</a></figure> : null}
   </section>;
 }

@@ -18,7 +18,7 @@ export function VideoBasePreset({value, onChange}: {value: VideoBaseSettings; on
     <BodyPlanField label="기준 그림의 신체 구조" value={value.bodyPlan} onChange={bodyPlan => onChange({...value, bodyPlan})}/>
     <Input label="기준 그림의 장비와 손" value={value.equipment} maxLength={2000} onChange={e => onChange({...value, equipment: e.target.value})} placeholder="예: sword:right; shield:left"/>
     <p className="caption">캐릭터 자신의 손을 기준으로 지정합니다. 정면·뒷면에서는 보기의 좌우를 적용하지 않으며 장비를 든 손은 유지합니다.</p>
-    <p className="caption">설명과 승인 기준의 기존 보기 방향을 정리하고, 선택한 방향·자세·신체 구조·장비를 새 후보 생성 요청에 반영합니다.</p>
+    <p className="caption">설명과 저장 기준의 기존 보기 방향을 정리하고, 선택한 방향·자세·신체 구조·장비를 새 후보 생성 요청에 반영합니다.</p>
     <p className="caption">새 후보 생성 후 결과 그림을 영상의 기준 이미지로 선택하세요. 영상은 자동 생성하지 않습니다.</p>
   </details>;
 }

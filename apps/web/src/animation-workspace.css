@@ -70,7 +70,7 @@
 .animation-workspace .aw-reference-heading>small{font:9px monospace;color:#abc0b2}
 .animation-workspace .aw-reference-heading button{margin-left:auto;min-height:24px;padding:3px;border:0;background:transparent}
 .animation-workspace .aw-reference-image{flex:1;min-height:0;overflow:auto;display:flex;align-items:flex-start;padding:16px}
-.animation-workspace .aw-reference-image img{margin:auto;max-width:100%;max-height:100%;object-fit:contain;image-rendering:pixelated}
+
 .animation-workspace .aw-reference>p{padding:7px 10px;font-size:10px;color:#acc0b2;max-height:48px;overflow:auto;flex-shrink:0;line-height:1.6}
 .animation-workspace .aw-canvas-host{min-width:0;min-height:0;overflow:hidden;position:relative}
 .animation-workspace .aw-canvas-host .canvas-shell{display:flex;flex-direction:column;height:100%;min-height:0;min-width:0;margin:0;border:0;border-radius:0;overflow:hidden}
@@ -99,7 +99,7 @@
 .animation-workspace .aw-raw-heading,.animation-workspace .aw-raw-caption{display:flex;align-items:center;gap:8px;padding:7px 10px;flex-wrap:wrap;background:#1b252e;flex-shrink:0}
 .animation-workspace .aw-raw-heading{justify-content:space-between;border-bottom:1px solid var(--aw-line)}
 .animation-workspace .aw-raw-image{flex:1;min-height:0;overflow:auto;display:flex;align-items:flex-start;padding:20px}
-.animation-workspace .aw-raw-image img{margin:auto;max-width:100%;max-height:100%;object-fit:contain;image-rendering:pixelated}
+
 .animation-workspace .aw-raw-caption{font-size:10px;color:#adc0cd;border-top:1px solid var(--aw-line)}
 .animation-workspace .aw-raw-caption button{margin-left:auto}
 .animation-workspace .aw-timeline{grid-column:2;grid-row:3;display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden;border-top:1px solid #4a5a66;background:#17212a}
@@ -144,7 +144,7 @@
 .animation-workspace .aw-reference-detail>p{font-size:11px;line-height:1.6;overflow-wrap:anywhere}
 .editor-tool.reference-image-dialog{width:min(800px,calc(100vw - 24px));height:fit-content;max-height:calc(100dvh - 24px);overflow:auto}
 .aw-reference-full{margin:0}
-.aw-reference-full img{display:block;width:100%;height:min(60dvh,600px);object-fit:contain;image-rendering:pixelated}
+
 .aw-reference-full figcaption{padding:12px 16px;font-size:12px;line-height:1.6;overflow-wrap:anywhere}
 .animation-workspace .aw-button-pair{display:flex;gap:7px;margin-top:12px}
 .animation-workspace .aw-button-pair>button{flex:1}
