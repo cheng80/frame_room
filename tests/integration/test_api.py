@@ -43,6 +43,98 @@ def approved(c):
     cl=p['clips'][0];p=edit(c,p,[{'type':'addOccurrence','clipId':cl['clipId'],'frameVersionId':f['frameVersionId']}])
     return p,a
 
+@pytest.fixture
+def pending_project(client):
+    p,a=upload(client,new(client))
+    response=client.post('/v1/projects/'+p['projectId']+'/reference-revisions',json={
+        'expectedRevision':p['revision'],'reference':{'identityAssetId':a['assetId']}})
+    assert response.status_code==201,response.text
+    p=load(client,p)
+    run_job(queue(client,p,'extract',[a['assetId']],{'mode':'whole'})['jobId'])
+    p=load(client,p)
+    p=edit(client,p,[
+        {'type':'setAlignmentGroup','alignmentGroupId':p['alignmentGroups'][0]['alignmentGroupId'],
+         'changes':{'targetAnchor':{'x':31,'y':51},'mode':'shared-scale-foot-anchor',
+                    'bodyMeasurement':{'topY':10,'bottomY':51,'targetHeight':41,'approved':False}}},
+        {'type':'createClip','clip':{'name':'기존 검수 대기 동작','referenceRevisionId':p['references'][0]['referenceRevisionId']}},
+    ])
+    p=edit(client,p,[{'type':'addOccurrence','clipId':p['clips'][0]['clipId'],
+                      'frameVersionId':p['frames'][0]['frameVersionId']}])
+    return load(client,p),a
+
+def test_saved_pending_project_bakes_and_exports_without_review_mutation(client,pending_project):
+    p,a=pending_project;url='/v1/projects/'+p['projectId']
+    before=s.get_project(p['projectId'])
+    with s.connect() as db:
+        history=[tuple(row) for row in db.execute('SELECT * FROM revisions WHERE project_id=? ORDER BY revision',(p['projectId'],))]
+    assert p['references'][0]['approval']=='draft'
+    assert p['frames'][0]['review']==p['clips'][0]['review']=='pending'
+    assert all(a['approval']=='pending' for a in p['alignments'].values())
+    for operation in ('align','inspect','bake'):
+        job=run_job(queue(client,p,operation,params={'clipRevisionIds':[p['clips'][0]['clipRevisionId']]})['jobId'])
+        assert job['status']=='needs_review' and job['result']['qa']['errors']==[]
+    response=client.post(url+'/exports',json={'savedRevision':p['revision'],
+        'clipRevisionIds':[p['clips'][0]['clipRevisionId']],'idempotencyKey':s.uid()})
+    assert response.status_code==202,response.text
+    job=run_job(response.json()['jobId'])
+    assert job['status']=='succeeded' and job['result']['qa']['status']=='verified'
+    assert job['result']['qa']['fullRGBAParity'] is True
+    assert client.get('/v1/exports/'+response.json()['exportId']).json()['status']=='succeeded'
+    assert s.get_project(p['projectId'])==before
+    assert load(client,p)==p
+    with s.connect() as db:
+        assert [tuple(row) for row in db.execute('SELECT * FROM revisions WHERE project_id=? ORDER BY revision',(p['projectId'],))]==history
+    assert client.get(a['url']).content==png()
+
+@pytest.mark.parametrize('scope',['states','sheet','frame'])
+def test_saved_pending_project_generates_without_review_mutation(client,pending_project,monkeypatch,scope):
+    from adapters.spritegen import provider
+    from sprite_gen import gen
+    from sprite_gen.gen.base import GenResult
+    p,_=pending_project
+    monkeypatch.setattr(provider,'_login_probe',lambda:{'loginReady':True,'authMode':'chatgpt','lastProbe':'test','reason':None})
+    monkeypatch.setattr(provider,'_models',lambda:[provider.DEFAULT_MODEL])
+    calls=[]
+    def generated(provider_id,prompt,out,**kwargs):
+        calls.append(kwargs)
+        out.write_bytes(png())
+        return GenResult(provider=provider_id,prompt=prompt,out=out,raw=out,raw_bytes=out.stat().st_size,
+                         elapsed_seconds=0,model=kwargs['model'],session_id='synthetic-test',refs=kwargs['refs'])
+    monkeypatch.setattr(gen,'generate_image',generated)
+    params={'providerId':'codex','frameCount':1,'scope':scope,'prompt':'합성 fixture 생성 시험',
+            'referenceRevisionId':p['references'][0]['referenceRevisionId']}
+    if scope=='frame': params['frameVersionId']=p['frames'][0]['frameVersionId']
+    job=run_job(queue(client,p,'generate',params=params)['jobId'])
+    assert len(calls)==1 and job['status']=='needs_review'
+    saved=load(client,p)
+    for key in ('references','activeReferenceRevisionId','frames','clips','alignmentGroups','alignments','schemaVersion'):
+        assert saved[key]==p[key]
+    assert saved['revision']==p['revision']+1
+    assert saved['generations'][-1]['requestSnapshot']['reference']==p['references'][0]
+    with s.connect() as db:
+        old=json.loads(db.execute('SELECT snapshot FROM revisions WHERE project_id=? AND revision=?',
+                                 (p['projectId'],p['revision'])).fetchone()[0])
+    for key in ('references','frames','clips','alignmentGroups','alignments'): assert old[key]==p[key]
+
+@pytest.mark.parametrize('batch',[False,True])
+def test_video_generation_accepts_draft_reference_and_keeps_identity_binding(client,pending_project,batch):
+    p,a=pending_project;url='/v1/projects/'+p['projectId']
+    params={'referenceRevisionId':p['references'][0]['referenceRevisionId']}
+    def request(asset_id,params):
+        if batch:
+            return client.post(url+'/video-batches',json={'inputRevision':p['revision'],'idempotencyKey':s.uid(),
+                'items':[{'assetId':asset_id,'params':params}]})
+        return client.post(url+'/jobs',json={'operation':'generate_video','inputRevision':p['revision'],
+            'assetIds':[asset_id],'params':params,'idempotencyKey':s.uid()})
+    for asset_id,settings,status,code in [
+        (p['frames'][0]['imageAssetId'],params,422,'VIDEO_REFERENCE_MISMATCH'),
+        (a['assetId'],{'referenceRevisionId':'missing'},404,'ENTITY_NOT_FOUND'),
+    ]:
+        rejected=request(asset_id,settings)
+        assert rejected.status_code==status and rejected.json()['code']==code
+    assert request(a['assetId'],params).status_code==202
+    assert load(client,p)==p
+
 def test_asset_generation_enqueues_without_reference_and_preserves_request(client):
     p=new(client);params={'scope':'asset','providerId':'codex','frameCount':1,'prompt':'  첫 원본 이미지  '}
     job=queue(client,p,'generate',params=params)
@@ -95,7 +187,7 @@ def test_asset_generation_translates_shared_validator_error(client,monkeypatch):
 
 @pytest.mark.parametrize('scope',[None,'states','sheet','frame'])
 @pytest.mark.parametrize('reference_state',['missing','draft','approved'])
-def test_nonasset_generation_preserves_reference_gate(client,scope,reference_state):
+def test_nonasset_generation_requires_reference_binding_only(client,scope,reference_state):
     p=new(client)
     if reference_state!='missing':
         p,a=upload(client,p)
@@ -110,9 +202,9 @@ def test_nonasset_generation_preserves_reference_gate(client,scope,reference_sta
     if reference_state=='draft': params['referenceRevisionId']=reference['referenceRevisionId']
     response=client.post('/v1/projects/'+p['projectId']+'/jobs',json={
         'operation':'generate','inputRevision':p['revision'],'params':params,'idempotencyKey':s.uid()})
-    assert response.status_code=={'missing':404,'draft':424,'approved':202}[reference_state],response.text
-    if reference_state=='draft': assert response.json()['code']=='REFERENCE_REQUIRED'
-    assert len(client.get('/v1/projects/'+p['projectId']+'/jobs').json()['jobs'])==(reference_state=='approved')
+    assert response.status_code=={'missing':404,'draft':202,'approved':202}[reference_state],response.text
+    assert len(client.get('/v1/projects/'+p['projectId']+'/jobs').json()['jobs'])==(reference_state!='missing')
+    assert load(client,p)==p
 
 def test_image_use_settings_round_trip_without_generation(client):
     p=new(client)
@@ -640,7 +732,7 @@ def test_rejected_frame_reason_survives_reopen_and_blocks_export(client):
     assert r.status_code==422
 
 @pytest.mark.parametrize('mutation', ['timing','transform','pixels','order','group','anchor','reference','outline'])
-def test_edits_revoke_clip_approval_and_block_exports(client,mutation):
+def test_edits_preserve_review_invalidation_without_blocking_exports(client,mutation):
     c=client;p,_=approved(c);cl=p['clips'][0];cid=cl['clipId'];fid=p['frames'][0]['frameVersionId'];oid=cl['occurrences'][0]['occurrenceId']
     p=edit(c,p,[{'type':'updateClip','clipId':cid,'changes':{'review':'approved'}}])
     operations={
@@ -657,13 +749,16 @@ def test_edits_revoke_clip_approval_and_block_exports(client,mutation):
     assert reopened['clips'][0]['review']=='pending'
     assert reopened['clips'][0]['reviewInvalidatedReason']
     response=c.post('/v1/projects/'+p['projectId']+'/exports',json={'savedRevision':p['revision'],'clipRevisionIds':[p['clips'][0]['clipRevisionId']],'idempotencyKey':s.uid()})
-    assert response.status_code==422 and response.json()['code']=='CLIP_UNAPPROVED'
+    assert response.status_code==202,response.text
+    assert run_job(response.json()['jobId'])['status']=='succeeded'
+    assert load(c,p)==reopened
     if mutation in ('anchor','group'):
         assert p['alignments'][fid]['approval']=='pending'
         assert p['alignments'][fid]['reviewInvalidatedReason']
         p=edit(c,p,[{'type':'updateClip','clipId':cid,'changes':{'review':'approved'}}])
         response=c.post('/v1/projects/'+p['projectId']+'/exports',json={'savedRevision':p['revision'],'clipRevisionIds':[p['clips'][0]['clipRevisionId']],'idempotencyKey':s.uid()})
-        assert response.status_code==422 and response.json()['code']=='ANCHOR_UNAPPROVED'
+        assert response.status_code==202,response.text
+        assert run_job(response.json()['jobId'])['status']=='succeeded'
         # Full UI echo contains the server-owned reason; reapproval must accept it.
         p=edit(c,p,[{'type':'setAlignment','frameVersionId':fid,'alignment':{**p['alignments'][fid],'approval':'approved'}}])
         assert 'reviewInvalidatedReason' not in p['alignments'][fid]
@@ -687,7 +782,7 @@ def test_export_rejects_duplicate_missing_and_stale_selections(client):
     with s.transaction() as db:
         p['alignments'][p['frames'][0]['frameVersionId']]['groupRevisionId']='stale';s.write_project(db,p,'stale anchor test fixture')
     response=c.post('/v1/projects/'+p['projectId']+'/exports',json={'savedRevision':p['revision'],'clipRevisionIds':[rid],'idempotencyKey':s.uid()})
-    assert response.status_code==422 and response.json()['code']=='ANCHOR_UNAPPROVED'
+    assert response.status_code==422 and response.json()['code']=='STALE_ALIGNMENT'
 
 
 def test_public_job_scope_for_legacy_records_and_future_events(client):

@@ -294,8 +294,7 @@ def enqueue(pid,operation,request,idem,expected=None,connection=None):
             except ProviderError as exc:
                 raise s.AppError(exc.code,exc.message,details=exc.details) from exc
             if not asset_scope:
-                ref=find(p['references'],'referenceRevisionId',request['params'].get('referenceRevisionId',p['activeReferenceRevisionId']))
-                if ref['approval']!='approved': raise s.AppError('REFERENCE_REQUIRED','승인된 기준이 필요합니다.',424)
+                find(p['references'],'referenceRevisionId',request['params'].get('referenceRevisionId',p['activeReferenceRevisionId']))
                 if request['params'].get('providerId') not in ('codex','grok','openai'): raise s.AppError('PROVIDER_REQUIRED','생성 연결을 명시적으로 선택하세요.')
                 number(request['params'].get('frameCount',1),1,24,'요청 프레임 수',True)
         if operation in ('generate_video','process_video'):
@@ -313,8 +312,7 @@ def enqueue(pid,operation,request,idem,expected=None,connection=None):
                 if len(request.get('assetIds',[]))!=1: raise s.AppError('VIDEO_BASE_REQUIRED','영상에 사용할 기준 그림 하나를 선택하세요.')
                 if settings.get('referenceRevisionId'):
                     ref=find(p['references'],'referenceRevisionId',settings['referenceRevisionId'])
-                    if ref['approval']!='approved': raise s.AppError('REFERENCE_REQUIRED','선택한 기준을 먼저 승인하세요.',424)
-                    if ref['identityAssetId']!=request['assetIds'][0]: raise s.AppError('VIDEO_REFERENCE_MISMATCH','승인 기준과 선택한 그림이 다릅니다.')
+                    if ref['identityAssetId']!=request['assetIds'][0]: raise s.AppError('VIDEO_REFERENCE_MISMATCH','선택한 기준과 그림이 다릅니다.')
             else:
                 if request.get('assetIds'): raise s.AppError('VIDEO_INPUT','영상 후처리에는 영상만 선택하세요.')
                 video=find(p.get('videos',[]),'videoId',settings.get('videoId'))
@@ -444,11 +442,12 @@ def export_create(pid:str,body:ExportRequest):
         if gates: raise s.AppError(gates[0]['code'],gates[0]['message'],422,{'errors':gates})
         for occurrence in cl['occurrences']:
             frame=find(p['frames'],'frameVersionId',occurrence['frameVersionId'])
-            if frame.get('review')!='approved': raise s.AppError('FRAME_UNAPPROVED','프레임 검수가 필요합니다.',422,{'affectedIds':[frame['frameVersionId']]})
+            if frame.get('review')=='rejected': raise s.AppError('FRAME_REJECTED','제외한 프레임을 타임라인에서 제거하거나 다시 선택하세요.',422,{'affectedIds':[frame['frameVersionId']]})
             anchor=p['alignments'].get(frame['frameVersionId'],{})
             group=find(p['alignmentGroups'],'alignmentGroupId',frame['nativeScaleGroupId'])
-            if anchor.get('approval')!='approved' or anchor.get('groupRevisionId')!=group['groupRevisionId']:
-                raise s.AppError('ANCHOR_UNAPPROVED','현재 그룹 기준의 앵커 승인이 필요합니다.',422,{'affectedIds':[frame['frameVersionId']]})
+            if not anchor: raise s.AppError('ALIGNMENT_MISSING','프레임 앵커가 없습니다.',422,{'affectedIds':[frame['frameVersionId']]})
+            if anchor.get('groupRevisionId')!=group['groupRevisionId'] or anchor.get('frameVersionId')!=frame['frameVersionId']:
+                raise s.AppError('STALE_ALIGNMENT','현재 프레임/그룹에 대한 앵커가 아닙니다.',422,{'affectedIds':[frame['frameVersionId']]})
             s.asset_path(frame['imageAssetId'])
     request=body.model_dump(exclude={'idempotencyKey'})
     with s.transaction() as c:

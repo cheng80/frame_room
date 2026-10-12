@@ -171,7 +171,9 @@ def apply(p,ops):
             if d.get('mode') not in (None,'preserve-source-scale','shared-scale-foot-anchor'): raise AppError('ALIGNMENT_MODE','지원하지 않는 정렬 모드입니다.')
             if d.get('mode',g['mode'])=='shared-scale-foot-anchor':
                 m=d.get('bodyMeasurement',g.get('bodyMeasurement'))
-                if not m or not m.get('approved') or m.get('bottomY',0)<=m.get('topY',0): raise AppError('BODY_MEASUREMENT','승인된 몸 기준점이 필요합니다.')
+                if not isinstance(m,dict) or not m: raise AppError('BODY_MEASUREMENT','몸 기준점과 목표 체고가 필요합니다.')
+                for k in ('topY','bottomY'): number(m.get(k),-32768,32768,'몸 기준점')
+                if m['bottomY']<=m['topY']: raise AppError('BODY_MEASUREMENT','몸 아래 기준점은 위 기준점보다 커야 합니다.')
                 number(m.get('targetHeight'),1,8192,'목표 몸 체고'); d['sharedScale']=m['targetHeight']/(m['bottomY']-m['topY'])
                 number(d['sharedScale'],.01,8,'공통 배율')
             g.update(d); g['groupRevisionId']=uid()

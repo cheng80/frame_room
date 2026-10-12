@@ -341,16 +341,14 @@ def render_occurrence(snapshot, clip, occurrence, asset_path, include_outline=Tr
     for name, actual in (("sha256", _hash(raw)), ("decodedHash", source_hash)):
         if asset.get(name) and asset[name] != actual:
             errors.append(_error("ASSET_HASH_MISMATCH", "저장된 자산 해시가 다릅니다.", assetId=asset["assetId"], field=name))
-    if frame.get("review") != "approved":
-        errors.append(_error("FRAME_UNAPPROVED", "프레임 검수가 필요합니다."))
-    if alignment.get("approval") != "approved":
-        errors.append(_error("ANCHOR_UNAPPROVED", "앵커 승인이 필요합니다."))
+    if frame.get("review") == "rejected":
+        errors.append(_error("FRAME_REJECTED", "제외한 프레임을 타임라인에서 제거하거나 다시 선택하세요."))
     if alignment.get("groupRevisionId") != group.get("groupRevisionId") or alignment.get("frameVersionId") != frame["frameVersionId"]:
-        errors.append(_error("STALE_ALIGNMENT", "현재 프레임/그룹에 대한 앵커 승인이 아닙니다."))
+        errors.append(_error("STALE_ALIGNMENT", "현재 프레임/그룹에 대한 앵커가 아닙니다."))
     if group.get("referenceRevisionId") and group["referenceRevisionId"] != clip.get("referenceRevisionId"):
         errors.append(_error("STALE_REFERENCE", "정렬 그룹과 동작의 기준이 다릅니다."))
     if alignment.get("imageAssetId", asset["assetId"]) != asset["assetId"] or alignment.get("decodedHash", source_hash) != source_hash:
-        errors.append(_error("STALE_ALIGNMENT", "앵커가 승인된 이미지가 변경되었습니다."))
+        errors.append(_error("STALE_ALIGNMENT", "앵커에 연결된 이미지가 변경되었습니다."))
     if group.get("resampler", "nearest") != "nearest" or group.get("roundingVersion", "js-round-v1") != "js-round-v1":
         raise PipelineError("UNSUPPORTED_RENDER_RECIPE", "지원하지 않는 정렬 샘플링입니다.")
     scale = _number(group.get("sharedScale", 1), "sharedScale")
@@ -361,13 +359,13 @@ def render_occurrence(snapshot, clip, occurrence, asset_path, include_outline=Tr
         raise PipelineError("UNSUPPORTED_ALIGNMENT", "포즈별 자동 fit은 지원하지 않습니다.")
     measurement = group.get("bodyMeasurement")
     if mode == "shared-scale-foot-anchor":
-        if not measurement or measurement.get("approved") is not True:
-            errors.append(_error("BODY_MEASUREMENT_UNAPPROVED", "몸 landmark 승인이 필요합니다."))
+        if not isinstance(measurement, dict) or not measurement:
+            errors.append(_error("BODY_MEASUREMENT_REQUIRED", "몸 기준점과 목표 체고가 필요합니다."))
         else:
             body = _number(measurement.get("bottomY"), "bottomY") - _number(measurement.get("topY"), "topY")
             target_height = _number(measurement.get("targetHeight"), "targetHeight")
             if body <= 0 or target_height <= 0 or not math.isclose(scale, target_height / body, rel_tol=1e-9):
-                errors.append(_error("STALE_BODY_SCALE", "공통 배율이 승인된 몸 landmark와 일치하지 않습니다."))
+                errors.append(_error("STALE_BODY_SCALE", "공통 배율이 몸 기준점과 목표 체고에 일치하지 않습니다."))
     cell = group.get("cell", {})
     width = _integer(cell.get("width", 512), "cell.width", 1)
     height = _integer(cell.get("height", 512), "cell.height", 1)
@@ -378,7 +376,7 @@ def render_occurrence(snapshot, clip, occurrence, asset_path, include_outline=Tr
         raise PipelineError("INVALID_CONTACT_MODE", "접지 또는 공중 모드가 필요합니다.")
     if contact == "airborne":
         if not alignment.get("rootAnchor"):
-            raise PipelineError("ROOT_ANCHOR_REQUIRED", "공중 프레임은 승인된 root anchor가 필요합니다.")
+            raise PipelineError("ROOT_ANCHOR_REQUIRED", "공중 프레임은 root anchor가 필요합니다.")
         anchor = _point(alignment["rootAnchor"], "rootAnchor")
     else:
         anchor = _point(alignment.get("sourceAnchor"), "sourceAnchor")
@@ -436,11 +434,9 @@ def _clip_gates(snapshot, clip):
     errors = []
     if not clip.get("occurrences"):
         errors.append(_error("EMPTY_TIMELINE", "빈 타임라인은 출력할 수 없습니다."))
-    if clip.get("review") != "approved":
-        errors.append(_error("CLIP_UNAPPROVED", "동작 검수가 필요합니다."))
     references = [r for r in snapshot.get("references", []) if r.get("referenceRevisionId") == clip.get("referenceRevisionId")]
-    if len(references) != 1 or references[0].get("approval") != "approved":
-        errors.append(_error("REFERENCE_UNAPPROVED", "동작에 고정된 승인 기준이 필요합니다."))
+    if len(references) != 1:
+        errors.append(_error("REFERENCE_REQUIRED", "동작에 연결된 기준이 필요합니다."))
     if clip.get("endBehavior", "hold-last") != "hold-last":
         errors.append(_error("UNSUPPORTED_TIMING", "단발 재생은 hold-last만 지원합니다."))
     fps = clip.get("defaultFps", 10)

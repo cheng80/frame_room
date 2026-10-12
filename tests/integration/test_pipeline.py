@@ -64,6 +64,66 @@ def bundle(project, path, **kwargs):
     return build_bundle(p, ["idle"], paths, path, "export", **kwargs)
 
 
+def pending(project):
+    p = project[0]
+    p['references'][0]['approval'] = 'draft'
+    p['clips'][0]['review'] = 'pending'
+    p['frames'][0]['review'] = 'pending'
+    p['alignments']['a']['approval'] = 'pending'
+    return p
+
+
+def test_pending_export_does_not_approve_or_mutate_snapshot(project, tmp_path):
+    p = pending(project)
+    before = copy.deepcopy(p)
+    result = bundle(project, tmp_path/'pending')
+    assert result['qa']['status'] == 'verified' and result['qa']['errors'] == []
+    assert p == before
+
+
+@pytest.mark.parametrize('mutation,code', [
+    (lambda p: p['clips'][0].update(referenceRevisionId='missing'), 'REFERENCE_REQUIRED'),
+    (lambda p: p['references'].append(copy.deepcopy(p['references'][0])), 'REFERENCE_REQUIRED'),
+    (lambda p: p['references'][0].update(identityAssetId='missing'), 'ASSET_MISSING'),
+    (lambda p: p['assets'][0].update(sha256='0'*64), 'ASSET_HASH_MISMATCH'),
+    (lambda p: p['assets'][0].update(provenance={'parentAssetId':'missing'}), 'ASSET_MISSING'),
+    (lambda p: p['alignments']['a'].update(groupRevisionId='old'), 'STALE_ALIGNMENT'),
+    (lambda p: p['alignments']['a'].update(frameVersionId='old'), 'STALE_ALIGNMENT'),
+    (lambda p: p['alignments']['a'].update(decodedHash='old'), 'STALE_ALIGNMENT'),
+    (lambda p: p['alignments']['a'].update(contactMode='airborne'), 'ROOT_ANCHOR_REQUIRED'),
+    (lambda p: p['clips'][0]['occurrences'][0].update(durationMs=0), 'UNSUPPORTED_TIMING'),
+    (lambda p: p['clips'][0]['occurrences'][0].update(transform={'dx':100}), 'FRAME_OVERFLOW'),
+    (lambda p: p['clips'][0]['occurrences'][0].update(transform={'scaleX':0}), 'INVALID_TRANSFORM'),
+    (lambda p: p['frames'][0].update(review='rejected'), 'FRAME_REJECTED'),
+])
+def test_pending_still_blocks_invalid_technical_data(project, tmp_path, mutation, code):
+    p = pending(project)
+    mutation(p)
+    before = copy.deepcopy(p)
+    with pytest.raises(PipelineError) as error:
+        bundle(project, tmp_path/'invalid-pending')
+    assert error.value.code == code
+    assert p == before and not (tmp_path/'invalid-pending').exists()
+
+
+@pytest.mark.parametrize('measurement,code', [
+    ({'topY':0,'bottomY':0,'targetHeight':4}, 'STALE_BODY_SCALE'),
+    ({'topY':4,'bottomY':0,'targetHeight':4}, 'STALE_BODY_SCALE'),
+    ({'topY':0,'bottomY':4,'targetHeight':0}, 'STALE_BODY_SCALE'),
+    ({'topY':False,'bottomY':4,'targetHeight':4}, 'INVALID_GEOMETRY'),
+    ({'topY':'0','bottomY':4,'targetHeight':4}, 'INVALID_GEOMETRY'),
+    ({'topY':0,'bottomY':float('inf'),'targetHeight':4}, 'INVALID_GEOMETRY'),
+    ({'topY':0,'bottomY':4}, 'INVALID_GEOMETRY'),
+    ([], 'BODY_MEASUREMENT_REQUIRED'),
+])
+def test_pending_body_measurements_must_be_real_geometry(project, tmp_path, measurement, code):
+    p = pending(project)
+    p['alignmentGroups'][0].update(mode='shared-scale-foot-anchor', bodyMeasurement=measurement)
+    with pytest.raises(PipelineError) as error:
+        bundle(project, tmp_path/'bad-measurements')
+    assert error.value.code == code
+
+
 def test_alpha_stats_full_rgba_fingerprint(tmp_path):
     image = Image.new("RGBA", (5, 1))
     image.putdata([(80, 90, 100, a) for a in (0, 1, 15, 16, 255)])
@@ -332,16 +392,14 @@ def test_preview_only_outline_does_not_change_bitmap_or_recipe(project,tmp_path)
 
 @pytest.mark.parametrize("mutation,code", [
     (lambda p:p["clips"][0].update(occurrences=[]),"EMPTY_TIMELINE"),
-    (lambda p:p["clips"][0].update(review="pending"),"CLIP_UNAPPROVED"),
-    (lambda p:p["references"][0].update(approval="draft"),"REFERENCE_UNAPPROVED"),
-    (lambda p:p["frames"][0].update(review="pending"),"FRAME_UNAPPROVED"),
-    (lambda p:p["alignments"]["a"].update(approval="pending"),"ANCHOR_UNAPPROVED"),
+    (lambda p:p["clips"][0].update(referenceRevisionId="missing"),"REFERENCE_REQUIRED"),
+    (lambda p:p["frames"][0].update(review="rejected"),"FRAME_REJECTED"),
     (lambda p:p["alignments"]["a"].update(groupRevisionId="old"),"STALE_ALIGNMENT"),
     (lambda p:p.update(savedRevision=6),"STALE_SAVE"),
     (lambda p:p.update(savePending=True),"STALE_SAVE"),
     (lambda p:p["clips"][0].update(endBehavior="stop"),"UNSUPPORTED_TIMING"),
     (lambda p:p["alignmentGroups"][0].update(referenceRevisionId="other"),"STALE_REFERENCE"),
-    (lambda p:p["alignmentGroups"][0].update(mode="shared-scale-foot-anchor"),"BODY_MEASUREMENT_UNAPPROVED"),
+    (lambda p:p["alignmentGroups"][0].update(mode="shared-scale-foot-anchor"),"BODY_MEASUREMENT_REQUIRED"),
 ])
 def test_strict_gates_publish_nothing(project,tmp_path,mutation,code):
     mutation(project[0])
@@ -382,6 +440,7 @@ def test_previous_approved_reference_and_unselected_invalid_clip_allowed(project
 
 def test_hash_tamper_and_missing_source_block(project,tmp_path):
     p, paths, _=project
+    pending(project)
     Image.new("RGBA",(4,4),(255,0,0,255)).save(paths("a"))
     with pytest.raises(PipelineError) as error:
         bundle(project,tmp_path/"tampered")
@@ -394,6 +453,7 @@ def test_hash_tamper_and_missing_source_block(project,tmp_path):
 
 def test_empty_alpha_and_overflow_strict_gate(project,tmp_path):
     p, _, add=project
+    pending(project)
     add(Image.new("RGBA",(2,2)),"empty")
     p["clips"][0]["occurrences"][0]["frameVersionId"]="empty"
     with pytest.raises(PipelineError) as error:
@@ -418,9 +478,10 @@ def test_locked_snapshot_not_mixed_with_edit_during_bake(project,tmp_path):
     assert p["revision"]==8
 
 
-def test_approved_body_landmarks_define_one_scale(project,tmp_path):
+@pytest.mark.parametrize('approval', [{}, {'approved': False}, {'approved': True}])
+def test_body_landmarks_define_one_scale_without_approval(project,tmp_path,approval):
     g=project[0]["alignmentGroups"][0]
-    g.update(mode="shared-scale-foot-anchor",bodyMeasurement={"topY":2,"bottomY":6,"targetHeight":5,"approved":True},sharedScale=1.25)
+    g.update(mode="shared-scale-foot-anchor",bodyMeasurement={"topY":2,"bottomY":6,"targetHeight":5,**approval},sharedScale=1.25)
     assert bundle(project,tmp_path/"ok")["qa"]["status"]=="verified"
     g["sharedScale"]=1
     with pytest.raises(PipelineError) as error:

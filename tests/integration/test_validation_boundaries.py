@@ -35,6 +35,32 @@ def test_cell_margin_preserves_nonempty_safe_area(width, height, edge, valid):
     assert snapshot == before
 
 
+@pytest.mark.parametrize('approval', [{}, {'approved':False}, {'approved':True}])
+def test_body_measurement_approval_is_metadata(approval):
+    snapshot = json.loads((Path(__file__).parents[1] / 'fixtures/review-transitions.json').read_text())['snapshot']
+    measurement = {'topY':2, 'bottomY':6, 'targetHeight':5, **approval}
+    result = apply(snapshot, [{'type':'setAlignmentGroup','alignmentGroupId':'g',
+                              'changes':{'mode':'shared-scale-foot-anchor','bodyMeasurement':measurement}}])
+    assert result['alignmentGroups'][0]['sharedScale'] == 1.25
+    assert result['alignmentGroups'][0]['bodyMeasurement'] == measurement
+
+
+@pytest.mark.parametrize('measurement', [
+    None, [], 'invalid', {}, {'topY':'2','bottomY':'6','targetHeight':5},
+    {'topY':False,'bottomY':6,'targetHeight':5}, {'topY':0,'bottomY':float('nan'),'targetHeight':5},
+    {'topY':6,'bottomY':2,'targetHeight':5}, {'topY':2,'bottomY':2,'targetHeight':5},
+    {'topY':2,'bottomY':6,'targetHeight':0}, {'topY':2,'bottomY':6,'targetHeight':True},
+    {'topY':2,'bottomY':6},
+])
+def test_invalid_body_geometry_is_rejected_without_mutation(measurement):
+    snapshot = json.loads((Path(__file__).parents[1] / 'fixtures/review-transitions.json').read_text())['snapshot']
+    before = copy.deepcopy(snapshot)
+    with pytest.raises(store.AppError):
+        apply(snapshot, [{'type':'setAlignmentGroup','alignmentGroupId':'g',
+                          'changes':{'mode':'shared-scale-foot-anchor','bodyMeasurement':measurement}}])
+    assert snapshot == before
+
+
 @pytest.mark.parametrize('fail', [False, True])
 def test_connection_context_closes_on_success_and_failure(tmp_path, monkeypatch, fail):
     monkeypatch.setattr(store, 'DATA', tmp_path)

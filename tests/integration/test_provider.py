@@ -87,11 +87,15 @@ def test_validation_before_any_submission(inputs, monkeypatch, change, code):
     assert not out_dir.exists()
 
 
-def test_reference_approval_gate(inputs, monkeypatch):
+@pytest.mark.parametrize('approval', ['approved', 'draft'])
+def test_reference_identity_still_required(inputs, monkeypatch, approval):
     params, reference, asset_path, out_dir = inputs
-    reference['approval'] = 'draft'
-    with pytest.raises(provider.ProviderError, match='승인'):
+    reference['approval'] = approval
+    reference.pop('identityAssetId')
+    monkeypatch.setattr(gen, 'generate_image', lambda *a, **k: pytest.fail('must not generate'))
+    with pytest.raises(provider.ProviderError) as error:
         provider.generate(params, reference, asset_path, out_dir)
+    assert error.value.code == 'provider.invalid_reference'
     assert not out_dir.exists()
 
 
@@ -136,8 +140,10 @@ def test_asset_generation_has_no_references_and_preserves_original_and_receipt(i
     assert Path(result['paths'][0]).read_bytes() == (out / 'provider-attempt/generated.png').read_bytes()
 
 
-def test_generate_passes_roles_and_preserves_receipt_and_raw(inputs, monkeypatch):
+@pytest.mark.parametrize('approval', ['approved', 'draft'])
+def test_generate_passes_roles_and_preserves_receipt_and_raw(inputs, monkeypatch, approval):
     params, reference, asset_path, out_dir = inputs
+    reference['approval'] = approval
     original = copy.deepcopy((params, reference))
     before = asset_path('identity').read_bytes()
     seen = []
@@ -426,6 +432,7 @@ def test_native_alpha_request_measures_actual_output_without_modifying_raw(input
     assert receipt == result['receipt'] and sum(receipt['alphaStats'].values()) == 4
 
 
+@pytest.mark.parametrize('approval', ['approved', 'draft'])
 @pytest.mark.parametrize('case,code', [
     ('missing-target', 'provider.regeneration_target_required'),
     ('missing-selected-id', 'provider.regeneration_target_required'),
@@ -436,8 +443,9 @@ def test_native_alpha_request_measures_actual_output_without_modifying_raw(input
     ('changed-pixels', 'provider.regeneration_target_changed'),
     ('sheet-target', 'provider.invalid_regeneration_target'),
 ])
-def test_frame_regeneration_requires_matching_target_before_any_call(inputs, monkeypatch, case, code):
+def test_frame_regeneration_requires_matching_target_before_any_call(inputs, monkeypatch, case, code, approval):
     params, reference, asset_path, out_dir = inputs
+    reference['approval'] = approval
     params.update(scope='frame', frameCount=1, frameVersionId='selected-frame')
     target = {'frameVersionId': 'selected-frame', 'imageAssetId': 'pose',
               'sha256': hashlib.sha256(asset_path('pose').read_bytes()).hexdigest()}

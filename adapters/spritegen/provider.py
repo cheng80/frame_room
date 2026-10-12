@@ -202,8 +202,8 @@ def _validate(params: dict, reference: dict, regeneration_target: dict | None = 
         raise ProviderError("provider.invalid_regeneration_target", "재생성 대상 참조는 scope=frame에서만 사용할 수 있습니다.")
     if scope == "asset":
         validate_asset_params(params, reference, regeneration_target)
-    elif reference.get("approval") != "approved" or not reference.get("identityAssetId"):
-        raise ProviderError("provider.reference_unapproved", "identity 이미지가 있는 승인된 기준 참조가 필요합니다.")
+    elif not reference.get("identityAssetId"):
+        raise ProviderError("provider.invalid_reference", "identity 이미지가 있는 기준 참조가 필요합니다.")
     for field in ("styleAssetIds", "poseAssetIds"):
         if not isinstance(reference.get(field, []), list):
             raise ProviderError("provider.invalid_reference", f"{field}는 배열이어야 합니다.")
