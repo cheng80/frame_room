@@ -34,6 +34,8 @@ export interface VideoProcessingSettings {
   startFoot: 'auto' | 'left' | 'right';
   startIndex: string;
   matchClipId: string;
+  /** Optional: settings saved before frame selection omit it and stay uniform. Vision always judges by rules. */
+  frameSelection?: 'uniform' | 'vision';
 }
 export interface VideoGenerationSettings {
   assetId: string;
@@ -50,7 +52,7 @@ export const defaultVideoProcessing = (): VideoProcessingSettings => ({
   state: 'walk', key: 'auto', loopMode: 'auto', startFrame: '0', endFrame: '',
   maxFrames: '8', bodyHeight: '94', cellWidth: '64', cellHeight: '128',
   spillReferenceAssetId: '', finishMode: 'gif', repairMode: 'off', matchClipId: '',
-  between: 'auto', startFoot: 'auto', startIndex: '',
+  between: 'auto', startFoot: 'auto', startIndex: '', frameSelection: 'vision',
 });
 export const imageProviders = (providers: Provider[]) => providers.filter(p => p.mediaKind !== 'video');
 export function approvedVideoReference(snapshot: Snapshot, assetId?: string) {
@@ -111,6 +113,11 @@ export function videoProcessingParams(settings: VideoProcessingSettings, video?:
   };
   if (settings.direction) params.direction = oneOf(settings.direction, VIDEO_DIRECTIONS.map(d => d.id), '원본 보기 방향');
   if (settings.facing) params.facing = oneOf(settings.facing, ['right', 'left'], '원본 캐릭터 방향');
+  // Always explicit: the API writes vision+rules into a new request that omits it. Settings without the
+  // field (saved before it existed) and cycle matching keep the uniform path.
+  const selection = oneOf(settings.frameSelection ?? 'uniform', ['uniform', 'vision'], '영상 프레임 선별');
+  params.frameSelection = settings.matchClipId ? 'uniform' : selection;
+  if (params.frameSelection === 'vision') params.frameJudge = 'rules';
   if (settings.startIndex?.trim()) params.startIndex = integer(settings.startIndex, 0, 63, '수동 시작 위치');
   if (Number(settings.bodyHeight) > Number(settings.cellHeight) - 4) throw new Error('셀 높이는 공통 몸 높이보다 4px 이상 크게 지정해 주세요.');
   if (settings.loopMode === 'manual') {

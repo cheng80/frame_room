@@ -16,6 +16,8 @@ from adapters.spritegen.video_prompt import (
 from services.api import store as s
 from services.api.main import app
 
+# New requests without frameSelection are stored with the fresh default written in.
+FRESH_SELECTION = {"frameSelection": "vision", "frameJudge": "rules"}
 EXTRA_BODIES = ("reference", "arachnid", "winged_biped", "winged_quadruped")
 INVALID_BODIES = (
     "centaur", "the bird=winged", "=arachnid", " =winged_biped", "arachnid; winged_biped",
@@ -329,13 +331,13 @@ def test_api_rejects_invalid_structure_before_queue_and_preserves_request_snapsh
         response = client.post(root + "/jobs", json={**request, "idempotencyKey": s.uid(), "params": params})
         assert response.status_code == 202, response.text
         job = s.get_job(response.json()["jobId"])
-        assert job["request"]["params"] == params
+        assert job["request"]["params"] == {**params, **FRESH_SELECTION}
         assert provider.validate_params(job["request"]["params"], generation=True)["maxFrames"] == 12
         response = client.post(root + "/video-batches", json={"inputRevision": project["revision"],
                                "idempotencyKey": s.uid(), "items": [{"assetId": asset["assetId"], "params": params}]})
         assert response.status_code == 202, response.text
         queued = s.get_job(response.json()["jobs"][0]["jobId"])
-        assert queued["request"]["params"] == params
+        assert queued["request"]["params"] == {**params, **FRESH_SELECTION}
 
 
 @pytest.mark.parametrize("body", EXTRA_BODIES)
@@ -358,4 +360,4 @@ def test_catalog_body_process_enqueue_preserves_request(tmp_path, monkeypatch, b
         response = client.post(root + "/jobs", json={"operation": "process_video", "assetIds": [],
                                "inputRevision": uploaded["snapshot"]["revision"], "params": params, "idempotencyKey": s.uid()})
         assert response.status_code == 202, response.text
-        assert s.get_job(response.json()["jobId"])["request"]["params"] == params
+        assert s.get_job(response.json()["jobId"])["request"]["params"] == {**params, **FRESH_SELECTION}

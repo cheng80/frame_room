@@ -52,3 +52,33 @@ def test_video_batch_rejects_whole_plan_without_partial_jobs(setup):
     assert c.post(url,json=body).status_code==422
     body['items']=[]
     assert c.post(url,json=body).status_code==422
+
+
+@pytest.mark.parametrize('params',[{},{'frameJudge':'auto'},{'frameSelection':'vision','frameJudge':'auto'}])
+def test_job_stored_before_the_fresh_default_replays_by_its_raw_request(setup,params):
+    """A job saved before frameSelection defaulted hashed the raw request; the same raw replay returns it unchanged."""
+    c,p,a=setup;url='/v1/projects/'+p['projectId']+'/jobs'
+    raw={'operation':'generate_video','inputRevision':p['revision'],'assetIds':[a['assetId']],'params':params,'idempotencyKey':'old'}
+    jid=c.post(url,json=raw).json()['jobId']
+    original={k:v for k,v in raw.items() if k!='idempotencyKey'}
+    with s.transaction() as db:  # stand-in for a record written by the previous code (test database only)
+        job=s.get_job(jid,db);job.update(request=original,requestHash=s.digest(s.dumps(original).encode()));s.write_job(db,job)
+        db.execute('UPDATE jobs SET request_hash=? WHERE id=?',(job['requestHash'],jid))
+    replay=c.post(url,json=raw);assert replay.status_code==202,replay.text
+    assert replay.json()['jobId']==jid and s.get_job(jid)['request']==original
+    assert c.post(url,json={**raw,'params':{**params,'state':'run'}}).status_code==409
+    assert len(c.get('/v1/projects/'+p['projectId']+'/jobs').json()['jobs'])==1
+
+
+def test_new_default_and_explicit_uniform_jobs_replay_stably(setup):
+    c,p,a=setup;url='/v1/projects/'+p['projectId']+'/jobs'
+    base={'operation':'generate_video','inputRevision':p['revision'],'assetIds':[a['assetId']]}
+    fresh={**base,'params':{},'idempotencyKey':'fresh'};uniform={**base,'params':{'frameSelection':'uniform'},'idempotencyKey':'uniform'}
+    first,second=c.post(url,json=fresh).json(),c.post(url,json=uniform).json()
+    assert s.get_job(first['jobId'])['request']['params']=={'frameSelection':'vision','frameJudge':'rules'}
+    assert s.get_job(second['jobId'])['request']['params']=={'frameSelection':'uniform'}
+    for body,job in ((fresh,first),(uniform,second)):
+        again=c.post(url,json=body);assert again.status_code==202 and again.json()['jobId']==job['jobId']
+    assert c.post(url,json={**fresh,'params':{'frameSelection':'uniform'}}).status_code==409  # changed content, same key
+    assert c.post(url,json={**uniform,'params':{}}).status_code==409
+    assert len(c.get('/v1/projects/'+p['projectId']+'/jobs').json()['jobs'])==2

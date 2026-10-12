@@ -127,3 +127,21 @@ describe('candidate history with explicit lineage', () => {
     expect(html).toContain('aria-pressed="true"');
   });
 });
+
+describe('frame selection recommendation labels', () => {
+  it('names automatic recommendations apart from user review records', async () => {
+    const {selectionLabel, selectionReason} = await import('../src/CandidateReview');
+    expect(selectionLabel({label: 'keep'})).toBe('사용 추천');
+    expect(selectionLabel({label: 'reject', role: 'uniform-alternative'})).toBe('교체된 균등 프레임');
+    expect(selectionLabel({})).toBe('판정 미기록');
+    expect(selectionReason('OBSERVED:extra_or_missing_parts')).toBe('관찰: 신체·장비 추가/누락');
+    expect(selectionReason('UNKNOWN:blur_or_smear')).toBe('판단 불가: 흐림·번짐');
+    expect(selectionReason('JEV_ERROR:JEV_TIMEOUT')).toBe('Jev 호출 실패: JEV_TIMEOUT');
+    expect(selectionReason('CONFLICT_JEV_VS_RULES')).toBe('Jev와 규칙 판정 불일치');
+    // Laya/Jev were removed on 2026-10-13; records saved before that keep readable reasons.
+    expect(selectionReason('CONFLICT_LAYA_VS_RULES')).toBe('Laya와 규칙 판정 불일치');
+    expect(selectionReason('LAYA_ABSTAINED')).toBe('Laya 신뢰도 부족');
+    expect(selectionReason('OBSERVED:colour_contamination')).toBe('관찰: 기준과 다른 색 얼룩');
+    expect(selectionReason('NEW_CODE')).toBe('NEW_CODE');
+  });
+});

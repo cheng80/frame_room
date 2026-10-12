@@ -3,6 +3,7 @@ import {useMemo} from 'react';
 import type {Asset, Job, Snapshot} from './types';
 import {assetProvenanceLabel} from './assetProvenance';
 import {buildCandidateHistory, candidateApprovalLabel, type CandidateGeneration} from './candidateHistory';
+import {selectionLabel} from './CandidateReview';
 import './candidate-library.css';
 
 export interface CandidateLibraryProps {
@@ -44,7 +45,7 @@ export function CandidateLibrary({snapshot, jobs, includeHidden, selectedFrameId
         return <article className="cl-entry" key={frame.frameVersionId}>
           <button type="button" className={`aw-candidate ${selectedFrameId === frame.frameVersionId ? 'is-selected' : ''}`} aria-pressed={selectedFrameId === frame.frameVersionId} onClick={() => onSelect(frame.frameVersionId)}>
             <span className="aw-candidate-thumb checker">{asset && <img src={asset.url} alt="" loading="lazy"/>}</span>
-            <span className="aw-candidate-info"><strong>후보 {number}</strong><small>{frame.hidden ? '숨김 · ' : ''}{candidateApprovalLabel(frame.review)}</small><small>{asset ? assetProvenanceLabel(asset, assets).originLabel || assetProvenanceLabel(asset, assets).label : '자료 기록 없음'}</small><small>{entry.uses.length}회 사용 · {shortId(frame.frameVersionId)}</small>{(frame.extractionReview?.warnings?.length||frame.extractionReview?.belowMinArea)?<small>추출 검사 경고 · 직접 확인</small>:null}</span>
+            <span className="aw-candidate-info"><strong>후보 {number}</strong><small>{frame.hidden ? '숨김 · ' : ''}{candidateApprovalLabel(frame.review)}</small><small>{asset ? assetProvenanceLabel(asset, assets).originLabel || assetProvenanceLabel(asset, assets).label : '자료 기록 없음'}</small><small>{entry.uses.length}회 사용 · {shortId(frame.frameVersionId)}</small>{(frame.extractionReview?.warnings?.length||frame.extractionReview?.belowMinArea)?<small>추출 검사 경고 · 직접 확인</small>:null}{frame.selectionDecision?<small>영상 선별 · {selectionLabel(frame.selectionDecision)}</small>:null}</span>
           </button>
           <details className="cl-entry-detail">
             <summary>출처·사용처{entry.uses.length ? ` (${entry.uses.length})` : ''}</summary>

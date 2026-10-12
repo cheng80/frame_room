@@ -54,6 +54,9 @@ export function VideoStep({s, onSelectClip}: {s: Studio; onSelectClip?: (clipId:
   const rifeAvailable = rife?.available === true;
   const rifeReason = typeof rife?.reason === 'string' ? rife.reason : '보정 도구의 준비 상태를 확인하지 못했습니다. Grok 연결을 다시 확인해 주세요.';
   const available = !!provider && provider.available !== false && provider.loginReady !== false;
+  const selectionCapability = provider?.capabilities?.frameSelection as {observer?: {model?: string | null; effort?: string | null; available?: boolean; reason?: string | null}} | undefined;
+  const observer = selectionCapability?.observer;
+  const frameSelection = processing.matchClipId ? 'uniform' : processing.frameSelection ?? 'uniform';
   const active = s.jobs.some(job => isVideoJob(job) && ['queued', 'running', 'cancel_requested'].includes(job.status));
   const locked = s.busy || !!s.commands.length || !!s.conflict;
   const disabled = locked || active || s.service?.worker !== 'ready';
@@ -268,6 +271,14 @@ export function VideoStep({s, onSelectClip}: {s: Studio; onSelectClip?: (clipId:
             </Select>
             <p className="caption">걷기·달리기 반복 구간의 급격한 움직임만 보정합니다. 자동 모드는 RIFE를 사용할 수 없으면 원본 프레임을 유지하고 사유를 기록합니다. 보간 프레임은 출처에 표시됩니다.</p>
             {!rifeAvailable ? <p className="warning">RIFE 필수 보정을 사용할 수 없습니다. {rifeReason}</p> : <p className="caption">로컬 RIFE 준비됨 · 보정에 새 영상 생성은 필요하지 않습니다.</p>}
+            <Select label="영상 프레임 선별" value={frameSelection} disabled={!!processing.matchClipId} onChange={e => setProcessingField('frameSelection', e.target.value as NonNullable<VideoProcessingSettings['frameSelection']>)}>
+              <option value="vision" disabled={!selectionCapability}>Luna 관찰 + 규칙 판정 · 기본</option>
+              <option value="uniform">균등 간격 · 기존 방식</option>
+            </Select>
+            {processing.matchClipId ? <p className="caption">주기 맞춤은 균등 간격으로 추출합니다.</p> : frameSelection === 'vision' ? <>
+              <p className="caption">각 출력 슬롯의 균등 위치와 이웃 후보를 {observer?.model ? `${observer.model} · ${observer.effort}` : 'Luna'}가 한 번 관찰하고 규칙으로 판정합니다(ChatGPT 구독 호출 1회, 같은 후보는 캐시 재사용). 프레임 수·순서·총 재생 시간은 유지하며 확실한 대체 후보가 없으면 균등 프레임을 둡니다. 추천은 프레임 편집에서 바꿀 수 있고 검토·숨김 기록은 바꾸지 않습니다.</p>
+              {observer && observer.available !== true ? <p className="warning">이 컴퓨터의 Codex 모델 목록에서 이미지·medium을 지원하는 Luna를 찾지 못했습니다({observer.reason ?? '확인 불가'}). 관찰 호출 없이 균등 프레임을 유지하고 확인 필요로 표시합니다.</p> : null}
+            </> : null}
             <Select label="추출 구간" value={processing.loopMode} onChange={e => setProcessing(previous => ({...previous, loopMode: e.target.value, ...(e.target.value === 'full' ? {matchClipId: '', startIndex: '', startFoot: 'auto'} : {})}))}>
               <option value="auto">자동 · 반복 구간 찾기</option><option value="full">전체 영상</option>
               {mode === 'process' ? <option value="manual">수동 · 프레임 범위</option> : null}
