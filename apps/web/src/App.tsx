@@ -2,7 +2,7 @@ import {useState,useEffect,useRef} from 'react';
 import {BookOpen,Boxes,FolderOpen,ImagePlus,ScanFace,Sparkles,Scissors,Move,ShieldCheck,Download,History,Activity,Undo2,Redo2,Save,ArrowLeft,Plus,ExternalLink,ChevronRight,Trash2} from 'lucide-react';
 import {useStudio,type Studio} from './useStudio';
 import {api,downloadJson} from './api';
-import {uid,type Snapshot,type MissingProjectFolder,type Job} from './types';
+import {uid,type Snapshot,type MissingProjectFolder,type Job,type Asset} from './types';
 import {Panel,Input,Num,Empty,date} from './ui';
 import {AssetsStep,ReferenceStep,GenerationStep,ImageGenerationStep,ExtractStep} from './SourceSteps';
 import {AlignmentStep} from './EditSteps';
@@ -11,6 +11,7 @@ import {ReviewStep,ExportStep,JobsStep,HistoryStep,JobCard} from './FinishSteps'
 import {FileViewer} from './Canvas';
 import {EditorDialog} from './EditorDialog';
 import {ProviderConnections} from './ProviderConnections';
+import {projectCoverAsset} from './referenceLabel';
 import './editor-shell.css';
 
 const tools=[
@@ -32,6 +33,7 @@ export default function App(){
  const [toolSelection,setToolSelection]=useState<{frameVersionId?:string;assetId?:string}>({});
  const [name,setName]=useState(''),[character,setCharacter]=useState(''),[width,setWidth]=useState(512),[height,setHeight]=useState(512),[restoreJob,setRestoreJob]=useState<Job|null>(null);
  const [deleteTarget,setDeleteTarget]=useState<Snapshot|null>(null);
+ const [projectImage,setProjectImage]=useState<Asset|null>(null);
  const [parentDirectory,setParentDirectory]=useState(''),[folderPath,setFolderPath]=useState('');
  const [missingFolders,setMissingFolders]=useState<MissingProjectFolder[]|null>(null);
  const openedRoute=useRef('');
@@ -80,13 +82,14 @@ export default function App(){
    {restoreJob&&<Panel title="백업 복원"><JobCard job={restoreJob} s={s}/>{restoreJob.result?.projectId&&<button onClick={()=>open(restoreJob.result!.projectId!)}>복원된 프로젝트 열기</button>}</Panel>}
    <div className="project-storage-toolbar"><p className="project-storage-note">폴더를 옮기거나 이름을 바꾸려면 저장하고 작업을 마친 뒤 Finder에서 폴더를 옮기고, <strong>프로젝트 폴더 열기</strong>로 새 위치를 여세요. 삭제는 폴더까지 지우므로 이동에 사용하지 마세요.</p><button disabled={s.busy||!s.service} onClick={checkMissingFolders}>없는 폴더 정리</button></div>
    <div className="project-list-heading"><span>캐릭터 · 프로젝트</span><span>저장 정보</span><span>동작 / 후보</span></div>
-   <div className="project-list">{s.projects.map(project=><div className="project-row" key={project.projectId}>
-    <button className="project-file" disabled={s.busy||project.storage?.available===false} onClick={()=>open(project.projectId)}><div className="project-file-identity"><div className="project-file-thumb checker">{project.assets?.[0]&&project.storage?.available!==false?<img src={project.assets[0].url} alt=""/>:<FolderOpen size={24}/>}</div><div><strong>{project.name}</strong><small>{project.characterName}</small><small className="project-folder-path" title={project.storage?.path}>{project.storage?.path||'폴더 경로 확인 필요'}</small>{project.storage&&<small className={`project-folder-status ${project.storage.available&&!project.storage.syncPending?'':'unavailable'}`}>{project.storage.syncPending?`폴더 저장 보류${project.storage.available?'':' · 폴더 접근 불가'}`:project.storage.available?'폴더 연결됨':'폴더 접근 불가 · 경로와 연결을 확인해 주세요'}</small>}</div></div><span className="project-file-date">v{project.revision}<small>{date(project.updatedAt)}</small></span><span className="project-file-count">{project.clips?.length||0} / {project.frames?.length||0}<ChevronRight size={15}/></span></button>
+   <div className="project-list">{s.projects.map(project=>{const cover=projectCoverAsset(project);return <div className="project-row" key={project.projectId}>
+    <button className="project-file" disabled={s.busy||project.storage?.available===false} onClick={()=>open(project.projectId)}><div className="project-file-identity"><div className="project-file-thumb checker">{cover&&project.storage?.available!==false?<img src={cover.url} alt=""/>:<FolderOpen size={24}/>}</div><div><strong>{project.name}</strong><small>{project.characterName}</small><small className="project-folder-path" title={project.storage?.path}>{project.storage?.path||'폴더 경로 확인 필요'}</small>{project.storage&&<small className={`project-folder-status ${project.storage.available&&!project.storage.syncPending?'':'unavailable'}`}>{project.storage.syncPending?`폴더 저장 보류${project.storage.available?'':' · 폴더 접근 불가'}`:project.storage.available?'폴더 연결됨':'폴더 접근 불가 · 경로와 연결을 확인해 주세요'}</small>}</div></div><span className="project-file-date">v{project.revision}<small>{date(project.updatedAt)}</small></span><span className="project-file-count">{project.clips?.length||0} / {project.frames?.length||0}<ChevronRight size={15}/></span></button>
     <div className="project-actions">
+     {cover&&project.storage?.available!==false&&<button type="button" aria-label={`${project.name} 캐릭터 크게 보기`} onClick={()=>setProjectImage(cover)}><ScanFace size={15}/><span>캐릭터 보기</span></button>}
      <button className="project-reveal" aria-label={`${project.name} 프로젝트 폴더 위치 열기`} title={storageTitle} disabled={s.busy||!fileManager||project.storage?.available===false} onClick={()=>s.revealProject(project)}><FolderOpen size={15}/><span>폴더 위치</span></button>
      <button className="project-delete" aria-label={`${project.name} 프로젝트 삭제`} title="프로젝트와 프로젝트 폴더 삭제" disabled={s.busy||!s.service} onClick={()=>{s.setError('');setDeleteTarget(project);}}><Trash2 size={15}/><span>삭제</span></button>
     </div>
-   </div>)}</div>
+   </div>;})}</div>
    {!s.projects.length&&<Empty title="프로젝트를 만들거나 폴더를 열어 주세요"><p>기존 프로젝트는 폴더를 선택하면 편집을 이어갈 수 있습니다.</p><button disabled={s.busy||!s.service} onClick={()=>openTool('create')}>새 프로젝트</button></Empty>}
   </main>}
   <footer className="studio-status"><span className={`service ${s.service?'online':''}`}>{page==='viewer'?'독립 파일 재생':service}</span>{page!=='viewer'&&<ProviderConnections providers={s.providers} service={s.service} checking={s.providersChecking} error={s.providersError} onCheck={s.connect}/>}<span className="studio-notice" role="status">{s.notice||((page==='editor'&&p)?`${p.assets.length}개 자료 · ${p.frames.length}개 후보 · ${p.clips.length}개 동작`:'원본과 편집 이력은 이 컴퓨터에 저장됩니다.')}</span>{page!=='viewer'&&<button disabled={s.providersChecking} onClick={s.connect}>{s.providersChecking?'확인 중…':'연결 확인'}</button>}</footer>
@@ -109,6 +112,9 @@ export default function App(){
     </fieldset></form>:<fieldset className="tool-fieldset" disabled={s.busy}>{toolContent}</fieldset>}
    </div>
    {!['create','openFolder'].includes(activeTool)&&<div className="tool-footer"><span>{['generate','generateAsset'].includes(activeTool)?'생성 작업은 도구를 닫아도 계속됩니다.':'편집 중인 동작과 프레임 선택은 유지됩니다.'}</span><button onClick={closeTool}>편집기로 돌아가기</button></div>}
+  </EditorDialog>
+  <EditorDialog open={!!projectImage} title="프로젝트 캐릭터 보기" className="reference-image-dialog" onClose={()=>setProjectImage(null)}>
+   {projectImage&&<figure className="aw-reference-full"><div className="checker"><img src={projectImage.url} alt="프로젝트 대표 캐릭터"/></div></figure>}
   </EditorDialog>
   <EditorDialog open={!!deleteTarget} onClose={()=>{if(!s.busy)setDeleteTarget(null);}} title="프로젝트 삭제" className="project-delete-dialog" closeDisabled={s.busy}>
    <Feedback s={s}/>

@@ -146,3 +146,15 @@ describe('missing project folder cleanup dialog',()=>{
   const h=new Harness();await h.click('없는 폴더 정리');await h.click('취소');expect(s.cleanupMissingFolders).not.toHaveBeenCalled();
  });
 });
+
+describe('project cover in list',()=>{
+ it('shows the same representative character in the thumbnail and the viewer, not the first sheet',async()=>{
+  const assets=[{assetId:'sheet',url:'/sheet.png'},{assetId:'identity',url:'/identity.png'}];
+  s.projects=[{...project,assets,activeReferenceRevisionId:'r1',references:[{referenceRevisionId:'r1',identityAssetId:'identity'}]} as unknown as Snapshot];
+  const h=new Harness();const images=()=>nodes(h.tree).filter(n=>n.type==='img').map(n=>n.props.src);
+  expect(images()).toEqual(['/identity.png']);
+  await h.click('걷기 캐릭터 크게 보기');
+  expect(h.dialog('프로젝트 캐릭터 보기')).toBeDefined();expect(images()).toEqual(['/identity.png','/identity.png']);
+  expect(s.projects[0].assets.map(a=>a.assetId)).toEqual(['sheet','identity']);
+ });
+});
