@@ -9,7 +9,7 @@
 - `GET /v1/videos/{videoId}/content`: 원본 MP4. `Video`는 `{videoId, sha256, originalFilename, mediaType, width, height, fps, frameCount, durationMs, provenance, url}`.
 - `POST /v1/projects/{id}/jobs`: 기존 envelope와 idempotencyKey를 유지. operation에 `generate_video`, `process_video` 추가.
 - `POST /v1/projects/{id}/video-batches`: `{inputRevision, items:[{assetId, params}], idempotencyKey}`로 1~16개 영상 제작을 원자적으로 접수한다. 각 항목은 `generate_video`와 같은 검증을 받으며 하나라도 잘못되면 전체를 접수하지 않는다. 응답은 `{batchId, jobs}`. 같은 키·같은 내용의 재전송은 같은 작업들을 반환하며 다른 내용이면 409다. 항목별 `batchId`, `batchIndex`(0부터), `batchSize`를 작업에 표시한다. 모델 호출 수는 항목 수이며 실행 버튼에서 이 수를 명시한다. 방향별 기준 그림은 항목마다 사용자가 선택하고 별도 그림을 몰래 생성하지 않는다. 작업 처리기는 저장된 항목을 순차 실행하며 탭이 닫혀도 접수된 작업은 유지된다.
-- `generate_video`: assetIds는 기준 그림 하나. params는 `state`(idle/walk/run/jump/attack/dance/wave/cheer), `direction`(side/front/back/front_diagonal/back_diagonal), `facing`(right/left), `motionPrompt`, `model`, `durationSeconds`(기본 3), `resolution`(기본480p), 선택 `referenceRevisionId`, 아래 후처리 설정. `referenceRevisionId`를 지정하면 승인된 참조여야 한다.
+- `generate_video`: assetIds는 기준 그림 하나. params는 `state`(idle/walk/run/jump/attack/dance/wave/cheer), `direction`(side/front/back/front_diagonal/back_diagonal), `facing`(right/left), `motionPrompt`, `model`, `durationSeconds`(기본 3), `resolution`(기본480p), 선택 `referenceRevisionId`, 아래 후처리 설정. 지정한 기준은 같은 프로젝트에 속해야 하며 approval 값은 실행 조건이 아니다.
 - `process_video`: assetIds는 빈 배열. params `videoId`는 프로젝트 소속 영상. 선택 `spillReferenceAssetId`는 같은 프로젝트의 원본 기준 이미지이며, 영상 안쪽에 섞인 배경색과 캐릭터 본래 색을 구분하는 데 사용한다. 생략하면 영상 생성 때 보존한 기준 이미지를 사용하고, 그것도 없으면 보수적인 작은 영역 보정만 적용한다. 명시한 기준이 없거나 다른 프로젝트 소속이면 접수 전에 거부한다. `generate_video`는 자체 생성 기준을 사용하므로 이 설정을 받지 않는다. 아래 후처리 설정 적용. 외부 생성 없이 원본을 다시 처리한다.
 - 공통 후처리 params: `state` 기본 walk, `key` auto/green/magenta/cyan/white 중 지원 범위, `loopMode` auto/full/manual, 수동 구간 `startFrame`(0부터), `endFrame`(미포함), `maxFrames` 4~64이며 생략 시 walk는 **8**, 나머지는 32다. 명시한 값과 기존 저장 요청은 유지한다. `bodyHeight` 16~512 기본94, `cellWidth` 32~1024 기본64, `cellHeight` 32~1024 기본128. 선택 구간을 시간 순서로 샘플링하며 한 사이클 시간을 유지한다. 구간 불합격을 자동 재생성으로 바꾸지 않는다.
 - 공통 `finishMode`: `gif`(기본) 또는 `rgba`. `gif`는 검수한 3배 GIF와 같은 색상·알파 결과를 PNG 후보에 저장한다. 공통 크기 PNG를 출력 셀에 배치하고 nearest 3배 → 검정에 알파 합성 → 프레임별 최대 255색 → 알파 128 이하 제거 → 원래 크기로 복원한다. 이진 알파 PNG 자체가 편집과 bake의 입력이므로 화면만 바꾸는 필터가 아니다. `rgba`는 반투명을 유지한다. 두 모드 모두 원래 크기의 추출·배경 제거 PNG 및 마무리 전 정규화 PNG를 보존한다. 기존 저장 프로젝트의 픽셀을 조회만으로 변경하지 않는다.
@@ -37,7 +37,7 @@
 - `repairMode: off/auto/on`(기본 off): 보행·달리기 반복의 튀는 프레임을 로컬 RIFE로 선택 보정한다. `auto`의 도구 부재는 원본 유지와 진단으로 표시하고, `on`에서 필요한 보간 도구가 없으면 실패한다. 원본을 재생성하지 않는다. `/v1/providers`의 `capabilities.rife`는 설치 상태·release·model을 제공한다.
 - 선택 `matchClipId`는 같은 프로젝트의 반복 동작이며 4~64프레임, 총 60,000ms 이하여야 한다. 선택한 동작의 슬롯 수와 총 시간에 맞춰 원본 영상 구간을 다시 샘플링하고 접지 시점으로 회전한다. 중간 프레임이 필요하면 로컬 RIFE를 사용하며 없는 도구로 근사 성공을 가장하지 않는다. 전체/단발 구간과 함께 사용할 수 없다. 원래 시간과 변경 시간을 처리 보고서에 함께 남긴다.
 - 자동 루프의 느린 보행·크기 흔들림 재탐색은 공개 엔진의 제한된 로컬 재탐색만 사용한다. 원격 재촬영을 자동 실행하지 않는다.
-- 보간 프레임은 `interpolated: true`, 입력 프레임 번호·보간 비율·도구를 `interpolation`으로 기록한다. 원본 추출·배경 제거 프레임을 따로 보존하며 bake와 백업에서도 이 계보를 유지한다. 품질 지표는 진단이고 수동 검수를 대신하지 않는다.
+- 보간 프레임은 `interpolated: true`, 입력 프레임 번호·보간 비율·도구를 `interpolation`으로 기록한다. 원본 추출·배경 제거 프레임을 따로 보존하며 bake와 백업에서도 이 계보를 유지한다. 품질 지표는 진단이며 approval/review 메타데이터를 자동 변경하지 않는다.
 
 게임용 출력에는 기존 atlas/runtime/PNG/Aseprite에 더해 동작별 strip PNG·grid PNG·GIF·lossless animated WebP를 별도 ZIP으로 제공한다. 모두 같은 bake의 실제 최종 셀을 사용하며 PNG 픽셀·순서·앵커·밀리초 시간은 runtime이 기준이다. GIF의 10ms 시간 단위 반올림 및 색상/알파 제약은 출력 메타데이터에 기록하고, GIF로 정확히 표현할 수 없는 짧은 프레임은 오류/누락 이유를 명시한다. WebP와 GIF의 반복/단발 여부를 원래 동작과 일치시킨다.
 

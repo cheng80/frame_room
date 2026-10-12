@@ -58,15 +58,17 @@ API가 프로젝트 revision과 asset 참조의 정본을 소유한다. 엔진 r
 
 | 단계 | 재사용 | 필수 보완 |
 | --- | --- | --- |
-| 기준/요청 | prepare·guide·prompt 작성 | identity/style 역할, 승인 revision, 지원 옵션 전달 검증 |
+| 기준/요청 | prepare·guide·prompt 작성 | identity/style 역할, 명시적 기준 연결, 지원 옵션 전달 검증 |
 | 생성 | 명시 provider의 gen/gen-set | 웹 설정·작업 관리·부분 생성 lineage·지원 capability |
 | 배경 제거 | 균일 배경 cutout·chroma | 실제 알파 검사, 한계 표시, 원본 보존·수동 mask |
 | 분리 | component/projection 추출 | resize/fit **이전** crop·좌표·변환을 반환하는 포크 hook |
 | 가져오기 | 같은 셀 PNG unpack-atlas | 가변 크기 입력은 먼저 앱 정렬, 자동 중앙배치를 발 정렬로 오인하지 않음 |
-| 정렬 | 기존 측정 보조 | 공통 scale·수동 anchor·공중 offset·overflow gate 신규 |
+| 정렬 | 기존 측정 보조 | 공통 scale·수동 anchor·공중 offset·기술 overflow 검사 |
 | 편집 | curation state/clone/transform/pixel bake | 안정 ID/occurrence 매핑, 빈 선택 차단, base 원본 보호, save ACK |
 | 재생/출력 | compose-atlas·호환 serializer | duration의 명시적 지원, 고정 bake, 최종 atlas에서 PNG 추출, 단일 묶음 publication |
 | outline | 새 deterministic renderer | 기존 pixel outline과 별개, 4/8방향·단위·alpha·padding 검증 |
+
+현재 제작 화면은 자료 준비, 캐릭터 기준, 동작 만들기, 프레임 편집, 결과 확인, 내보내기의 여섯 영역을 제공한다. 이 순서와 진행 표시는 탐색 상태이며 수동 approval gate가 아니다. 기존 approval/review 필드·API와 저장 이력은 유지한다. `draft` 기준과 `pending` 후보·앵커·동작으로도 기술 입력이 유효하면 생성·검사·bake·export를 실행할 수 있다. 서버는 저장 revision, 입력 계보, 기준 연결, 파일·픽셀·좌표·시간·overflow를 검증하고 명시적 rejected 프레임을 거부한다. 출력 성공은 approval이나 revision을 자동 변경하지 않는다. 생성·추출 결과의 프로젝트 등록은 기존 방식으로 새 revision을 추가하며 approval은 보존한다.
 
 `slice-sheet`는 애니메이션 기본 경로에서 호출하지 않는다. 이미 정규화된 출력만으로 원래 체형을 복원했다고 주장하지 않는다. `extract`의 기존 fit도 검사 없이 통과시키지 않는다. 자동 heal이 원본 프레임을 바꿀 수 있는 compose는 고정된 run 사본에서만 실행한다.
 
@@ -84,7 +86,7 @@ job마다 inputRevision, referenceRevision, 입력 hashes, engine/adapter versio
 
 원본 파일은 content-addressed immutable asset으로 저장한다. 기준 편집도 새 derived asset/reference revision을 만든다. working base의 변화가 원본에 반영되지 않게 한다. asset 파일 write·fsync·atomic rename 후 DB transaction에서 참조를 게시한다. 실패한 임시 파일은 복구 대상이며 이미 게시된 참조 파일을 자동 삭제하지 않는다.
 
-확정 출력은 저장 ACK를 받은 project revision을 잠근다. 동일 snapshot을 한 번 bake하고 그 bitmap/manifest로 최종 미리보기·아틀라스·개별 PNG·호환 JSON을 만든다. 개별 PNG는 기존 export-pngs의 기본 후보 전체 출력에 의존하지 않는다. 결과 폴더를 staging에서 검증 후 rename하고 DB에서 다운로드 가능 상태로 만든다. 파일 게시와 DB commit 사이 중단은 복구 시 hash를 확인하며 미완성 묶음을 노출하지 않는다.
+확정 출력은 저장 ACK를 받은 project revision을 잠근다. 동일 snapshot을 한 번 bake하고 그 bitmap/manifest로 최종 미리보기·아틀라스·개별 PNG·호환 JSON을 만든다. 개별 PNG는 기존 export-pngs의 기본 후보 전체 출력에 의존하지 않는다. 결과는 프로젝트 `jobs/<jobId>/<attemptId>/staging/`에서 검증한 뒤 `outputs/<jobId>/<attemptId>/`로 이동해 게시하고 DB에서 다운로드 가능 상태로 만든다. 재시도는 새 attempt 경로를 사용하며 이전 출력은 보존한다. 파일 게시와 DB commit 사이 중단은 복구 시 hash를 확인하며 미완성 묶음을 노출하지 않는다. 출력 설정·이력 UI는 기존 API의 export 목록과 job `createdAt`/`updatedAt`을 `jobId`로 결합해 사용한다.
 
 ## 7. 로컬 운영과 입력 제한
 

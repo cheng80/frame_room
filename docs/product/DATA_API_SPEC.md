@@ -1,6 +1,6 @@
 # 데이터·API 계약
 
-버전 1.0 · **새 앱 계약의 정본**. 기존 엔진이 이미 지원하는 API/필드라는 의미가 아니다.
+초기 버전 1.0 설계와 2026-10-12 후속 계약을 함께 보관한다. 실제 지원 필드·엔드포인트의 정본은 [구현 통합 계약](../../packages/contracts/IMPLEMENTATION.md)과 [OpenAPI](../../packages/contracts/openapi.json)다. 초기 엔터티·미구현 옵션을 이미 지원하는 기능으로 해석하지 않는다.
 
 ## 1. 식별자와 정본
 
@@ -18,7 +18,7 @@
 | FrameAlignment | frameVersionId, groupRevisionId, sourceAnchor, anchorSpace, method, contactMode, rootAnchor?, authoredOffsetPx, residual, approval | 원본/crop/cell 좌표 명시. 픽셀 버전 바뀌면 기존 승인 자동 적용 금지 |
 | ClipRevision | clipId, clipRevisionId, referenceRevisionId, stateId, facing, loop, endBehavior, defaultFps, occurrences | 순서·시간·사용 기준의 정본. 빈 occurrences는 유효 편집 상태, 출력 불가 |
 | Occurrence | occurrenceId, frameVersionId, durationMs, timingMode, transform, pixelEditRevision | 같은 frameVersion 여러 번 참조 가능. clone별 offset/time 독립 |
-| Job / Attempt | jobId, operation, status, inputRevision, idempotencyKey, requestHash, attemptId, step, eventSeq, lease, checkpoints, errors, artifacts | input snapshot 불변, 실행 기록 append. 재시도는 새 attempt |
+| Job / Attempt | jobId, operation, status, inputRevision, idempotencyKey, requestHash, attemptId, createdAt, updatedAt, step, eventSeq, lease, checkpoints, errors, artifacts | input snapshot 불변, 실행 기록 append. 재시도는 새 attempt와 새 출력 경로를 사용하고 과거 attempt/output 보존 |
 | ExportSnapshot | exportId, projectRevision, clipRevisionIds, engineCommit, adapterVersion, renderRecipeHash, files, qaStatus | 검증·게시 후 불변. 같은 export에 다른 revision 섞지 않음 |
 
 Edit journal에는 revision, parentRevision, typed changes, affectedIds를 남긴다. undo/redo 및 과거 복원은 새 revision을 만드는 작업이다. 사용자 원본과 성공한 과거 출력은 덮어쓰지 않는다.
@@ -29,15 +29,15 @@ Edit journal에는 revision, parentRevision, typed changes, affectedIds를 남�
 
 ```text
 anchorLocal = inverseCropMapping(anchorRaw)
-sharedScale = targetBodyHeight / approvedBodyHeight
+sharedScale = targetBodyHeight / measuredBodyHeight
 placementFloat = targetAnchor - sharedScale * anchorLocal + authoredOffsetPx
 placementPixel = floor(placementFloat + 0.5)
 residual = placementPixel - placementFloat
 ```
 
-crop 이전 resize가 있으면 `sourceToFrameTransform`을 저장한다. 변환을 모르면 `nativeScaleUnverified`로 검수하고 자동으로 같은 scale group에 넣지 않는다. 체고는 승인된 몸의 두 landmark 차이이며 장비 포함 bbox 높이와 다르다. 기본 mode는 정렬된 PNG의 `preserve-source-scale`(s=1) 또는 landmark 승인 후 `shared-scale-foot-anchor`다. 사용자가 명시한 그룹 확대는 가능하지만 개별 포즈 높이 정규화는 하지 않는다.
+crop 이전 resize가 있으면 `sourceToFrameTransform`을 저장한다. 변환을 모르면 `nativeScaleUnverified`로 검수하고 자동으로 같은 scale group에 넣지 않는다. 체고는 몸의 두 landmark 차이이며 장비 포함 bbox 높이와 다르다. 기본 mode는 정렬된 PNG의 `preserve-source-scale`(s=1) 또는 유효한 landmark 좌표로 계산한 `shared-scale-foot-anchor`다. 사용자가 명시한 그룹 확대는 가능하지만 개별 포즈 높이 정규화는 하지 않는다.
 
-resampler는 nearest, roundingVersion은 `js-round-v1`로 고정한다. sourceAnchor와 residual은 소수 가능, raster 위치는 정수다. 발 추정 정책 `hero-lower-band-v1`은 alpha≥16, `band=max(4,floor(height*0.12+0.5))`, 밴드 유효 픽셀의 x 최소/최대 중간이다. 이는 발 **후보**이며 승인 상태가 아니다. 접지는 foot anchor, 공중은 승인 root anchor/trajectory와 offset을 사용한다. 공중 프레임의 발을 바닥에 강제하지 않는다.
+resampler는 nearest, roundingVersion은 `js-round-v1`로 고정한다. sourceAnchor와 residual은 소수 가능, raster 위치는 정수다. 발 추정 정책 `hero-lower-band-v1`은 alpha≥16, `band=max(4,floor(height*0.12+0.5))`, 밴드 유효 픽셀의 x 최소/최대 중간이다. 이는 발 **후보**이며 승인 상태가 아니다. 접지는 foot anchor, 공중은 유효한 root anchor/trajectory와 offset을 사용한다. 공중 프레임의 발을 바닥에 강제하지 않는다.
 
 거너 선택형 preset: cell512, targetAnchor(256,494), edge2, bottom18. y494는 마지막 가시 픽셀493 다음 경계다. bodyHeight471은 자동 입력하지 않는다. 471은 공개 대기의 bbox 관찰값이다.
 
@@ -61,9 +61,11 @@ loop=true는 누적 duration 경계에서 첫 슬롯으로 돌아간다. loop=fa
 
 저장은 DB transaction과 engine materialization 완료 범위를 구분한다. `savedRevision`은 프로젝트 저장 완료 ACK다. `engineRevision`은 materialization이 존재할 때만 반환한다. bake는 saved project snapshot에서 materialize하고 해당 engine revision을 검증한다. 엔진 저장 실패를 성공 ACK로 감추지 않는다. 409에서 UI draft를 버리지 않고 차이를 비교·재적용한다.
 
-export 요청은 현재 서버 revision과 일치하는 savedRevision을 요구한다. 승인 기준/입력 lineage·선택 clips·검수 상태·지원 timing·파일 hashes를 잠근다. 빈 타임라인, empty alpha, overflow, 누락 파일, anchor 미승인, stale save는 차단한다. 편집 도중 preview용 bake는 경고 상태로 볼 수 있으나 `verified` export로 게시하지 않는다.
+export 요청은 현재 서버 revision과 일치하는 savedRevision을 요구한다. 선택 clips와 입력 lineage·지원 timing·기술 QA·파일 hashes를 잠근다. 빈 타임라인, empty alpha, overflow, 누락/손상 파일, 잘못된 좌표·변형·시간·기준 연결, stale save는 차단한다. 명시적으로 `rejected`인 프레임이 타임라인에 남아도 차단하며, 자동으로 생략해 시간을 바꾸지 않는다. approval/review 상태(`draft`, `pending`, `approved`)는 출력 gate가 아니며 출력 성공이 이를 바꾸지 않는다. 생성·추출 결과 등록은 기존 방식으로 새 revision을 추가하되 기존 승인 기록을 보존한다. 기존 approval API·필드, 저장 revision, 이력과 변경 시 review 무효화는 유지한다. 편집 도중 preview용 bake는 기술 QA 결과와 `needs_review`를 표시할 수 있다.
 
-새 기준 초안이 있어도 clip이 이전 승인 referenceRevisionId에 명시적으로 고정되어 있으면 이전 기준으로 검수·출력할 수 있다. clip의 사용 기준을 바꾸는 작업은 관련 검수 상태를 무효화한다. 업로드 batch는 모든 파일의 기본 검증이 통과한 뒤 한 번에 등록한다. 파일 하나가 실패하면 해당 batch는 등록하지 않고 오류 목록과 재선택을 제공한다. 이미 다른 batch로 등록된 원본은 보존한다.
+새 기준 초안이 있어도 clip이 기존 `referenceRevisionId`에 고정되어 있으면 해당 기준으로 생성·검사·출력할 수 있다. 기준은 같은 프로젝트에 속해야 한다. 기준의 approval 상태는 실행에 필요하지 않으며 기준 생성만으로 `activeReferenceRevisionId`를 바꾸지 않는다. clip의 사용 기준을 바꾸는 작업은 기존 방식대로 관련 review 상태를 무효화한다. 업로드 batch는 모든 파일의 기본 검증이 통과한 뒤 한 번에 등록한다. 파일 하나가 실패하면 해당 batch는 등록하지 않고 오류 목록과 재선택을 제공한다. 이미 다른 batch로 등록된 원본은 보존한다.
+
+현재 UI는 자료 준비, 캐릭터 기준, 동작 만들기, 프레임 편집, 결과 확인, 내보내기의 여섯 영역으로 구성한다. 영역 이동과 진행 표시는 편집 순서를 돕지만 approval을 요구하지 않는다. 기술 오류와 저장/충돌 상태만 해당 편집·출력 요청을 차단한다. 출력 화면의 설정·이력 탭은 기존 project/export/jobs API를 사용한다. 최신 출력은 펼쳐 보이고 이전 출력은 시각 요약 행으로 접어 두며, `createdAt`/`updatedAt`을 작업 `jobId`로 연결해 요청·완료 시각과 `attemptId`를 표시한다. 이력 선택은 기존 산출물 URL을 열며 새 API나 새 저장 형식을 요구하지 않는다.
 
 ## 5. API 표
 
@@ -84,10 +86,10 @@ export 요청은 현재 서버 revision과 일치하는 savedRevision을 요구�
 | `PATCH /v1/projects/{p}/edits` | expectedRevision, operations | savedRevision, engineRevision?, affectedIds |
 | `POST /v1/projects/{p}/restore-revision` | expectedRevision, targetRevision | 새 savedRevision |
 | `POST /v1/projects/{p}/jobs` | operation, inputRevision, assetIds, params, idempotencyKey | 202 jobId/eventUrl; request snapshot 고정 |
-| `GET /v1/jobs/{j}` | — | status·attempt·progress·errors·artifacts |
+| `GET /v1/jobs/{j}` | — | status·attemptId·createdAt·updatedAt·progress·errors·artifacts |
 | `GET /v1/jobs/{j}/events` | Last-Event-ID | SSE 영구 seq부터 재전송, heartbeat와 오류 구분 |
 | `POST /v1/jobs/{j}/cancel` | expectedStatus | 202 cancel_requested / 200 already_terminal / 409 stale |
-| `POST /v1/jobs/{j}/retry` | failedStep, reuseCheckpoint, idempotencyKey | 새 attemptId, 불명 provider 결과는409와 조치 안내 |
+| `POST /v1/jobs/{j}/retry` | failedStep, reuseCheckpoint, idempotencyKey | 새 attemptId; 이전 attempt와 출력 유지. 불명 provider 결과는409와 조치 안내 |
 | `POST /v1/projects/{p}/exports` | savedRevision, clipRevisionIds, formats, outlineMode, idempotencyKey | 202 exportId/jobId. 내부 operation=export |
 | `GET /v1/exports/{e}` | — | status·manifest·검증된 파일 URL·hash·지원 정보 |
 | `POST /v1/projects/{p}/backup` | savedRevision | 202 backupId/jobId, 내부 operation=backup |
@@ -136,7 +138,9 @@ stateDiagram-v2
   provider_outcome_unknown --> failed: 실패 확인
 ```
 
-`needs_review`는 실행이 끝나고 후보 검토를 기다리는 상태이며 검수 없이 승인된 출력이라는 뜻이 아니다. 검토 수정은 새 project revision과 필요한 후속 job을 만든다. `provider_outcome_unknown`은 자동 재시도하지 않는다. 조회 기능이 없으면 UI에서 불확실성을 설명하고 명시적 새 생성으로만 새 job을 만든다. 외부 실행·과금이 멈췄다고 표시하지 않는다.
+`needs_review`는 기술 작업이 끝났으나 진단상 직접 확인할 후보가 있음을 나타낸다. 이는 approval 상태를 요구하거나 갱신하지 않으며, 해당 상태만으로 기술적으로 유효한 bake/export를 차단하지 않는다. 검토 편집은 새 project revision을 만들고 기존 review 무효화 규칙을 따른다. `provider_outcome_unknown`은 자동 재시도하지 않는다. 조회 기능이 없으면 UI에서 불확실성을 설명하고 명시적 새 생성으로만 새 job을 만든다. 외부 실행·과금이 멈췄다고 표시하지 않는다.
+
+프로젝트 산출물은 `outputs/<jobId>/<attemptId>/`에 게시한다. API artifact URL은 이 저장 경로를 추상화하며 재시도는 새 attempt 경로에 게시한다. 이전 성공 산출물·출력 기록은 후속 실패나 재시도로 덮어쓰지 않는다. 프로젝트 이력과 출력 이력은 저장 revision 및 job 시각을 연결해 표시한다.
 
 ## 7. 엔진 매핑과 출력 포맷
 
