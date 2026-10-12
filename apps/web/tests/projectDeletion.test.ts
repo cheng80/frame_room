@@ -33,7 +33,7 @@ beforeEach(()=>{
  storage=new Map();vi.stubGlobal('window',{addEventListener:vi.fn(),removeEventListener:vi.fn()});
  vi.stubGlobal('localStorage',{getItem:(key:string)=>storage.get(key)??null,setItem:(key:string,value:string)=>storage.set(key,value),removeItem:(key:string)=>storage.delete(key)});
  mockApi.mockReset();mockApi.mockImplementation(async (path,method)=>{
-  if(method==='DELETE')return {deletedProjectId:path.split('/').at(-1)};
+  if(method==='DELETE')return {deletedProjectId:path.split('/').at(-1),folderDeleted:true};
   if(path==='/projects')return {projects:[a,b]};
   if(path.endsWith('/jobs'))return {jobs:[{jobId:'j',status:'succeeded'}]};
   if(path.endsWith('/exports'))return {exports:[{exportId:'e'}]};
@@ -44,7 +44,7 @@ beforeEach(()=>{
 afterEach(()=>{h.close();vi.unstubAllGlobals();});
 async function openWithDraft(){await h.value.load('a');await h.value.refreshProjects();h.render();h.value.edit({type:'updateCharacter',name:'수정 초안'});h.render();}
 
-describe('project detachment state',()=>{
+describe('project deletion state',()=>{
  it('clears the selected project, draft and histories only after the server acknowledges deletion',async()=>{
   await openWithDraft();storage.set('frame-room-draft:b','keep');h.value.setConflict(b);h.render();
   expect(storage.has('frame-room-draft:a')).toBe(true);
@@ -54,16 +54,31 @@ describe('project detachment state',()=>{
   expect(h.value.base).toBeNull();expect(h.value.snapshot).toBeNull();expect(h.value.conflict).toBeNull();
   for(const values of [h.value.commands,h.value.redoCommands,h.value.jobs,h.value.exports,h.value.revisions])expect(values).toEqual([]);
   expect(storage.has('frame-room-draft:a')).toBe(false);expect(storage.get('frame-room-draft:b')).toBe('keep');
-  expect(h.value.notice).toContain('목록에서 제거');expect(h.value.notice).toContain('데이터는 모두 유지');
+  expect(h.value.notice).toContain('프로젝트 폴더(원본·편집 이력·작업·출력 파일)를 삭제했습니다');expect(h.value.notice).not.toContain('유지');
  });
- it('preserves another open project and its unsaved edits when deleting from the list',async()=>{
+ it.each([
+  [{folderDeleted:false},'폴더가 이미 없어 목록 등록과 이 브라우저의 초안만 지웠습니다'],
+ ])('reports exactly what the server deleted %#',async(result,message)=>{
+  await openWithDraft();const original=mockApi.getMockImplementation()!;
+  mockApi.mockImplementation((path,method,body)=>method==='DELETE'?Promise.resolve({deletedProjectId:'a',...result}):original(path,method,body));
+  expect(await h.value.deleteProject(a)).toBe(true);h.render();
+  expect(h.value.notice).toContain(message);expect(storage.has('frame-room-draft:a')).toBe(false);expect(h.value.base).toBeNull();
+ });
+ it('reports an incomplete folder removal after the registration was deleted',async()=>{
+  await openWithDraft();const original=mockApi.getMockImplementation()!;
+  mockApi.mockImplementation((path,method,body)=>method==='DELETE'?Promise.reject(new ApiError(503,'PROJECT_DELETE_INCOMPLETE','폴더 일부를 지우지 못했습니다.',{leftoverPath:'/projects/.a.deleting-x'})):original(path,method,body));
+  expect(await h.value.deleteProject(a)).toBe(true);h.render();
+  expect(h.value.error).toContain('폴더 일부를 지우지 못했습니다');expect(h.value.error).toContain('/projects/.a.deleting-x');expect(h.value.notice).not.toContain('삭제했습니다');
+  expect(h.value.projects.map(p=>p.projectId)).toEqual(['b']);expect(h.value.base).toBeNull();expect(storage.has('frame-room-draft:a')).toBe(false);
+ });
+ it('preserves another open project and its unsaved edits when deleting a different project',async()=>{
   await openWithDraft();const before=storage.get('frame-room-draft:a');storage.set('frame-room-draft:b','discard');
   await h.value.deleteProject(b);h.render();
   expect(h.value.base?.projectId).toBe('a');expect(h.value.snapshot?.characterName).toBe('수정 초안');
   expect(storage.get('frame-room-draft:a')).toBe(before);expect(storage.has('frame-room-draft:b')).toBe(false);
   expect(h.value.jobs).toHaveLength(1);
  });
- it.each([[409,'PROJECT_BUSY'],[409,'REVISION_CONFLICT'],[0,'OFFLINE'],[500,'SERVER_ERROR'],[404,'HTTP_404']])('preserves drafts and project data on failure %s/%s',async(status,code)=>{
+ it.each([[409,'PROJECT_BUSY'],[409,'REVISION_CONFLICT'],[409,'PROJECT_DELETE_UNSAFE'],[409,'PROJECT_FOLDER_MISMATCH'],[409,'PROJECT_RESOURCE_SHARED'],[503,'PROJECT_DELETE_FAILED'],[0,'OFFLINE'],[500,'SERVER_ERROR'],[404,'HTTP_404']])('preserves drafts and project data on failure %s/%s',async(status,code)=>{
   await openWithDraft();const before=storage.get('frame-room-draft:a');const original=mockApi.getMockImplementation()!;
   mockApi.mockImplementation((path,method,body)=>method==='DELETE'?Promise.reject(new ApiError(status,code,'삭제 실패')):original(path,method,body));
   expect(await h.value.deleteProject(a)).toBeUndefined();h.render();
@@ -82,11 +97,12 @@ describe('project detachment state',()=>{
   await openWithDraft();const ack=deferred<any>();mockApi.mockImplementation(()=>ack.promise);mockApi.mockClear();
   const pending=h.value.deleteProject(a);h.render();expect(h.value.busy).toBe(true);expect(h.value.base).toEqual(a);
   await h.value.deleteProject(a);expect(mockApi).toHaveBeenCalledTimes(1);
-  ack.resolve({deletedProjectId:'a'});await pending;h.render();expect(h.value.base).toBeNull();
+  ack.resolve({deletedProjectId:'a',folderDeleted:true});await pending;h.render();expect(h.value.base).toBeNull();
  });
  it('clears stale local state when another window already deleted the project',async()=>{
   await openWithDraft();mockApi.mockRejectedValue(new ApiError(404,'PROJECT_NOT_FOUND','프로젝트 없음'));
   expect(await h.value.deleteProject(a)).toBe(true);h.render();expect(h.value.base).toBeNull();expect(storage.has('frame-room-draft:a')).toBe(false);
+  expect(h.value.notice).toContain('이미 삭제되었습니다');
  });
  it('reports a missing project as a failed load instead of opening the previous project',async()=>{
   await openWithDraft();mockApi.mockRejectedValue(new ApiError(404,'PROJECT_NOT_FOUND','프로젝트 없음'));
@@ -153,7 +169,7 @@ describe('project folder registration',()=>{
   await openWithDraft();mockApi.mockRejectedValue(new ApiError(501,'FOLDER_PICKER_UNAVAILABLE','경로를 직접 입력하세요.'));
   expect(await h.value.pickProjectFolder('parent')).toBeUndefined();h.render();expect(h.value.error).toBe('경로를 직접 입력하세요.');expect(h.value.commands).toHaveLength(1);
  });
- it('reopens a detached project and restores histories, later loads, and list refreshes',async()=>{
+ it('opens a backup copy after deletion and restores histories, later loads, and list refreshes',async()=>{
   await openWithDraft();await h.value.deleteProject(a);h.render();
   const moved={...a,storage:{...a.storage!,path:'/moved project'}};const original=mockApi.getMockImplementation()!;
   mockApi.mockImplementation((path,method,body)=>path==='/project-folders/open'?Promise.resolve(moved):path==='/projects/a'?Promise.resolve(moved):original(path,method,body));
@@ -164,7 +180,7 @@ describe('project folder registration',()=>{
   await h.value.refreshProjects();expect(await h.value.load('a')).toBe(true);h.render();
   expect(h.value.projects.map(p=>p.projectId)).toContain('a');expect(h.value.exports).toHaveLength(1);
  });
- it('allows a successful direct load after another window re-registers a detached project',async()=>{
+ it('allows a successful direct load after another window re-registers a deleted project',async()=>{
   await openWithDraft();await h.value.deleteProject(a);h.render();await h.value.load('a');h.render();
   expect(h.value.jobs).toHaveLength(1);expect(h.value.projects.map(p=>p.projectId)).toContain('a');
  });

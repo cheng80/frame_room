@@ -104,7 +104,7 @@ def test_duplicate_owns_independent_files_even_when_source_removed(client,tmp_pa
     other=s.project_folder(duplicate['projectId']);asset=other/folders.resource_name('assets',a['assetId'],a)
     assert asset.read_bytes()==png()
     assert asset.stat().st_ino!=(root/folders.resource_name('assets',a['assetId'],a)).stat().st_ino
-    folders.detach_project(p['projectId'],p['revision']);root.rename(tmp_path/'detached')
+    assert folders.delete_project(p['projectId'],p['revision'])['folderDeleted'] and not root.exists()
     with s.project_scope(duplicate['projectId']):assert s.asset_path(a['assetId'])==asset
     assert run_job(queue(client,duplicate,'inspect')['jobId'])['status'] in ('succeeded','needs_review')
 

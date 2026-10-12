@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
+import stat
 from contextlib import closing
 from pathlib import Path, PurePosixPath
 import re
@@ -359,17 +361,146 @@ def _prune(c):
 
 def _busy(c,pid):
     if c.execute("SELECT 1 FROM jobs WHERE project_id=? AND status IN ('queued','running','cancel_requested') LIMIT 1",(pid,)).fetchone():
-        raise s.AppError('PROJECT_BUSY','작업이 끝나거나 취소된 후 목록에서 제거하세요.',409)
+        raise s.AppError('PROJECT_BUSY','작업이 끝나거나 취소된 후 다시 시도하세요.',409)
 
 
-def detach_project(pid,expected_revision):
-    # A prior failed save must reach the existing folder before its cache is removed.
-    flush([pid])
-    with s.transaction() as c:
-        p=s.get_project(pid,c);s.check_revision(p,expected_revision);_busy(c,pid)
-        folder_for(pid,c)
-        _remove_index(c,pid);_prune(c)
-    return {'deletedProjectId':pid}
+def _unsafe(message,path):
+    return s.AppError('PROJECT_DELETE_UNSAFE',message+' 폴더와 목록을 변경하지 않았습니다.',409,{'path':str(path)})
+
+
+def _check_deletable(c,pid,root):
+    """Refuse anything that is not exactly this project's own real folder tree."""
+    if root.is_symlink() or not root.is_absolute() or os.path.realpath(root)!=str(root):
+        raise _unsafe('등록 경로가 심볼릭 링크를 거칩니다.',root)
+    if not root.is_dir():raise _unsafe('등록 경로가 폴더가 아닙니다.',root)
+    try:marker=_marker(root)
+    except s.AppError:raise _unsafe('프로젝트 표식(project.json)을 확인할 수 없습니다.',root) from None
+    if marker.get('projectId')!=pid:
+        raise s.AppError('PROJECT_FOLDER_MISMATCH','등록된 위치의 프로젝트가 다릅니다. 폴더와 목록을 변경하지 않았습니다.',409,{'path':str(root)})
+    if s.DATA.is_relative_to(root):raise _unsafe('앱 저장소를 포함한 폴더입니다.',root)
+    for (other,) in c.execute('SELECT path FROM project_folders WHERE project_id!=?',(pid,)):
+        if Path(other).is_relative_to(root) and os.path.lexists(other):raise _unsafe('다른 프로젝트 폴더가 안에 있습니다.',other)
+    if not os.access(root.parent,os.W_OK|os.X_OK):raise _unsafe('상위 폴더에 쓰기 권한이 없습니다.',root.parent)
+    try:_walk_deletable(root)
+    except OSError as exc:raise _unsafe('읽을 수 없는 파일이나 폴더가 있습니다.',getattr(exc,'filename',None) or root) from exc
+
+
+def _walk_deletable(root):
+    device=root.lstat().st_dev
+    locked=getattr(stat,'UF_IMMUTABLE',0)|getattr(stat,'SF_IMMUTABLE',0)|getattr(stat,'UF_APPEND',0)|getattr(stat,'SF_APPEND',0)
+    def fail(exc):raise exc
+    for directory,dirs,files in os.walk(root,onerror=fail):
+        here=Path(directory)
+        if here.lstat().st_dev!=device:raise _unsafe('다른 디스크가 연결된 폴더가 안에 있습니다.',here)
+        if here!=root and 'project.json' in files:
+            try:_marker(here)
+            except s.AppError:pass
+            else:raise _unsafe('다른 프로젝트 폴더가 안에 있습니다.',here)
+        if not os.access(here,os.W_OK|os.X_OK):raise _unsafe('쓰기 권한이 없는 폴더가 있습니다.',here)
+        for path in [here/name for name in (*dirs,*files)]+([root] if here==root else []):
+            if getattr(path.lstat(),'st_flags',0)&locked:raise _unsafe('잠긴 파일이 있습니다.',path)
+
+
+def _shared_bytes(c,root):
+    """Repoint resources other projects still need away from root, or refuse."""
+    needed={'assets':set(),'videos':set()}
+    for (other,) in c.execute('SELECT id FROM projects').fetchall():
+        records=_records(c,other)
+        for kind in needed:needed[kind].update(r['id'] for r in records[kind])
+    roots=[Path(r[0]) for r in c.execute('SELECT path FROM project_folders WHERE ready=1')]
+    for kind,ids in needed.items():
+        for ident in ids:
+            row=c.execute(f'SELECT metadata,path FROM {kind} WHERE id=?',(ident,)).fetchone()
+            if not (s.DATA/row['path']).resolve().is_relative_to(root):continue
+            meta=json.loads(row['metadata']);relative=resource_name(kind,ident,meta)
+            for other in roots:
+                # A copy only counts when it is a real file inside another folder, never root reached via a link.
+                try:target=_safe_relative(other,relative)
+                except s.AppError:continue
+                if target.is_file() and not target.resolve().is_relative_to(root) and s.digest(target.read_bytes())==meta['sha256']:
+                    c.execute(f'UPDATE {kind} SET path=? WHERE id=?',(s.stored_path(target),ident));break
+            else:
+                raise s.AppError('PROJECT_RESOURCE_SHARED','다른 프로젝트가 아직 이 폴더의 원본을 사용합니다. 그 프로젝트의 폴더 저장을 완료한 뒤 다시 시도하세요. 폴더와 목록을 변경하지 않았습니다.',409,{'kind':kind,'id':ident})
+
+
+def _finish_deletion(pid):
+    """Remove a committed deletion's quarantine folder; the meta row is its owner record."""
+    key='project_delete:'+pid
+    with s.connect() as c:row=c.execute('SELECT value FROM meta WHERE key=?',(key,)).fetchone()
+    if not row:return False
+    record=json.loads(row[0]);staged=Path(record['path']);failure=None
+    if os.path.lexists(staged):
+        # The write lock serializes other finishers and new registrations until the record is settled.
+        with s.transaction() as c:
+            if not c.execute('SELECT 1 FROM meta WHERE key=?',(key,)).fetchone():return True
+            # The renamed root keeps its device/inode; a marker may already be gone after a partial removal.
+            st=staged.lstat()
+            if not stat.S_ISDIR(st.st_mode) or (st.st_dev,st.st_ino)!=(record.get('dev'),record.get('ino')) or os.path.realpath(staged)!=str(staged) or '.deleting-' not in staged.name:
+                raise s.AppError('PROJECT_DELETE_UNSAFE','삭제 대기 경로가 다른 폴더나 파일로 바뀌어 삭제하지 않았습니다. 삭제 대기 기록은 유지합니다.',409,{'projectId':pid,'leftoverPath':str(staged)})
+            # A project moved or opened inside the quarantine after commit is not part of this deletion.
+            try:
+                for (other,) in c.execute('SELECT path FROM project_folders'):
+                    if Path(other).is_relative_to(staged) and os.path.lexists(other):raise _unsafe('다른 프로젝트 폴더가 안에 있습니다.',other)
+                _walk_deletable(staged);_shared_bytes(c,staged)
+            except s.AppError as exc:
+                raise s.AppError('PROJECT_DELETE_UNSAFE','삭제 대기 폴더 안에 다른 프로젝트나 잠긴 파일, 다른 프로젝트가 쓰는 원본이 있어 삭제하지 않았습니다. 해당 항목을 옮긴 뒤 다시 시도하세요. 삭제 대기 기록은 유지합니다.',409,{'projectId':pid,'leftoverPath':str(staged),'path':exc.details.get('path',str(staged))}) from exc
+            except OSError as exc:failure=exc
+            if not failure:
+                try:shutil.rmtree(staged)
+                except OSError as exc:failure=exc
+            if not failure:c.execute('DELETE FROM meta WHERE key=?',(key,))
+        if failure:
+            raise s.AppError('PROJECT_DELETE_INCOMPLETE','프로젝트는 목록에서 삭제했지만 폴더 일부를 지우지 못했습니다. 권한을 확인하세요. 앱을 다시 시작하면 남은 폴더 삭제를 다시 시도합니다.',503,{'projectId':pid,'leftoverPath':str(staged),'reason':type(failure).__name__}) from failure
+        return True
+    with s.connect() as c:c.execute('DELETE FROM meta WHERE key=?',(key,))
+    return True
+
+
+def finish_pending_deletions():
+    with s.connect() as c:keys=[r[0] for r in c.execute("SELECT key FROM meta WHERE substr(key,1,15)='project_delete:'")]
+    for key in keys:
+        try:_finish_deletion(key[15:])
+        except s.AppError:pass
+
+
+def delete_project(pid,expected_revision):
+    """Delete the registration, the index, and the project's own folder.
+
+    No flush: the pending outbox belongs to the project being deleted, and a
+    missing folder must not be recreated. Before commit the folder is only
+    renamed aside (atomic), so any failure up to and including commit renames it
+    back intact. The commit also records the quarantine path; bytes are removed
+    only after commit, and a failure there is reported and retried from that record.
+    """
+    if _finish_deletion(pid):
+        with s.connect() as c:
+            if not c.execute('SELECT 1 FROM projects WHERE id=?',(pid,)).fetchone():return {'deletedProjectId':pid,'folderDeleted':True}
+    staged=root=None
+    try:
+        with s.transaction() as c:
+            p=s.get_project(pid,c);s.check_revision(p,expected_revision);_busy(c,pid)
+            row=c.execute('SELECT path FROM project_folders WHERE project_id=?',(pid,)).fetchone()
+            root=Path(row['path']) if row else None
+            if root and os.path.lexists(root):_check_deletable(c,pid,root)
+            else:root=None
+            _remove_index(c,pid);_prune(c)
+            if root:
+                _shared_bytes(c,root)
+                target=root.with_name('.'+root.name+'.deleting-'+s.uid())
+                st=root.lstat()
+                c.execute('INSERT OR REPLACE INTO meta VALUES (?,?)',('project_delete:'+pid,s.dumps({'path':str(target),'dev':st.st_dev,'ino':st.st_ino})))
+                try:os.rename(root,target)
+                except OSError as exc:
+                    raise s.AppError('PROJECT_DELETE_FAILED','프로젝트 폴더를 삭제하지 못했습니다. 폴더 권한과 사용 중인 프로그램을 확인하세요. 폴더와 목록을 변경하지 않았습니다.',503,{'path':str(root),'reason':type(exc).__name__}) from exc
+                staged=target
+    except BaseException:
+        if staged:
+            try:os.rename(staged,root)
+            except OSError as exc:
+                raise s.AppError('PROJECT_DELETE_FAILED','삭제를 취소했지만 폴더를 원래 위치로 되돌리지 못했습니다. 아래 경로의 폴더를 원래 이름으로 직접 옮기세요. 목록은 변경하지 않았습니다.',503,{'path':str(root),'leftoverPath':str(staged),'reason':type(exc).__name__}) from exc
+        raise
+    if staged:_finish_deletion(pid)
+    return {'deletedProjectId':pid,'folderDeleted':bool(root)}
 
 
 def missing_projects():
@@ -413,7 +544,7 @@ def open_project(value):
     with s.transaction() as c:
         old=c.execute('SELECT path FROM project_folders WHERE project_id=?',(pid,)).fetchone()
         if old and Path(old['path']).resolve()==folder:return s.public_project(s.get_project(pid,c))
-        if old and Path(old['path']).is_dir():raise s.AppError('PROJECT_ALREADY_OPEN','같은 프로젝트가 다른 폴더에서 열려 있습니다. 먼저 목록에서 제거하거나 프로젝트 복제를 사용하세요.',409,{'path':old['path']})
+        if old and Path(old['path']).is_dir():raise s.AppError('PROJECT_ALREADY_OPEN','같은 프로젝트가 다른 폴더에서 열려 있습니다. 다른 위치의 복사본은 앱의 프로젝트 복제를 사용하세요.',409,{'path':old['path']})
         _busy(c,pid)
         # Resource IDs can be shared by a genuine project duplicate, but their bytes must agree.
         for kind in ('assets','videos'):

@@ -1,5 +1,5 @@
 import {useState,useEffect,useRef} from 'react';
-import {BookOpen,Boxes,FolderOpen,ImagePlus,ScanFace,Sparkles,Scissors,Move,ShieldCheck,Download,History,Activity,Undo2,Redo2,Save,ArrowLeft,Plus,ExternalLink,ChevronRight,ListMinus} from 'lucide-react';
+import {BookOpen,Boxes,FolderOpen,ImagePlus,ScanFace,Sparkles,Scissors,Move,ShieldCheck,Download,History,Activity,Undo2,Redo2,Save,ArrowLeft,Plus,ExternalLink,ChevronRight,Trash2} from 'lucide-react';
 import {useStudio,type Studio} from './useStudio';
 import {api,downloadJson} from './api';
 import {uid,type Snapshot,type MissingProjectFolder,type Job} from './types';
@@ -78,13 +78,13 @@ export default function App(){
   {page==='editor'&&p?<main id="main" className="studio-work-area"><fieldset className="workspace-fieldset" disabled={s.busy}><EditStep key={p.projectId} s={s} clipId={clip} onClip={setClip} onAction={openTool} onSelectionChange={setCurrentSelection}/></fieldset></main>:page==='viewer'?<main id="main" className="standalone-workspace"><button className="viewer-back" onClick={()=>{if(p){setPage('editor');history.replaceState(null,'',`#project=${p.projectId}`);}else goProjects();}}><ArrowLeft size={15}/>{p?'편집기로':'프로젝트로'}</button><FileViewer/></main>:<main id="main" className="project-browser">
    <section className="project-browser-toolbar"><div><h1>프로젝트</h1><p>프로젝트마다 폴더 하나에 원본, 편집 이력과 출력 파일을 함께 보관합니다.</p></div><div className="row project-browser-actions"><button disabled={s.busy||!s.service} onClick={()=>openTool('openFolder')}><FolderOpen size={16}/>프로젝트 폴더 열기</button><label className="file-button">백업 복원<input type="file" accept=".zip,application/zip" disabled={s.busy||!s.service} onChange={async e=>{const file=e.target.files?.[0];if(!file)return;const body=new FormData();body.append('backupZip',file);body.append('idempotencyKey',uid());const result=await s.run(()=>api<Job>('/projects/restore','POST',body));if(result)setRestoreJob(result);e.target.value='';}}/></label><button className="primary" disabled={s.busy||!s.service} onClick={()=>openTool('create')}><Plus size={16}/>새 프로젝트</button></div></section>
    {restoreJob&&<Panel title="백업 복원"><JobCard job={restoreJob} s={s}/>{restoreJob.result?.projectId&&<button onClick={()=>open(restoreJob.result!.projectId!)}>복원된 프로젝트 열기</button>}</Panel>}
-   <div className="project-storage-toolbar"><p className="project-storage-note">폴더를 옮기거나 이름을 바꾸려면 작업을 마친 뒤 목록에서 제거하고, 옮긴 폴더를 다시 열어 주세요.</p><button disabled={s.busy||!s.service} onClick={checkMissingFolders}>없는 폴더 정리</button></div>
+   <div className="project-storage-toolbar"><p className="project-storage-note">폴더를 옮기거나 이름을 바꾸려면 저장하고 작업을 마친 뒤 Finder에서 폴더를 옮기고, <strong>프로젝트 폴더 열기</strong>로 새 위치를 여세요. 삭제는 폴더까지 지우므로 이동에 사용하지 마세요.</p><button disabled={s.busy||!s.service} onClick={checkMissingFolders}>없는 폴더 정리</button></div>
    <div className="project-list-heading"><span>캐릭터 · 프로젝트</span><span>저장 정보</span><span>동작 / 후보</span></div>
    <div className="project-list">{s.projects.map(project=><div className="project-row" key={project.projectId}>
     <button className="project-file" disabled={s.busy||project.storage?.available===false} onClick={()=>open(project.projectId)}><div className="project-file-identity"><div className="project-file-thumb checker">{project.assets?.[0]&&project.storage?.available!==false?<img src={project.assets[0].url} alt=""/>:<FolderOpen size={24}/>}</div><div><strong>{project.name}</strong><small>{project.characterName}</small><small className="project-folder-path" title={project.storage?.path}>{project.storage?.path||'폴더 경로 확인 필요'}</small>{project.storage&&<small className={`project-folder-status ${project.storage.available&&!project.storage.syncPending?'':'unavailable'}`}>{project.storage.syncPending?`폴더 저장 보류${project.storage.available?'':' · 폴더 접근 불가'}`:project.storage.available?'폴더 연결됨':'폴더 접근 불가 · 경로와 연결을 확인해 주세요'}</small>}</div></div><span className="project-file-date">v{project.revision}<small>{date(project.updatedAt)}</small></span><span className="project-file-count">{project.clips?.length||0} / {project.frames?.length||0}<ChevronRight size={15}/></span></button>
     <div className="project-actions">
      <button className="project-reveal" aria-label={`${project.name} 프로젝트 폴더 위치 열기`} title={storageTitle} disabled={s.busy||!fileManager||project.storage?.available===false} onClick={()=>s.revealProject(project)}><FolderOpen size={15}/><span>폴더 위치</span></button>
-     <button className="project-delete" aria-label={`${project.name} 목록에서 제거`} title="폴더를 보존하고 목록에서 제거" disabled={s.busy||!s.service} onClick={()=>{s.setError('');setDeleteTarget(project);}}><ListMinus size={15}/><span>목록에서 제거</span></button>
+     <button className="project-delete" aria-label={`${project.name} 프로젝트 삭제`} title="프로젝트와 프로젝트 폴더 삭제" disabled={s.busy||!s.service} onClick={()=>{s.setError('');setDeleteTarget(project);}}><Trash2 size={15}/><span>삭제</span></button>
     </div>
    </div>)}</div>
    {!s.projects.length&&<Empty title="프로젝트를 만들거나 폴더를 열어 주세요"><p>기존 프로젝트는 폴더를 선택하면 편집을 이어갈 수 있습니다.</p><button disabled={s.busy||!s.service} onClick={()=>openTool('create')}>새 프로젝트</button></Empty>}
@@ -110,14 +110,14 @@ export default function App(){
    </div>
    {!['create','openFolder'].includes(activeTool)&&<div className="tool-footer"><span>{['generate','generateAsset'].includes(activeTool)?'생성 작업은 도구를 닫아도 계속됩니다.':'편집 중인 동작과 프레임 선택은 유지됩니다.'}</span><button onClick={closeTool}>편집기로 돌아가기</button></div>}
   </EditorDialog>
-  <EditorDialog open={!!deleteTarget} onClose={()=>{if(!s.busy)setDeleteTarget(null);}} title="프로젝트 목록에서 제거" className="project-delete-dialog" closeDisabled={s.busy}>
+  <EditorDialog open={!!deleteTarget} onClose={()=>{if(!s.busy)setDeleteTarget(null);}} title="프로젝트 삭제" className="project-delete-dialog" closeDisabled={s.busy}>
    <Feedback s={s}/>
    <div className="project-delete-content">
-    <p><strong>“{deleteTarget?.name}”</strong> 프로젝트를 목록에서 제거할까요?</p>
+    <p><strong>“{deleteTarget?.name}”</strong> 프로젝트를 삭제할까요?</p>
     {deleteTarget?.storage&&<p className="project-folder-path">{deleteTarget.storage.path}</p>}
-    <p>프로젝트 폴더와 그 안의 원본, 저장된 편집 이력, 작업·출력 파일은 모두 유지됩니다. <strong>프로젝트 폴더 열기</strong>로 다시 등록할 수 있습니다.</p>
-    <p>이 브라우저의 미저장 편집 초안은 지워집니다. 필요한 변경은 먼저 저장해 주세요.</p>
-    <div className="project-delete-actions"><button autoFocus disabled={s.busy} onClick={()=>setDeleteTarget(null)}>취소</button><button disabled={s.busy||!s.service} onClick={removeProject}>{s.busy?'제거 중…':'목록에서 제거'}</button></div>
+    <p><strong>이 프로젝트 폴더와 그 안의 원본, 저장된 편집 이력, 작업·출력 파일을 모두 삭제합니다. 되돌릴 수 없습니다.</strong> 폴더가 이미 없으면 목록 등록만 지웁니다.</p>
+    <p>이 브라우저의 미저장 편집 초안도 지워집니다. 보관하려면 먼저 Finder에서 폴더를 복사해 두세요. 폴더를 옮기려는 경우에는 삭제하지 말고, 옮긴 뒤 <strong>프로젝트 폴더 열기</strong>로 새 위치를 여세요.</p>
+    <div className="project-delete-actions"><button autoFocus disabled={s.busy} onClick={()=>setDeleteTarget(null)}>취소</button><button className="danger" disabled={s.busy||!s.service} onClick={removeProject}>{s.busy?'삭제 중…':'프로젝트와 폴더 삭제'}</button></div>
    </div>
   </EditorDialog>
   <EditorDialog open={missingFolders!==null} onClose={()=>{if(!s.busy)setMissingFolders(null);}} title="없는 폴더 정리" className="project-delete-dialog" closeDisabled={s.busy}>

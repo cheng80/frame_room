@@ -129,15 +129,16 @@ class DeleteProject(Strict):
     expectedRevision:int=Field(strict=True,ge=1)
 class DeletedProject(Strict):
     deletedProjectId:str
+    folderDeleted:bool
 @app.delete('/v1/projects/{pid}',response_model=DeletedProject,
-    description='프로젝트를 앱 목록에서 제거합니다. 프로젝트 폴더의 편집 상태·이력·원본·출력 파일을 보존하여 다시 열 수 있습니다. X-Session-Token과 로컬 Origin 보호를 적용합니다.',
+    description='프로젝트를 삭제합니다. 목록 등록·앱 인덱스와 함께 등록된 프로젝트 폴더(원본·편집 이력·작업·출력 파일)를 실제로 삭제합니다. 폴더가 이미 없으면 등록만 정리하고 folderDeleted=false이며 폴더를 다시 만들지 않습니다. 이 프로젝트 표식이 있는 실제 폴더만 삭제하고 심볼릭 링크·다른 프로젝트 표식·중첩 프로젝트·다른 디스크·잠긴 파일은 변경 없이 거부합니다. 커밋 전에는 폴더 이름만 바꾸므로 커밋 실패 시 폴더를 그대로 되돌리고 등록을 유지합니다. 커밋 후 파일 삭제가 실패하면 503 PROJECT_DELETE_INCOMPLETE와 남은 경로를 알리고, 같은 요청 또는 앱 재시작 때 기록된 삭제 대기 폴더만, 장치·inode가 기록과 같고 안에 다른 프로젝트·잠긴 파일이 없을 때 다시 삭제합니다. X-Session-Token과 로컬 Origin 보호를 적용합니다.',
     responses={403:{'description':'SESSION_REQUIRED 또는 ORIGIN_FORBIDDEN'},
                404:{'description':'PROJECT_NOT_FOUND'},
-               409:{'description':'REVISION_CONFLICT 또는 PROJECT_BUSY (queued/running/cancel_requested 작업 존재)'}})
+               409:{'description':'REVISION_CONFLICT, PROJECT_BUSY (queued/running/cancel_requested 작업 존재), PROJECT_FOLDER_MISMATCH, PROJECT_DELETE_UNSAFE, PROJECT_RESOURCE_SHARED'},
+               503:{'description':'PROJECT_DELETE_FAILED (폴더 이름 변경 실패; 변경 없음) 또는 PROJECT_DELETE_INCOMPLETE (등록 삭제 후 폴더 일부 삭제 실패; details.leftoverPath, 재시도 가능)'}})
 def delete_project(pid:str,body:DeleteProject):
     from . import project_folders as folders
-    folders.detach_project(pid,body.expectedRevision)
-    return {'deletedProjectId':pid}
+    return folders.delete_project(pid,body.expectedRevision)
 class Duplicate(Strict): expectedRevision:int; name:str=Field(min_length=1,max_length=200)
 @app.post('/v1/projects/{pid}/duplicate',status_code=201)
 def duplicate(pid:str,body:Duplicate):

@@ -29,7 +29,7 @@ def client(tmp_path, monkeypatch):
 @pytest.fixture
 def fake_folders(monkeypatch):
     folders = importlib.import_module('services.api.project_folders')
-    fake = SimpleNamespace(open_project=Mock(), detach_project=Mock(), missing_projects=Mock(), cleanup_missing=Mock())
+    fake = SimpleNamespace(open_project=Mock(), delete_project=Mock(), missing_projects=Mock(), cleanup_missing=Mock())
     for name, service in vars(fake).items():
         monkeypatch.setattr(folders, name, service)
     return fake
@@ -70,9 +70,11 @@ def test_folder_routes_delegate_with_exact_contract(client, fake_folders, monkey
     r = client.post('/v1/project-folders/cleanup', json={'projects': items})
     assert r.status_code == 200 and r.json() == removed
     fake_folders.cleanup_missing.assert_called_once_with(items)
+    deleted = {'deletedProjectId': p['projectId'], 'folderDeleted': False}
+    fake_folders.delete_project.return_value = deleted
     r = client.request('DELETE', f'/v1/projects/{p["projectId"]}', json={'expectedRevision': p['revision']})
-    assert r.status_code == 200 and r.json() == {'deletedProjectId': p['projectId']}
-    fake_folders.detach_project.assert_called_once_with(p['projectId'], p['revision'])
+    assert r.status_code == 200 and r.json() == deleted
+    fake_folders.delete_project.assert_called_once_with(p['projectId'], p['revision'])
 
 
 @pytest.mark.parametrize('route,body', [
@@ -176,7 +178,7 @@ def test_snapshots_advertise_folder_after_create_edit_duplicate_restore(client, 
 
 
 @pytest.mark.parametrize('suffix', ['', '/project.json', '/project.sqlite3'])
-def test_detach_preserves_folder_then_reopens_after_move(client, tmp_path, suffix):
+def test_move_then_open_reregisters_and_delete_removes_moved_folder(client, tmp_path, suffix):
     p = create(client)
     pid = p['projectId']
     url = '/v1/projects/' + pid
@@ -187,12 +189,7 @@ def test_detach_preserves_folder_then_reopens_after_move(client, tmp_path, suffi
     p = client.get(url).json()
     folder = Path(p['storage']['path'])
     history = client.get(url + '/revisions').json()
-    persisted = {name: (folder / name).read_bytes() for name in ('project.json', 'project.sqlite3')}
-    removed = client.request('DELETE', url, json={'expectedRevision': p['revision']})
-    assert removed.status_code == 200, removed.text
-    assert client.get(url).status_code == 404
-    assert client.get('/v1/projects').json()['projects'] == []
-    assert {name: (folder / name).read_bytes() for name in persisted} == persisted
+    # Safe move: finish work, move the folder, then open the new location. No delete involved.
     moved = tmp_path / '옮겨 둔 프로젝트'
     folder.rename(moved)
     r = client.post('/v1/project-folders/open', json={'path': str(moved) + suffix})
@@ -205,6 +202,9 @@ def test_detach_preserves_folder_then_reopens_after_move(client, tmp_path, suffi
     assert client.get(reopened['assets'][0]['url']).content == png.getvalue()
     assert client.post('/v1/project-folders/open', json={'path': str(moved)}).json() == reopened
     assert not folder.exists()
+    removed = client.request('DELETE', url, json={'expectedRevision': reopened['revision']})
+    assert removed.status_code == 200 and removed.json() == {'deletedProjectId': pid, 'folderDeleted': True}
+    assert not moved.exists() and not folder.exists() and client.get('/v1/projects').json()['projects'] == []
 
 
 def test_missing_cleanup_removes_only_confirmed_missing_registration(client, tmp_path):

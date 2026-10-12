@@ -36,10 +36,10 @@ Errors top-level {code,message,stage,details,...}; health {api:'ready',worker:'r
 프로젝트 폴더·SQLite 계약:
 - [PROJECT_FOLDERS.md](PROJECT_FOLDERS.md)를 따른다. 기본 `SPRITE_DATA_DIR/projects/<이름>--<ID>` 또는 지정 부모 폴더에 `project.json`, `project.sqlite3`, `assets/`, `videos/`, `jobs/`, `outputs/`를 보관한다.
 - `POST /v1/projects/{pid}/reveal`은 해당 프로젝트 폴더를 Finder/탐색기로 열며 `storageLayout: 'project-folder'`를 반환한다. 건강 상태의 `projectStorage.defaultParent`가 기본 부모 경로다.
-- `DELETE /v1/projects/{pid}`는 목록에서 제거다. `{expectedRevision: integer >= 1}`을 검증하고 진행 작업이 있으면 409로 거부한다. 공용 인덱스의 관련 기록만 정리하며 폴더를 다시 열면 동일 ID·이력·작업·출력을 복원한다.
+- `DELETE /v1/projects/{pid}`는 프로젝트 삭제다. `{expectedRevision: integer >= 1}`을 검증하고 진행 작업이 있으면 409로 거부한다. 인덱스와 함께 등록된 프로젝트 폴더를 실제로 삭제하고 `{deletedProjectId, folderDeleted}`를 반환한다. 폴더가 없으면 인덱스만 지우며 다시 만들지 않는다. 안전 검증·실패 복구 순서는 [PROJECT_FOLDERS.md](PROJECT_FOLDERS.md)를 따른다. 폴더 이동은 삭제가 아니라 이동 후 새 위치 열기다.
 - `GET /v1/project-folders/missing`과 `POST /v1/project-folders/cleanup`은 루트 폴더가 사라진 등록을 정리한다. 실행 직전 ID·경로·버전·폴더 부재·진행 작업을 다시 확인하며 변경이 있으면 전체 요청을 거부한다.
 - 폴더 저장 실패는 503 `PROJECT_FOLDER_SYNC_FAILED`이며 인덱스의 보류 데이터는 유지한다. `storage.syncPending`은 폴더 반영이 끝나지 않았음을 표시한다. 앱 재시작 또는 같은 폴더 재열기로 복구한다.
-- 이전 공용 원본은 자동으로 삭제하지 않는다. 인덱스 정리는 파일 삭제·디스크 공간 회수 기능이 아니다. 세션 토큰·Origin 보호를 유지한다.
+- 이전 공용 원본은 자동으로 삭제하지 않는다. 없는 폴더 정리는 파일 삭제·디스크 공간 회수 기능이 아니다. 세션 토큰·Origin 보호를 유지한다.
 
 OpenAPI는 FastAPI `services.api.main.app.openapi()`에서 생성한다. 저장소 루트에서 다음 명령으로 갱신하며 서버/lifespan/DB 초기화는 실행하지 않는다:
 ```sh

@@ -107,13 +107,19 @@ describe('project folder list and detachment',()=>{
  it('blocks opening or revealing unavailable folders while retaining the list-removal action',()=>{
   s.projects=[{...project,storage:{...project.storage!,available:false}}];const h=new Harness();
   expect(text(h.tree)).toContain('폴더 접근 불가');expect(nodes(h.tree).find(n=>n.props.className==='project-file')!.props.disabled).toBe(true);
-  expect(h.button('걷기 프로젝트 폴더 위치 열기').props.disabled).toBe(true);expect(h.button('걷기 목록에서 제거').props.disabled).toBe(false);
+  expect(h.button('걷기 프로젝트 폴더 위치 열기').props.disabled).toBe(true);expect(h.button('걷기 프로젝트 삭제').props.disabled).toBe(false);
  });
- it('explains folder preservation and drafts before explicit list removal',async()=>{
-  const h=new Harness();await h.click('걷기 목록에서 제거');const dialog=h.dialog('프로젝트 목록에서 제거');
-  expect(text(dialog)).toContain('모두 유지');expect(text(dialog)).toContain('미저장 편집 초안은 지워집니다');expect(text(dialog)).toContain(project.storage!.path);
-  expect(text(dialog)).not.toContain('되돌릴 수 없습니다');expect(s.deleteProject).not.toHaveBeenCalled();
-  await h.click('목록에서 제거');expect(s.deleteProject).toHaveBeenCalledExactlyOnceWith(project);expect(h.dialog('프로젝트 목록에서 제거')).toBeUndefined();
+ it('states that the folder and its data are deleted before explicit confirmation',async()=>{
+  const h=new Harness();expect(text(h.tree)).not.toContain('목록에서 제거하고');expect(text(h.tree)).toContain('삭제는 폴더까지 지우므로 이동에 사용하지 마세요');
+  await h.click('걷기 프로젝트 삭제');const dialog=h.dialog('프로젝트 삭제');
+  for(const phrase of ['원본, 저장된 편집 이력, 작업·출력 파일을 모두 삭제합니다','되돌릴 수 없습니다','폴더가 이미 없으면 목록 등록만 지웁니다','미저장 편집 초안도 지워집니다','삭제하지 말고'])expect(text(dialog)).toContain(phrase);
+  expect(text(dialog)).toContain(project.storage!.path);expect(text(dialog)).not.toContain('모두 유지');expect(s.deleteProject).not.toHaveBeenCalled();
+  await h.click('프로젝트와 폴더 삭제');expect(s.deleteProject).toHaveBeenCalledExactlyOnceWith(project);expect(h.dialog('프로젝트 삭제')).toBeUndefined();
+ });
+ it('cancels deletion without a request and keeps the dialog open after a failed delete',async()=>{
+  let h=new Harness();await h.click('걷기 프로젝트 삭제');await h.click('취소');expect(s.deleteProject).not.toHaveBeenCalled();expect(h.dialog('프로젝트 삭제')).toBeUndefined();
+  vi.mocked(s.deleteProject).mockResolvedValue(undefined);h=new Harness();await h.click('걷기 프로젝트 삭제');await h.click('프로젝트와 폴더 삭제');
+  expect(s.deleteProject).toHaveBeenCalledOnce();expect(h.dialog('프로젝트 삭제')).toBeDefined();
  });
 });
 

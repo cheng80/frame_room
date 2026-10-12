@@ -52,6 +52,7 @@ def init():
         c.execute('INSERT OR IGNORE INTO meta VALUES (?,?)',('session_token',uid()+uid()))
     from . import project_folders
     project_folders.migrate_legacy()
+    project_folders.finish_pending_deletions()
 
 @contextlib.contextmanager
 def transaction():
