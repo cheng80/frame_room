@@ -70,7 +70,7 @@ def test_imported_spill_reference_survives_rewind_and_portable_restore(client,me
     import sprite_gen.gen.xai as xai
     monkeypatch.setattr(xai,'http_json',lambda *_:pytest.fail('Spill repair must stay local'))
     c=client;p,a=base(c,new(c));p,v=upload(c,p,media)
-    request={'videoId':v['videoId'],'spillReferenceAssetId':a['assetId'],'loopMode':'full','maxFrames':4,'bodyHeight':32,'cellWidth':64,'cellHeight':64}
+    request={'frameSelection':'uniform','videoId':v['videoId'],'spillReferenceAssetId':a['assetId'],'loopMode':'full','maxFrames':4,'bodyHeight':32,'cellWidth':64,'cellHeight':64}
     response=queue(c,p,params=request);assert response.status_code==202,response.text
     job=s.get_job(response.json()['jobId']);out=s.job_directory(job['jobId'])/job['attemptId']/'staging'
     result=execute(job,out)
@@ -116,7 +116,7 @@ def test_real_local_processing_candidates_timing_and_backup(client,media,monkeyp
     import sprite_gen.gen.xai as xai
     monkeypatch.setattr(xai,'http_json',lambda *_:pytest.fail('No remote calls in video processing'))
     c=client;p,v=upload(c,new(c),media);before=p['revision']
-    request={'videoId':v['videoId'],'loopMode':'manual','startFrame':1,'endFrame':7,'maxFrames':4,'bodyHeight':32,'cellWidth':64,'cellHeight':64,'key':'magenta'}
+    request={'frameSelection':'uniform','videoId':v['videoId'],'loopMode':'manual','startFrame':1,'endFrame':7,'maxFrames':4,'bodyHeight':32,'cellWidth':64,'cellHeight':64,'key':'magenta'}
     r=queue(c,p,params=request,idem='local-video');assert r.status_code==202,r.text
     # A duplicate submission uses the existing job even after its input revision becomes stale.
     j=run(r.json());assert j['status']=='needs_review'
@@ -189,7 +189,7 @@ def test_cycle_matching_uses_snapshot_timing_and_preserves_interpolation_lineage
         def describe(self):return {'kind':'synthetic-test-interpolator'}
     monkeypatch.setattr(video_processing,'rife_interpolator',Interpolator)
     c=client;p,v=upload(c,new(c),media)
-    params={'videoId':v['videoId'],'loopMode':'manual','startFrame':0,'endFrame':8,'maxFrames':5,'bodyHeight':32,'cellWidth':64,'cellHeight':64,'repairMode':'off'}
+    params={'frameSelection':'uniform','videoId':v['videoId'],'loopMode':'manual','startFrame':0,'endFrame':8,'maxFrames':5,'bodyHeight':32,'cellWidth':64,'cellHeight':64,'repairMode':'off'}
     initial=run(queue(c,p,params=params).json());p=load(c,p)
     clip=p['clips'][0];assert len(clip['occurrences'])==5
     changed={**params,'maxFrames':8,'matchClipId':clip['clipId']}
@@ -330,7 +330,7 @@ def test_video_checkpoint_recovery_in_external_project_folder(client,media,monke
     response=client.post('/v1/projects',json={'name':'외부 영상 프로젝트','parentDirectory':str(parent)})
     assert response.status_code==201,response.text
     p,a=base(client,response.json())
-    params={'loopMode':'full','maxFrames':4,'bodyHeight':32,'cellWidth':64,'cellHeight':64}
+    params={'frameSelection':'uniform','loopMode':'full','maxFrames':4,'bodyHeight':32,'cellWidth':64,'cellHeight':64}
     queued=queue(client,p,'generate_video',params,[a['assetId']])
     assert queued.status_code==202,queued.text
     j=s.get_job(queued.json()['jobId']);root=s.project_folder(p['projectId'])

@@ -736,7 +736,18 @@ def process_clip(clip: Path, work: Path, params: dict, on_progress=None) -> dict
                "direction": _choice(params, "direction", DIRECTIONS, "side"),
                "bodyPlan": params.get("bodyPlan", ""),
                "between": _choice(params, "between", ("auto", "on", "off"), "auto"),
-               "startFoot": _choice(params, "startFoot", ("auto", "left", "right"), "auto")}
+               "startFoot": _choice(params, "startFoot", ("auto", "left", "right"), "auto"),
+               "frameSelection": _choice(params, "frameSelection", ("uniform", "vision"), "uniform"),
+               "frameJudge": "rules"}
+    # Legacy "auto" always meant rules once Laya is gone; laya/jev were removed and fail before any observer call.
+    _choice(params, "frameJudge", ("auto", "rules"), "rules")
+    if params.get("frameObserver") is not None:  # explicit comparison opt-in; omitted keeps the saved shape
+        from .frame_selection import OBSERVERS
+        options["frameObserver"] = _choice(params, "frameObserver", tuple(OBSERVERS), None)
+    if params.get("observationCacheOnly") is not None:  # comparison reruns: existing observations only
+        if params["observationCacheOnly"] is not True or options["frameSelection"] != "vision":
+            raise VideoProcessingError("VIDEO_INVALID_PARAMS", "observationCacheOnly는 영상 프레임 선별(vision)에서 true만 허용합니다.")
+        options["observationCacheOnly"] = True
     if params.get("startIndex") is not None:
         options["startIndex"] = _integer(params["startIndex"], "startIndex", 0, 63)
     if params.get("targetFrameCount") is not None:
@@ -843,20 +854,57 @@ def process_clip(clip: Path, work: Path, params: dict, on_progress=None) -> dict
         count = min(limit, end - start)
         indices = [start + i * (end - start) // count for i in range(count)]
         times = source["timesMs"]
-        boundaries = [_round(times[i] - times[start]) for i in [*indices, end]]
-        frames = [{"rawPath": str(raw[i]), "keyedPath": str(keyed[i]), "sourceFrameIndex": i,
-                   "outputFrameIndex": k,
-                   "sourceTimeMs": times[i], "durationMs": boundaries[k + 1] - boundaries[k],
-                   "originalKeyedPath": str(original_keyed[i]),
-                   "interpolated": i in repair.get("sourceFrameIndices", []),
-                   "processing": {"kind": "rife-jump-repair" if i in repair.get("sourceFrameIndices", []) else
-                                  "scale-drift-correction" if selection.get("scaleCorrection") else "chroma-key",
-                                  **({"interpolation": {"method": "rife-ncnn-vulkan", "fraction": 0.5,
-                                                       "sourceFrameIndices": [start + (i - start - 1) % (end - start),
-                                                                              start + (i - start + 1) % (end - start)]}}
-                                     if i in repair.get("sourceFrameIndices", []) else {})}}
-                  for k, i in enumerate(indices)]
-        for frame in frames:
+        if options["frameSelection"] == "vision":
+            if "targetFrameCount" in options:
+                selection["frameSelection"] = {"mode": "vision", "status": "skipped",
+                                               "reason": "주기 맞춤은 자체 샘플링을 유지합니다."}
+            else:
+                from . import frame_selection
+                progress(stage, "균등 위치 주변 후보를 관찰·판정합니다.")
+                cache_dir = params.get("observationCacheDir")
+                try:
+                    indices, selection["frameSelection"] = frame_selection.select(
+                        keyed, start, end, count, times, artifact_dir / "frame-selection", loop=selection["loop"],
+                        observer=options.get("frameObserver"),
+                        reference=reference, cache_dir=Path(cache_dir) if cache_dir else None,
+                        observation_cache_only=options.get("observationCacheOnly", False))
+                except frame_selection.ObservationCacheMiss as exc:
+                    raise VideoProcessingError("VIDEO_FRAME_OBSERVATION_CACHE_MISS", "저장된 관찰 결과가 없어 관찰 모델을 호출하지 않고 중단했습니다.",
+                                               {"reason": str(exc)}) from exc
+        # Identical to the uniform formula when indices[0] == start; a moved first pick keeps the total time.
+        from .frame_selection import boundaries as display_boundaries
+        boundaries = [_round(b) for b in display_boundaries(times, indices, start, end, selection["loop"])]
+        repaired = repair.get("sourceFrameIndices", [])
+
+        def frame_for(i, k):
+            return {"rawPath": str(raw[i]), "keyedPath": str(keyed[i]), "sourceFrameIndex": i, "outputFrameIndex": k,
+                    "sourceTimeMs": times[i], "durationMs": boundaries[k + 1] - boundaries[k] if k is not None else None,
+                    "originalKeyedPath": str(original_keyed[i]), "interpolated": i in repaired,
+                    "processing": {"kind": "rife-jump-repair" if i in repaired else
+                                   "scale-drift-correction" if selection.get("scaleCorrection") else "chroma-key",
+                                   **({"interpolation": {"method": "rife-ncnn-vulkan", "fraction": 0.5,
+                                                         "sourceFrameIndices": [start + (i - start - 1) % (end - start),
+                                                                                start + (i - start + 1) % (end - start)]}}
+                                      if i in repaired else {})}}
+        frames = [frame_for(i, k) for k, i in enumerate(indices)]
+        alternates = []
+        chosen = selection.get("frameSelection", {})
+        if chosen.get("slots"):
+            decided = {d["sourceFrameIndex"]: d for d in chosen["decisions"]}
+            for frame, slot in zip(frames, chosen["slots"]):
+                d = decided[frame["sourceFrameIndex"]]
+                frame["frameSelection"] = {"slot": slot["slot"], "label": d["label"], "reasons": d["reasons"],
+                                           "source": d["source"], "slotStatus": slot["status"], "slotReasons": slot["reasons"], "changed": slot["changed"],
+                                           "uniformSourceFrameIndex": slot["uniformSourceFrameIndex"]}
+                if slot["changed"]:
+                    # Keep the replaced uniform frame as an unused candidate so the user can swap back.
+                    u = decided[slot["uniformSourceFrameIndex"]]
+                    alternate = frame_for(slot["uniformSourceFrameIndex"], None)
+                    del alternate["outputFrameIndex"], alternate["durationMs"]  # not a slot; files are named by position
+                    alternate["frameSelection"] = {"slot": slot["slot"], "label": u["label"], "reasons": u["reasons"],
+                                                   "source": u["source"], "role": "uniform-alternative"}
+                    alternates.append(alternate)
+        for frame in frames + alternates:
             if frame["interpolated"]:
                 frame["interpolation"] = frame["processing"]["interpolation"]
         if "targetFrameCount" in options:
@@ -875,7 +923,7 @@ def process_clip(clip: Path, work: Path, params: dict, on_progress=None) -> dict
             for i, frame in enumerate(frames):
                 frame["outputFrameIndex"] = i
             selection["outputPhase"] = {"turnedBy": turned, "manual": "startIndex" in options, "footStrike": strike}
-        for frame in frames:
+        for frame in frames + alternates:
             _describe_source_processing(frame, selection)
         if any(frame["durationMs"] <= 0 for frame in frames):
             raise VideoProcessingError("VIDEO_TIMING_TOO_SHORT", "밀리초 단위로 보존할 수 없는 프레임 시간입니다.")
@@ -884,11 +932,13 @@ def process_clip(clip: Path, work: Path, params: dict, on_progress=None) -> dict
         preview = _preview(frames, artifact_dir, selection["loop"])
         files = [extraction["reportPath"], str(marker), str(artifact_dir / "processing.report.json"), str(checkpoint)]
         files += [preview[k] for k in ("path", "sheetPath") if k in preview]
+        files += [str(p) for p in (artifact_dir / "frame-selection").glob("candidates.sheet.png")]
         result = {"version": VERSION, "options": options, "frames": frames, "source": dict(source),
                   "selection": selection, "standingHeight": standing, "anchor": anchor,
                   "boundsPaths": [str(f["keyedPath"]) for f in frames] if "targetFrameCount" in options else
                                  [str(p) for p in keyed[start:end]],
                   "anchorSourceFrameIndex": 0, "sourceSha256": digest, "preview": preview,
+                  **({"alternateFrames": alternates} if alternates else {}),
                   "extraction": {k: v for k, v in extraction.items() if k not in ("source", "manifest", "options")},
                   "files": [Path(p).relative_to(work).as_posix() for p in files]}
         if keyed != original_keyed:

@@ -10,7 +10,7 @@ MODELS=('grok-imagine-video-1.5','grok-imagine-video-1.5-lite')
 DEFAULTS=dict(state='walk',direction='side',facing='right',motionPrompt='',model=MODELS[0],durationSeconds=3,resolution='480p',key='auto',loopMode='auto',maxFrames=8,bodyHeight=94,cellWidth=64,cellHeight=128,finishMode='gif',repairMode='off',between='auto',startFoot='auto',bodyPlan='',equipment='')
 
 def validate_params(params,*,generation):
-    allowed=set(DEFAULTS)|{'referenceRevisionId','videoId','startFrame','endFrame','spillReferenceAssetId','matchClipId','startIndex'}
+    allowed=set(DEFAULTS)|{'referenceRevisionId','videoId','startFrame','endFrame','spillReferenceAssetId','matchClipId','startIndex','frameSelection','frameJudge','frameObserver','observationCacheOnly'}
     if set(params)-allowed: raise s.AppError('VIDEO_FIELDS','지원하지 않는 영상 설정입니다.',details={'fields':sorted(set(params)-allowed)})
     value={**DEFAULTS,**params}
     # Only new walks adopt the game-sized cycle; explicit saved requests keep
@@ -33,6 +33,18 @@ def validate_params(params,*,generation):
         for k,lo,hi,label in [('startFrame',0,599,'시작 프레임'),('endFrame',1,600,'끝 프레임')]:
             number(value.get(k),lo,hi,label,True);value[k]=int(value[k])
         if value['endFrame']<=value['startFrame']: raise s.AppError('VIDEO_RANGE','끝 프레임은 시작보다 커야 합니다.')
+    # Omitted stays uniform here, so stored job requests re-validated by the worker keep their meaning;
+    # new requests get vision+rules written in by with_fresh_selection() before they are stored.
+    for k,values in (('frameSelection',('uniform','vision')),('frameJudge',('auto','rules'))):
+        if k in value and value[k] not in values:
+            removed=k=='frameJudge' and value[k] in ('laya','jev')
+            raise s.AppError('VIDEO_SETTING','Laya·Jev 판정은 제거되었습니다. 규칙 판정(rules)을 사용하세요.' if removed else f'영상 {k} 설정을 확인하세요.')
+    if value.get('frameJudge')=='auto': value['frameJudge']='rules'  # legacy auto: Laya is gone, so it always meant rules here
+    if 'frameObserver' in value:
+        from .frame_selection import OBSERVERS
+        if not isinstance(value['frameObserver'],str) or value['frameObserver'] not in OBSERVERS or value.get('frameSelection')!='vision': raise s.AppError('VIDEO_SETTING','관찰 모델 비교는 영상 프레임 선별(vision)에서 허용 목록 값만 사용할 수 있습니다.')
+    if 'observationCacheOnly' in value and (value['observationCacheOnly'] is not True or value.get('frameSelection')!='vision'): raise s.AppError('VIDEO_SETTING','관찰 캐시 전용 실행은 영상 프레임 선별(vision)에서 true만 허용합니다.')
+    if value.get('frameSelection')=='vision' and value.get('matchClipId'): raise s.AppError('VIDEO_SETTING','영상 프레임 선별은 주기 맞춤과 함께 사용할 수 없습니다.')
     if generation and 'spillReferenceAssetId' in params: raise s.AppError('VIDEO_SETTING','새 영상은 생성에 사용한 기준 그림으로 색 번짐을 판정합니다.')
     for k in ('videoId','referenceRevisionId','spillReferenceAssetId','matchClipId'):
         if k in value and value[k] is not None and (not isinstance(value[k],str) or not value[k]): raise s.AppError('VIDEO_SETTING',f'{k} 값을 확인하세요.')
@@ -46,6 +58,18 @@ def login_credential():
     if credential.source!=AUTH_SOURCE_GROK_LOGIN: raise ProviderError('GROK_LOGIN_REQUIRED','Grok Build 로그인이 필요합니다. API 키로 전환하지 않습니다.')
     return credential
 
+def with_fresh_selection(params):
+    """New requests only: an omitted frameSelection becomes explicit vision+rules before hashing/storing.
+    Cycle matching keeps its uniform path; stored requests are never rewritten."""
+    if not isinstance(params,dict) or 'frameSelection' in params or params.get('matchClipId'): return params
+    return {'frameSelection':'vision','frameJudge':'rules',**params}
+
+def frame_selection_capability():
+    from .frame_selection import latest_luna, OBSERVER_EFFORT
+    model,reason=latest_luna()
+    return dict(modes=['uniform','vision'],judges=['rules'],defaultMode='vision',defaultJudge='rules',
+                observer=dict(model=model,effort=OBSERVER_EFFORT if model else None,available=bool(model),reason=reason))
+
 def capability():
     ready=True; reason='Grok 로그인 파일을 확인했습니다. 실제 사용량과 서버 권한은 생성 시 확인됩니다.'
     try: login_credential()
@@ -54,7 +78,7 @@ def capability():
     if not dependencies: reason='영상 처리에 ffmpeg와 ffprobe가 필요합니다.'
     from .video_processing import rife_capability
     rife={k:v for k,v in rife_capability().items() if k not in ('binary','modelPath')}
-    return dict(providerId='grok-video',label='Grok 영상',mediaKind='video',available=ready and dependencies,loginReady=ready,reason=reason,defaultModel=MODELS[0],models=[{'id':MODELS[0],'name':'Pro'},{'id':MODELS[1],'name':'Lite'}],billingRoute='Grok 로그인 · 계정 사용량 차감, 잔여량 확인 불가',quota=None,lastSuccess=None,capabilities=dict(video=True,resolution=True,resolutions=['480p','720p'],durationSeconds={'min':2,'max':6,'default':3},resume=True,apiKeyFallback=False,finishModes=['gif','rgba'],repairModes=['off','auto','on'],rife=rife))
+    return dict(providerId='grok-video',label='Grok 영상',mediaKind='video',available=ready and dependencies,loginReady=ready,reason=reason,defaultModel=MODELS[0],models=[{'id':MODELS[0],'name':'Pro'},{'id':MODELS[1],'name':'Lite'}],billingRoute='Grok 로그인 · 계정 사용량 차감, 잔여량 확인 불가',quota=None,lastSuccess=None,capabilities=dict(video=True,resolution=True,resolutions=['480p','720p'],durationSeconds={'min':2,'max':6,'default':3},resume=True,apiKeyFallback=False,finishModes=['gif','rgba'],repairModes=['off','auto','on'],rife=rife,frameSelection=frame_selection_capability()))
 
 def read_checkpoint(path):
     return json.loads(path.read_text()) if path.is_file() else None

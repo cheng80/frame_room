@@ -81,7 +81,7 @@ describe('video request boundaries', () => {
     expect(videoGenerationRequest(snapshot, generation(), defaultVideoProcessing())).toEqual({
       operation: 'generate_video', assetIds: ['approved'], params: {
         state: 'walk', key: 'auto', loopMode: 'auto', maxFrames: 8, bodyHeight: 94, cellWidth: 64, cellHeight: 128, finishMode: 'gif', repairMode: 'off', between: 'auto', startFoot: 'auto',
-        model: 'grok-imagine-video-1.5', durationSeconds: 3, resolution: '480p', direction: 'side', facing: 'right',
+        frameSelection: 'vision', frameJudge: 'rules', model: 'grok-imagine-video-1.5', durationSeconds: 3, resolution: '480p', direction: 'side', facing: 'right',
         motionPrompt: '', bodyPlan: '', equipment: '', referenceRevisionId: 'ref',
       },
     });
@@ -313,4 +313,24 @@ it('keeps stored imported-video direction unless explicitly overridden for foot 
   expect(old).not.toHaveProperty('facing');
   const explicit = videoProcessingParams({...defaults, direction: 'back_diagonal', facing: 'left'});
   expect(explicit).toMatchObject({direction: 'back_diagonal', facing: 'left'});
+});
+
+describe('video frame selection settings', () => {
+  it('defaults new settings to vision+rules and always sends the choice explicitly', () => {
+    expect(defaultVideoProcessing().frameSelection).toBe('vision');
+    expect(videoProcessingParams(defaultVideoProcessing())).toMatchObject({frameSelection: 'vision', frameJudge: 'rules', maxFrames: 8});
+    const uniform = videoProcessingParams({...defaultVideoProcessing(), frameSelection: 'uniform'});
+    expect(uniform.frameSelection).toBe('uniform');
+    expect(uniform).not.toHaveProperty('frameJudge');  // uniform never sends a judge
+  });
+  it('sends explicit uniform for settings saved before the option and for cycle matching', () => {
+    const saved = {...defaultVideoProcessing()} as Partial<ReturnType<typeof defaultVideoProcessing>>;
+    delete saved.frameSelection;  // settings stored before this option existed
+    const params = videoProcessingParams(saved as ReturnType<typeof defaultVideoProcessing>);
+    expect(params.frameSelection).toBe('uniform');
+    expect(params).not.toHaveProperty('frameJudge');
+    expect(videoProcessingParams({...defaultVideoProcessing(), matchClipId: 'c'})).toMatchObject({frameSelection: 'uniform', matchClipId: 'c'});
+    expect(videoProcessingParams({...defaultVideoProcessing(), matchClipId: 'c'})).not.toHaveProperty('frameJudge');
+    expect(() => videoProcessingParams({...defaultVideoProcessing(), frameSelection: 'luna' as never})).toThrow('영상 프레임 선별');
+  });
 });

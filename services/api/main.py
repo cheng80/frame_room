@@ -255,13 +255,20 @@ def providers():
 class JobRequest(Strict):
     operation:Literal['generate','generate_video','process_video','cutout','extract','align','inspect','bake','preview_follow','apply_follow','check_handed']; inputRevision:int; assetIds:list[str]=[]; params:dict={}; idempotencyKey:str=Field(min_length=1,max_length=200)
 def enqueue(pid,operation,request,idem,expected=None,connection=None):
-    try: rh=s.digest(s.dumps(request).encode())
+    try:
+        # A job stored before the fresh selection default hashed the raw request: an exact replay of
+        # that raw request still returns that job unchanged. New jobs store and hash the defaulted one.
+        raw_rh=s.digest(s.dumps(request).encode())
+        if operation in ('generate_video','process_video'):
+            from adapters.spritegen.video_provider import with_fresh_selection
+            request={**request,'params':with_fresh_selection(request.get('params',{}))}
+        rh=s.digest(s.dumps(request).encode())
     except (ValueError,TypeError) as exc:
         raise s.AppError('JOB_REQUEST_INVALID','작업 요청에는 유한한 숫자와 JSON 값만 사용할 수 있습니다.') from exc
     with (s.transaction() if connection is None else nullcontext(connection)) as c:
         row=c.execute('SELECT body,request_hash FROM jobs WHERE project_id=? AND operation=? AND idem=?',(pid,operation,idem)).fetchone()
         if row:
-            if row['request_hash']!=rh: raise s.AppError('IDEMPOTENCY_CONFLICT','같은 제출 키에 다른 내용이 있습니다.',409)
+            if row['request_hash'] not in (raw_rh,rh): raise s.AppError('IDEMPOTENCY_CONFLICT','같은 제출 키에 다른 내용이 있습니다.',409)
             return s.public_job(json.loads(row['body']))
         p=s.get_project(pid,c) if pid else None
         if p is not None and expected is not None: s.check_revision(p,expected)

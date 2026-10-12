@@ -86,6 +86,9 @@ def execute_video(j,out):
     spill_reference=params.get('spillReferenceAssetId') or video.get('provenance',{}).get('referenceAssetId')
     if spill_reference:
         processing_params['referencePath']=str(s.asset_path(spill_reference))
+    if processing_params.get('frameSelection')=='vision':
+        # Content-keyed observation cache shared by jobs, so a judge change does not re-observe.
+        processing_params['observationCacheDir']=str(s.DATA/'cache'/'frame-selection')
     result=process_clip(video_path,out/'processing',processing_params,on_progress=progress)
     if match_clip and result['selection'].get('cycleAlignment'):
         result['selection']['cycleAlignment'].update(matchClipId=match_clip['clipId'],matchClipRevisionId=match_clip['clipRevisionId'])
@@ -99,7 +102,9 @@ def execute_video(j,out):
     keyed_dir=result.get('extraction',{}).get('processedKeyedDir') or result.get('extraction',{}).get('keyedDir')
     bounds_paths=sorted(Path(keyed_dir).glob('frame-*.png'))[result['selection']['startFrame']:result['selection']['endFrame']] if keyed_dir else None
     bounds_paths=result.get('boundsPaths') or bounds_paths
-    normalized,normalization=normalize_frames(result['frames'],result['standingHeight'],params['bodyHeight'],out/'normalized',bounds_paths=bounds_paths,source_anchor=result['anchor'],resize_mode='legacy' if params['finishMode']=='gif' else 'color-alpha')
+    # Replaced uniform frames are imported as unused candidates only (no slot).
+    items=result['frames']+result.get('alternateFrames',[])
+    normalized,normalization=normalize_frames(items,result['standingHeight'],params['bodyHeight'],out/'normalized',bounds_paths=bounds_paths,source_anchor=result['anchor'],resize_mode='legacy' if params['finishMode']=='gif' else 'color-alpha')
     from adapters.spritegen.video_finish import finish_frames
     finished,finish=finish_frames(normalized,out/'finished',mode=params['finishMode'],cell_width=grid[0],cell_height=grid[1])
     progress('import_candidates','마무리한 프레임을 새 동작과 후보에 등록합니다.')
@@ -109,7 +114,7 @@ def execute_video(j,out):
                measurementProposal={'bodyHeight':result['standingHeight']*normalization['sourceToFrameTransform']['scaleY'],'targetHeight':params['bodyHeight'],'source':'video-normalized-first-frame'})
     assets=[];frames=[];alignments={};occurrences=[]
     generation_id=s.uid() if receipt else None
-    for item,normalized_path,finished_path in zip(result['frames'],normalized,finished):
+    for item,normalized_path,finished_path in zip(items,normalized,finished):
         provenance={'kind':'video-frame','sourceVideoId':video['videoId'],'sourceVideoSha256':video['sha256'],
                     'sourceFrameIndex':item['sourceFrameIndex'],'sourceTimeMs':item['sourceTimeMs'],'interpolated':bool(item.get('interpolated')),
                     'sourceProcessing':item.get('processing',{'kind':'chroma-key'}),
@@ -131,13 +136,16 @@ def execute_video(j,out):
                    sourceVideoId=video['videoId'],sourceFrameIndex=item['sourceFrameIndex'],sourceTimeMs=item['sourceTimeMs'],interpolated=bool(item.get('interpolated')),
                    **({'interpolation':item['processing']['interpolation']} if item.get('processing',{}).get('interpolation') else {}))
         frame['sourceProcessing']=item.get('processing',{'kind':'chroma-key'})
+        # Automatic recommendation only; Frame.review/reviewReason/hidden stay user-owned.
+        if item.get('frameSelection'): frame['selectionDecision']=item['frameSelection']
         if generation_id: frame['generationVersionId']=generation_id
         frames.append(frame)
         alignments[fid]=dict(frameVersionId=fid,groupRevisionId=group['groupRevisionId'],sourceAnchor=anchor,anchorSpace='crop',method='automatic',contactMode='grounded',authoredOffsetPx={'x':0,'y':0},approval='pending')
+        if item.get('frameSelection',{}).get('role')=='uniform-alternative': continue
         occurrences.append(dict(occurrenceId=s.uid(),frameVersionId=fid,durationMs=item['durationMs'],timingMode='explicit',transform={'dx':0,'dy':0,'scaleX':1,'scaleY':1,'rotationDeg':0,'shearX':0,'shearY':0,'flipX':False,'flipY':False},pixelEdits=[]))
     names={'idle':'대기','walk':'걷기','run':'달리기','jump':'점프','attack':'공격','dance':'춤','wave':'손 흔들기','cheer':'환호'}
     directions={'side':'측면','front':'정면','back':'뒷면','front_diagonal':'앞 대각선','back_diagonal':'뒤 대각선'}
-    clip=dict(clipId=s.uid(),clipRevisionId=s.uid(),name=f"영상 {names[params['state']]} · 검수 대기",stateId=params['state'],facing=params['facing'],referenceRevisionId=params.get('referenceRevisionId') or j['snapshot'].get('activeReferenceRevisionId'),loop=result['selection']['loop'],endBehavior='hold-last',defaultFps=min(60,max(1,round(len(frames)/(sum(o['durationMs'] for o in occurrences)/1000)))),occurrences=occurrences,review='pending',sourceVideoId=video['videoId'])
+    clip=dict(clipId=s.uid(),clipRevisionId=s.uid(),name=f"영상 {names[params['state']]} · 검수 대기",stateId=params['state'],facing=params['facing'],referenceRevisionId=params.get('referenceRevisionId') or j['snapshot'].get('activeReferenceRevisionId'),loop=result['selection']['loop'],endBehavior='hold-last',defaultFps=min(60,max(1,round(len(occurrences)/(sum(o['durationMs'] for o in occurrences)/1000)))),occurrences=occurrences,review='pending',sourceVideoId=video['videoId'])
     clip['direction']=params['direction']
     clip['name']=f"영상 {names[params['state']]} · {directions[params['direction']]} · 검수 대기"
     generations=[]
@@ -159,7 +167,7 @@ def execute_video(j,out):
     files+=['final-preview/'+name for name in preview['files']]+['final-preview/preview.json']
     return dict(assets=assets,frames=frames,alignmentGroups=[group],alignments=alignments,clips=[clip],generations=generations,
                 files=files,status='needs_review',videoId=video['videoId'],clipId=clip['clipId'],frameVersionIds=group['frameVersionIds'],
-                processing={'version':result['version'],'options':result['options'],'source':source,'selection':result['selection'],'outputFrames':len(frames),'durationMs':sum(o['durationMs'] for o in occurrences),'normalization':normalization,'finish':finish,'preview':preview,'spill':spill,**({'spillReferenceAssetId':spill_reference} if spill_reference else {})},**({'receipt':receipt} if receipt else {}))
+                processing={'version':result['version'],'options':result['options'],'source':source,'selection':result['selection'],'outputFrames':len(occurrences),'durationMs':sum(o['durationMs'] for o in occurrences),'normalization':normalization,'finish':finish,'preview':preview,'spill':spill,**({'spillReferenceAssetId':spill_reference} if spill_reference else {})},**({'receipt':receipt} if receipt else {}))
 
 def videos_frame_asset(path,name,provenance):
     return s.register_asset(Path(path).read_bytes(),name,'derived',provenance)
