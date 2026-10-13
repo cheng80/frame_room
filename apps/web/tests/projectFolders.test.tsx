@@ -1,5 +1,5 @@
 import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
-import type {ReactElement} from 'react';
+import {useEffect,type ReactElement} from 'react';
 import type {Snapshot,MissingProjectFolder} from '../src/types';
 import type {Studio} from '../src/useStudio';
 
@@ -9,10 +9,13 @@ vi.mock('react',async original=>({...await original<typeof import('react')>(),
  useState:(value:unknown)=>state.hooks.state(value),useRef:(value:unknown)=>state.hooks.ref(value),useEffect:vi.fn(),
 }));
 vi.mock('../src/useStudio',()=>({useStudio:()=>state.studio}));
+vi.mock('../src/ReferenceStep',async original=>({...await original<typeof import('../src/ReferenceStep')>(),hasUnstoredReferenceInput:vi.fn(()=>false)}));
 vi.mock('../src/api',async original=>({...await original<typeof import('../src/api')>(),api:vi.fn()}));
-import App from '../src/App';
+import App,{Conflict} from '../src/App';
 import {EditorDialog} from '../src/EditorDialog';
 import {api} from '../src/api';
+import {hasUnstoredReferenceInput} from '../src/ReferenceStep';
+import {Empty} from '../src/ui';
 
 type Node=ReactElement<any>;
 function nodes(tree:any):Node[]{
@@ -144,5 +147,97 @@ describe('missing project folder cleanup dialog',()=>{
  });
  it('cancels without submitting cleanup',async()=>{
   const h=new Harness();await h.click('없는 폴더 정리');await h.click('취소');expect(s.cleanupMissingFolders).not.toHaveBeenCalled();
+ });
+});
+
+describe('project list without a local server',()=>{
+ const empty=(h:Harness)=>nodes(h.tree).find(n=>n.type===Empty)!;
+ it('does not ask for a new project when the list could not load, and offers a reconnect',async()=>{
+  s.projects=[];s.service=null;s.connect=vi.fn();const h=new Harness();
+  expect(empty(h).props.title).toBe('로컬 서버에 연결되지 않았습니다');expect(text(empty(h))).not.toContain('새 프로젝트');
+  const reconnect=nodes(empty(h)).find(n=>n.type==='button')!;expect(text(reconnect)).toBe('연결 확인');await reconnect.props.onClick();expect(s.connect).toHaveBeenCalledOnce();
+  (s as any).providersChecking=true;h.render();expect(empty(h).props.title).toBe('로컬 서버에 연결하는 중입니다');
+ });
+ it('keeps the create prompt once connected with no projects',()=>{
+  s.projects=[];const h=new Harness();expect(empty(h).props.title).toBe('프로젝트를 만들거나 폴더를 열어 주세요');
+ });
+});
+
+describe('save shortcut',()=>{
+ function shortcut(){
+  const h=new Harness(),effect=vi.mocked(useEffect).mock.calls.filter(([,deps])=>deps?.includes(s.save)).at(-1)![0];
+  let listener!:(e:any)=>void;vi.stubGlobal('window',{addEventListener:(type:string,fn:any)=>{if(type==='keydown')listener=fn;},removeEventListener:vi.fn()});
+  effect();return {h,press:(target:any,extra={})=>listener({key:'s',metaKey:true,repeat:false,preventDefault:vi.fn(),target,...extra})};
+ }
+ let order:string[];
+ const field=(valid=true)=>({tagName:'INPUT',validity:{valid},blur:()=>order.push('blur-commit'),focus:()=>order.push('focus')});
+ beforeEach(()=>{order=[];vi.mocked(useEffect).mockClear();s.snapshot=project;s.save=vi.fn(async()=>{order.push('save');return true;});});
+ it('commits the focused field before one save and keeps focus there',()=>{
+  const {press}=shortcut();press(field());expect(order).toEqual(['blur-commit','focus','save']);expect(s.save).toHaveBeenCalledOnce();
+ });
+ it('does not save again on key repeat and saves directly outside fields',()=>{
+  const {press}=shortcut();press(field(),{repeat:true});expect(s.save).not.toHaveBeenCalled();
+  press({tagName:'DIV'});expect(order).toEqual(['save']);
+ });
+ it('reports an invalid field instead of showing a successful save',()=>{
+  const {press}=shortcut();press(field(false));expect(s.save).not.toHaveBeenCalled();expect(s.setError).toHaveBeenCalledWith(expect.stringContaining('올바르지 않은 값은 저장하지 않았습니다'));
+ });
+});
+
+describe('detail refresh failure banner',()=>{
+ it('offers one retry for the open project without replacing the error banner',async()=>{
+  s.base=project;(s as any).detailsError='작업 목록을 불러오지 못했습니다.';s.refreshDetails=vi.fn(async()=>{});s.error='저장 실패';
+  const h=new Harness(),feedback=nodes(h.tree).find(n=>n.props.s===s&&'details' in n.props)!;expect(feedback.props.details).toBe(false);
+  const shown=feedback.type({...feedback.props,details:true});
+  expect(text(shown)).toContain('저장 실패');expect(text(shown)).toContain('작업 목록을 불러오지 못했습니다.');
+  await nodes(shown).find(n=>n.type==='button'&&text(n)==='다시 조회')!.props.onClick();expect(s.refreshDetails).toHaveBeenCalledExactlyOnceWith('a');
+  expect(text(feedback.type({s}))).not.toContain('다시 조회');
+ });
+});
+
+describe('conflict draft protection',()=>{
+ function render(){const h={slots:[] as any[],cursor:0,tree:null as any,state(initial:unknown){const slot=this.slots[this.cursor++]??={value:initial};return [slot.value,(next:any)=>{slot.value=next;}];},ref(initial:unknown){return this.slots[this.cursor++]??={current:initial};},render(){this.cursor=0;state.hooks=this;this.tree=Conflict({s});state.hooks=null;}};h.render();return h;}
+ const button=(tree:any,label:string)=>nodes(tree).find(n=>n.type==='button'&&text(n)===label);
+ beforeEach(()=>{s.base=project;s.conflict={...project,revision:9,journal:[]} as any;s.commands=[{operation:{type:'updateCharacter',name:'a'}},{operation:{type:'updateCharacter',name:'b'}}] as any;s.setBase=vi.fn();s.setCommands=vi.fn();s.setConflict=vi.fn();});
+ it('keeps the draft when the discard confirmation is canceled',()=>{
+  const h=render();button(h.tree,'내 초안 버리고 서버 버전 열기')!.props.onClick();h.render();
+  expect(text(nodes(h.tree).find(n=>n.props.role==='alert'))).toContain('편집 초안 2개를 이 브라우저에서 지우고 서버 v9');
+  expect(s.setCommands).not.toHaveBeenCalled();button(h.tree,'취소')!.props.onClick();h.render();
+  expect(nodes(h.tree).find(n=>n.props.role==='alert')).toBeUndefined();expect(s.setCommands).not.toHaveBeenCalled();expect(s.setBase).not.toHaveBeenCalled();
+ });
+ it('opens the server version only after explicit confirmation',()=>{
+  const h=render();button(h.tree,'내 초안 버리고 서버 버전 열기')!.props.onClick();h.render();button(h.tree,'초안 버리고 서버 버전 열기')!.props.onClick();
+  expect(s.setBase).toHaveBeenCalledWith(s.conflict);expect(s.setCommands).toHaveBeenCalledWith([]);expect(s.setConflict).toHaveBeenCalledWith(null);
+ });
+});
+
+describe('leaving the editor with reference input the browser could not keep',()=>{
+ it('stays in the editor and explains why, then leaves once the input is resolved',()=>{
+  s.snapshot=project;s.base=project;const h=new Harness();h.slots[0].value='editor';h.render();
+  vi.mocked(hasUnstoredReferenceInput).mockReturnValue(true);
+  h.button('프레임룸 프로젝트 목록').props.onClick();h.render();h.button('독립 파일 뷰어').props.onClick();h.render();
+  expect(h.slots[0].value).toBe('editor');expect(history.replaceState).not.toHaveBeenCalled();expect(s.refreshProjects).not.toHaveBeenCalled();
+  expect(s.setError).toHaveBeenCalledWith(expect.stringContaining('보관하지 못한 기준 입력'));
+  vi.mocked(hasUnstoredReferenceInput).mockReturnValue(false);h.button('프레임룸 프로젝트 목록').props.onClick();h.render();expect(h.slots[0].value).toBe('projects');
+ });
+});
+
+describe('address changes while reference input could not be kept',()=>{
+ it('keeps the editor, input and URL on the shown project, then follows the address once resolved',async()=>{
+  const h=new Harness();
+  let onHash!:()=>void;vi.stubGlobal('window',{addEventListener:(type:string,fn:any)=>{if(type==='hashchange')onHash=fn;},removeEventListener:vi.fn()});
+  vi.mocked(useEffect).mock.calls.filter(([,deps])=>Array.isArray(deps)&&!deps.length).forEach(([fn])=>fn());
+  await nodes(h.tree).find(n=>n.type==='button'&&n.props.className==='project-file')!.props.onClick();h.render();
+  expect(h.slots[0].value).toBe('editor');expect(s.load).toHaveBeenCalledExactlyOnceWith('a');
+  vi.mocked(hasUnstoredReferenceInput).mockReturnValue(true);vi.mocked(history.replaceState).mockClear();
+  for(const next of ['#project=b','#viewer']){
+   location.hash=next;onHash();h.render();
+   expect(h.slots[0].value).toBe('editor');expect(history.replaceState).toHaveBeenLastCalledWith(null,'','#project=a');
+  }
+  expect(history.replaceState).toHaveBeenCalledTimes(2);expect(s.load).toHaveBeenCalledOnce();
+  expect(s.setError).toHaveBeenCalledWith(expect.stringContaining('보관하지 못한 기준 입력'));
+  location.hash='#project=a';onHash();expect(history.replaceState).toHaveBeenCalledTimes(2);
+  vi.mocked(hasUnstoredReferenceInput).mockReturnValue(false);location.hash='#project=b';onHash();await Promise.resolve();
+  expect(s.load).toHaveBeenLastCalledWith('b');
  });
 });

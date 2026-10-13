@@ -5,7 +5,7 @@ import {uid,type Snapshot,type MissingProjectFolder,type DraftCommand,type Opera
 export function useStudio(standalone=false){
  const [service,setService]=useState<Health|null>(null),[projects,setProjects]=useState<Snapshot[]>([]),[base,setBase]=useState<Snapshot|null>(null),[commands,setCommands]=useState<DraftCommand[]>([]),[redoCommands,setRedo]=useState<DraftCommand[]>([]),[resolvedIds,setResolvedIds]=useState<Record<string,string>>({}),[busy,setBusyState]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[conflict,setConflict]=useState<Snapshot|null>(null),[jobs,setJobs]=useState<Job[]>([]),[providers,setProviders]=useState<Provider[]>([]),[exports,setExports]=useState<ExportRecord[]>([]),[revisions,setRevisions]=useState<{revision:number;createdAt:string;reason:string}[]>([]);
  const ref=useRef({base,commands,busy});ref.current={base,commands,busy};const jobStates=useRef('');const detailsEpoch=useRef(0);const projectsEpoch=useRef(0);const deletedProjects=useRef(new Set<string>());
- const [providersChecking,setProvidersChecking]=useState(false),[providersError,setProvidersError]=useState('');const connecting=useRef(false);
+ const [providersChecking,setProvidersChecking]=useState(false),[providersError,setProvidersError]=useState(''),[detailsError,setDetailsError]=useState('');const connecting=useRef(false);
  function setBusy(value:boolean){ref.current.busy=value;setBusyState(value);}
  const snapshot=useMemo(()=>base?applyDraft(base,commands):null,[base,commands]);
  function report(e:unknown){setError(e instanceof Error?e.message:'작업을 완료하지 못했습니다.');}
@@ -31,12 +31,17 @@ export function useStudio(standalone=false){
   setBase(nextBase);setCommands(nextCommands);setRedo([]);setResolvedIds({});
   setConflict(cached?.commands.length&&cached.base.revision!==server.revision?server:null);
   setNotice(cached?.commands.length?'이 브라우저에 보관된 편집 초안을 복구했습니다.':'프로젝트 폴더를 열었습니다.');
-  setJobs([]);setExports([]);setRevisions([]);jobStates.current='';await refreshDetails(id);
+  setJobs([]);setExports([]);setRevisions([]);setDetailsError('');jobStates.current='';await refreshDetails(id);
  }
  async function load(id:string){if(ref.current.busy)return false;detailsEpoch.current++;setBusy(true);setError('');try{await activateProject(await api<Snapshot>(`/projects/${id}`));return true;}catch(e){report(e);return false;}finally{setBusy(false);}}
- async function refreshDetails(id:string){const epoch=detailsEpoch.current;const results=await Promise.allSettled([api<{jobs:Job[]}>(`/projects/${id}/jobs`),api<{exports:ExportRecord[]}>(`/projects/${id}/exports`),api<{revisions:{revision:number;createdAt:string;reason:string}[]}>(`/projects/${id}/revisions`)]);if(epoch!==detailsEpoch.current||deletedProjects.current.has(id))return;if(results[0].status==='fulfilled')setJobs(results[0].value.jobs);if(results[1].status==='fulfilled')setExports(results[1].value.exports);if(results[2].status==='fulfilled')setRevisions(results[2].value.revisions);}
+ async function refreshDetails(id:string){const epoch=detailsEpoch.current;const results=await Promise.allSettled([api<{jobs:Job[]}>(`/projects/${id}/jobs`),api<{exports:ExportRecord[]}>(`/projects/${id}/exports`),api<{revisions:{revision:number;createdAt:string;reason:string}[]}>(`/projects/${id}/revisions`)]);if(epoch!==detailsEpoch.current||deletedProjects.current.has(id))return;
+ // Failed lists keep their previous values; say so instead of letting them pass as empty or current.
+ const failed=['작업','출력 이력','저장 이력'].filter((_,i)=>results[i].status==='rejected');
+ setDetailsError(failed.length?`${failed.join('·')} 목록을 불러오지 못했습니다. 표시된 목록은 비어 있거나 이전 값일 수 있습니다.`:'');
+ if(results[0].status==='fulfilled')setJobs(results[0].value.jobs);if(results[1].status==='fulfilled')setExports(results[1].value.exports);if(results[2].status==='fulfilled')setRevisions(results[2].value.revisions);}
  useEffect(()=>{if(!base||standalone)return;const id=base.projectId;let cancelled=false;let polling=false;const poll=async()=>{if(polling||document.hidden)return;polling=true;try{const [j,h]=await Promise.all([api<{jobs:Job[]}>(`/projects/${id}/jobs`),health()]);if(cancelled||ref.current.base?.projectId!==id)return;setService(h);setJobs(j.jobs);const state=j.jobs.map(j=>`${j.jobId}:${j.status}:${j.step}`).join('|');if(state!==jobStates.current){jobStates.current=state;await refreshDetails(id);const server=await api<Snapshot>(`/projects/${id}`);if(!cancelled&&ref.current.base?.projectId===id&&!ref.current.busy){if(!ref.current.commands.length)setBase(server);else if(server.revision!==ref.current.base.revision)setConflict(server);}}}catch{if(!cancelled&&ref.current.base?.projectId===id)setService(null);}finally{polling=false;}};const timer=setInterval(poll,2200);return()=>{cancelled=true;clearInterval(timer);};},[base?.projectId,standalone]);
- function edit(operation:Operation){if(ref.current.busy||!ref.current.base)return;const localId=['createClip','addOccurrence','duplicateOccurrence'].includes(operation.type)?`draft-${uid()}`:undefined;setCommands(c=>[...c,{operation,localId}]);setRedo([]);setNotice('');return localId;}
+ function edit(operation:Operation){if(ref.current.busy||!ref.current.base)return;const localId=['createClip','addOccurrence','duplicateOccurrence'].includes(operation.type)?`draft-${uid()}`:undefined;// Keep the ref current so a save in the same event (blur commit + ⌘S) includes this edit.
+ const next=[...ref.current.commands,{operation,localId}];ref.current.commands=next;setCommands(next);setRedo([]);setNotice('');return localId;}
  function undo(){if(busy||!commands.length)return;setRedo(r=>[commands[commands.length-1],...r]);setCommands(c=>c.slice(0,-1));}
  function redo(){if(busy||!redoCommands.length)return;setCommands(c=>[...c,redoCommands[0]]);setRedo(r=>r.slice(1));}
  async function save(){const current=ref.current;if(!current.base||current.busy)return false;if(!current.commands.length)return true;if(conflict){setError('다른 저장 버전과 비교한 뒤 초안을 다시 적용해 주세요.');return false;}setBusy(true);setError('');setNotice('');let server=current.base;let pending=[...current.commands];const ids:Record<string,string>={};
@@ -85,9 +90,9 @@ export function useStudio(standalone=false){
   if(ref.current.base&&removed.has(ref.current.base.projectId)){
    detailsEpoch.current++;ref.current.base=null;ref.current.commands=[];
    setBase(null);setCommands([]);setRedo([]);setResolvedIds({});setConflict(null);
-   setJobs([]);setExports([]);setRevisions([]);jobStates.current='';
+   setJobs([]);setExports([]);setRevisions([]);setDetailsError('');jobStates.current='';
   }
-  let failed=false;for(const id of ids){try{localStorage.removeItem(`frame-room-draft:${id}`);}catch{failed=true;}}
+  let failed=false;for(const id of ids){try{localStorage.removeItem(`frame-room-draft:${id}`);localStorage.removeItem(`frame-room-reference-form:${id}`);}catch{failed=true;}}
   if(failed)setError('목록 등록은 정리했지만 이 브라우저에 보관된 일부 초안을 지우지 못했습니다.');
  }
  async function missingProjectFolders(){
@@ -132,6 +137,6 @@ export function useStudio(standalone=false){
   });
  }
  async function job(operation:string,assetIds:string[]=[],params:Record<string,unknown>={}){if(!base)return;return mutation(`/projects/${base.projectId}/jobs`,{operation,inputRevision:base.revision,assetIds,params,idempotencyKey:uid()});}
- return {resolveId:(id:string)=>resolvedIds[id]||id,service,projects,base,snapshot,commands,redoCommands,busy,error,notice,conflict,jobs,providers,providersChecking,providersError,exports,revisions,edit,undo,redo,save,reapply,load,run,job,pickProjectFolder,openProjectFolder,missingProjectFolders,cleanupMissingFolders,revealProject,deleteProject,mutation,connect,refreshProjects,refreshDetails,report,setError,setNotice,setBase,setCommands,setConflict,setExports};
+ return {resolveId:(id:string)=>resolvedIds[id]||id,service,projects,base,snapshot,commands,redoCommands,busy,error,notice,conflict,jobs,providers,providersChecking,providersError,detailsError,exports,revisions,edit,undo,redo,save,reapply,load,run,job,pickProjectFolder,openProjectFolder,missingProjectFolders,cleanupMissingFolders,revealProject,deleteProject,mutation,connect,refreshProjects,refreshDetails,report,setError,setNotice,setBase,setCommands,setConflict,setExports};
 }
 export type Studio=ReturnType<typeof useStudio>;

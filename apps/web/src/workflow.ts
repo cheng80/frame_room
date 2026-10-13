@@ -1,5 +1,6 @@
 import type {Clip,Job,Snapshot} from './types';
 import {exportGates} from './draft';
+import {defaultReference} from './referenceLabel';
 
 type RecordValue=Record<string,unknown>;
 const record=(value:unknown):RecordValue=>value&&typeof value==='object'&&!Array.isArray(value)?value as RecordValue:{};
@@ -65,7 +66,7 @@ export function nextWork(s:Snapshot,clip:Clip|undefined,dirty:boolean,jobs:Job[]
  if(conflict)add('conflict','저장 충돌 해결','서버 버전과 보존된 초안을 비교하세요.',{action:'conflict'});
  else if(dirty)add('save','편집 초안 저장','검사와 출력은 저장된 버전을 사용합니다.',{action:'save'});
  if(!s.assets.length)add('assets','자료 가져오기','제작할 캐릭터 자료를 등록하세요.',{action:'assets'});
- const reference=s.references.find(r=>r.referenceRevisionId===(clip?.referenceRevisionId||s.activeReferenceRevisionId));
+ const reference=clip?.referenceRevisionId?s.references.find(r=>r.referenceRevisionId===clip.referenceRevisionId):defaultReference(s);
  if(!reference)add('reference','캐릭터 기준 연결','기준 이미지와 고정 특징을 정하고 동작에 연결하세요.',{action:s.references.length&&clip?'clip-settings':'reference',clipId:clip?.clipId});
  if(!s.frames.length&&s.assets.length)add('extract','원본에서 프레임 추출','동작 만들기에서 기존 이미지의 영역을 나누세요.',{action:'extract'});
  if(!clip)add('create','편집할 동작 만들기','프레임 편집에서 동작을 만든 뒤 후보를 넣으세요.',{action:'create-clip'});

@@ -6,6 +6,7 @@ import {EditStep} from './AnimationWorkspace';
 import {ExportStep} from './FinishSteps';
 import {exportGates} from './draft';
 import {inspectionState,type WorkTarget} from './workflow';
+import {defaultReference} from './referenceLabel';
 import './production-workflow.css';
 
 export const productionSteps=[
@@ -18,7 +19,7 @@ export const productionSteps=[
 ];
 export type StageStatus='대기'|'작업 중'|'준비됨'|'수정 필요'|'출력 완료';
 export function productionProgress(p:Snapshot,clip:Clip|undefined,jobs:Job[],exports:ExportRecord[],dirty:boolean,conflict=false){
- const reference=p.references.find(r=>r.referenceRevisionId===(clip?.referenceRevisionId||p.activeReferenceRevisionId));
+ const reference=clip?.referenceRevisionId?p.references.find(r=>r.referenceRevisionId===clip.referenceRevisionId):defaultReference(p);
  const assetsReady=!!p.assets.length;
  const referenceReady=!!reference&&p.assets.some(a=>a.assetId===reference.identityAssetId);
  const framesReady=clip?.occurrences.length?clip.occurrences.every(o=>p.frames.some(f=>f.frameVersionId===o.frameVersionId)):!!p.frames.length;

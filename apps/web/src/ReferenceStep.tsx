@@ -1,28 +1,71 @@
 import {useEffect,useState} from 'react';
 import type {Studio} from './useStudio';
-import {referenceLabel} from './referenceLabel';
+import {referenceLabel,defaultReference} from './referenceLabel';
 import {ReferenceNameInput} from './ReferenceNameInput';
 import {assetLabel} from './assetProvenance';
 import {Field,Input,Select,Check,Empty} from './ui';
 import {SourceTool,SourcePane} from './SourceToolLayout';
 import {EditorDialog} from './EditorDialog';
 import {SpriteImage} from './SpriteViewport';
+import type {Reference,Snapshot} from './types';
+
+type ReferenceForm = {name: string; identity: string; styles: string[]; poses: string[]; fixed: string; allowed: string; forbidden: string; facing: string};
+const formKey = (projectId: string) => `frame-room-reference-form:${projectId}`;
+// Open forms whose unsaved input could not be kept in this browser; the editor blocks leaving while any exist.
+let unstoredForms = 0;
+export const hasUnstoredReferenceInput = () => unstoredForms > 0;
+function referenceForm(p: Snapshot, reference?: Reference): ReferenceForm {
+    return {name: reference?.name || '', identity: reference?.identityAssetId || p.assets[0]?.assetId || '', styles: reference?.styleAssetIds || [], poses: reference?.poseAssetIds || [], fixed: reference?.fixedTraits || '', allowed: reference?.allowedChanges || '', forbidden: reference?.forbiddenTransfers || '', facing: reference?.facing || 'right'};
+}
+/** Unsaved form input this browser kept for this project only; references and assets that no longer exist are dropped. */
+function storedForm(p: Snapshot): {editingReferenceId: string; form: ReferenceForm} | null {
+    try {
+        const value = JSON.parse(localStorage.getItem(formKey(p.projectId)) || 'null');
+        if (!value?.form || typeof value.form !== 'object') return null;
+        const id = p.references.some(r => r.referenceRevisionId === value.editingReferenceId) ? value.editingReferenceId as string : '';
+        const saved = referenceForm(p, p.references.find(r => r.referenceRevisionId === id)), f = value.form;
+        const text = (v: unknown, fallback: string) => typeof v === 'string' ? v : fallback;
+        const assets = (ids: unknown) => Array.isArray(ids) ? ids.filter(a => p.assets.some(x => x.assetId === a)) : [];
+        return {editingReferenceId: id, form: {name: text(f.name, saved.name), identity: p.assets.some(a => a.assetId === f.identity) ? f.identity : saved.identity, styles: assets(f.styles), poses: assets(f.poses), fixed: text(f.fixed, saved.fixed), allowed: text(f.allowed, saved.allowed), forbidden: text(f.forbidden, saved.forbidden), facing: text(f.facing, saved.facing)}};
+    } catch { return null; }
+}
 
 export function ReferenceStep({ s, initialReferenceRevisionId }: {
     s: Studio;
     initialReferenceRevisionId?: string;
 }) {
     const p = s.snapshot!;
-    const active = p.references.find(r => r.referenceRevisionId === initialReferenceRevisionId) || p.references.find(r => r.referenceRevisionId === p.activeReferenceRevisionId);
-    const [editingReferenceId, setEditingReferenceId] = useState(active?.referenceRevisionId || '');
-    const [name,setName] = useState(active?.name || '');
-    const [identity, setIdentity] = useState(active?.identityAssetId || p.assets[0]?.assetId || '');
-    const [styles, setStyles] = useState<string[]>(active?.styleAssetIds || []);
-    const [poses, setPoses] = useState<string[]>(active?.poseAssetIds || []);
-    const [fixed, setFixed] = useState(active?.fixedTraits || '');
-    const [allowed, setAllowed] = useState(active?.allowedChanges || '');
-    const [forbidden, setForbidden] = useState(active?.forbiddenTransfers || '');
-    const [facing, setFacing] = useState(active?.facing || 'right');
+    const active = p.references.find(r => r.referenceRevisionId === initialReferenceRevisionId) || defaultReference(p);
+    const [restored] = useState(() => storedForm(p));
+    const initial = restored?.form || referenceForm(p, active);
+    const [editingReferenceId, setEditingReferenceId] = useState(restored ? restored.editingReferenceId : active?.referenceRevisionId || '');
+    const [name,setName] = useState(initial.name);
+    const [identity, setIdentity] = useState(initial.identity);
+    const [styles, setStyles] = useState<string[]>(initial.styles);
+    const [poses, setPoses] = useState<string[]>(initial.poses);
+    const [fixed, setFixed] = useState(initial.fixed);
+    const [allowed, setAllowed] = useState(initial.allowed);
+    const [forbidden, setForbidden] = useState(initial.forbidden);
+    const [facing, setFacing] = useState(initial.facing);
+    const form: ReferenceForm = {name, identity, styles, poses, fixed, allowed, forbidden, facing};
+    const editing = p.references.find(r => r.referenceRevisionId === editingReferenceId), saved = referenceForm(p, editing);
+    // A new form opened before any asset existed has no identity yet; that is not user input.
+    if (!editing && !identity) saved.identity = '';
+    const dirty = JSON.stringify(form) !== JSON.stringify(saved);
+    const draft = dirty ? JSON.stringify({editingReferenceId, form}) : '';
+    // Saving a reference is an explicit API call; until then keep the typed input across reloads and project switches.
+    const [storeFailed, setStoreFailed] = useState(false);
+    useEffect(() => {
+        try { if (draft) localStorage.setItem(formKey(p.projectId), draft); else localStorage.removeItem(formKey(p.projectId)); setStoreFailed(false); }
+        catch { setStoreFailed(!!draft); }
+    }, [draft, p.projectId]);
+    const unstored = dirty && storeFailed;
+    useEffect(() => {
+        if (!unstored) return;
+        const leave = (e: BeforeUnloadEvent) => e.preventDefault();
+        unstoredForms++; window.addEventListener('beforeunload', leave);
+        return () => { unstoredForms--; window.removeEventListener('beforeunload', leave); };
+    }, [unstored]);
     const toggle = (ids: string[], id: string) => ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id];
     async function saveReference() {
         const reference = {
@@ -36,10 +79,11 @@ export function ReferenceStep({ s, initialReferenceRevisionId }: {
             facing,
             bodyMeasurement: null,
         };
-        await s.mutation(`/projects/${p.projectId}/reference-revisions`, {
+        const saved = await s.mutation(`/projects/${p.projectId}/reference-revisions`, {
             expectedRevision: p.revision,
             reference,
         });
+        if (saved?.referenceRevisionId) { setEditingReferenceId(saved.referenceRevisionId); setName(reference.name); }
     }
     const [tab, setTab] = useState<'identity' | 'roles'>('identity');
     function loadReference(id: string) {
@@ -67,6 +111,7 @@ export function ReferenceStep({ s, initialReferenceRevisionId }: {
         setFacing(reference.facing || 'right');
     }
     useEffect(() => {
+        if (dirty) return;
         if (initialReferenceRevisionId && p.references.some(r => r.referenceRevisionId === initialReferenceRevisionId)) loadReference(initialReferenceRevisionId);
     }, [initialReferenceRevisionId]);
     const identityAsset = p.assets.find(a => a.assetId === identity);
@@ -74,7 +119,7 @@ export function ReferenceStep({ s, initialReferenceRevisionId }: {
     const previewAsset = p.assets.find(a => a.assetId === previewAssetId);
     return (<SourceTool name="캐릭터 기준" preview={<SourcePane title="외형 기준 이미지" className="source-tool-visual-pane" footer={<span>{identityAsset ? `${assetLabel(identityAsset)} · ${identityAsset.width} × ${identityAsset.height}` : '외형 기준을 선택해 주세요'}</span>}>
     <div className="source-tool-canvas checker">{identityAsset ? <SpriteImage src={identityAsset.url} alt="선택한 외형 기준" width={identityAsset.width} height={identityAsset.height} className="source-tool-sprite"/> : <Empty title="외형 기준 이미지가 없습니다"/>}</div>
-  </SourcePane>} settings={<SourcePane title="기준 편집" footer={<button className="primary full" disabled={!identity || s.busy || !!s.commands.length} onClick={saveReference}>새 기준 저장</button>}>
+  </SourcePane>} settings={<SourcePane title="기준 편집" footer={<>{dirty && <>{unstored ? <p className="warning" role="alert">저장하지 않은 기준 입력을 이 브라우저에 보관하지 못했습니다. 이 화면을 떠나면 입력이 사라지므로 새 기준 저장 또는 입력 버리기를 먼저 하세요.</p> : <p className="caption" role="status">저장하지 않은 기준 입력이 있습니다. 이 브라우저에 임시 보관되며, 새 기준 저장을 눌러야 프로젝트에 반영됩니다.</p>}<button type="button" onClick={() => loadReference(editingReferenceId)}>입력 버리기</button></>}<button className="primary full" disabled={!identity || s.busy || !!s.commands.length} onClick={saveReference}>새 기준 저장</button></>}>
     <div className="source-tool-segments" role="group" aria-label="기준 설정 분류">
       <button aria-pressed={tab === 'identity'} onClick={() => setTab('identity')}>외형</button>
       <button aria-pressed={tab === 'roles'} onClick={() => setTab('roles')}>참조</button>

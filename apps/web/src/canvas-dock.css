@@ -9,7 +9,8 @@
   height: 100%;
   max-height: 100%;
   margin-bottom: 0;
-  overflow: hidden;
+  /* If toolbar and playbar outgrow a cramped dock, scroll instead of clipping them. */
+  overflow: hidden auto;
 }
 
 .animation-workspace .canvas-shell > .canvas-toolbar,

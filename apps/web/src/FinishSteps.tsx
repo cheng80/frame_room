@@ -38,6 +38,7 @@ export function JobCard({job,s,onSelectClip}:{job:Job;s:Studio;onSelectClip?:(cl
    {clip&&onSelectClip?<button onClick={()=>onSelectClip(clip.clipId)}>결과 동작 편집</button>:null}
    {downloads?.map(a=><a className="button" key={a.artifactId} href={a.url} download={a.name}>{outputNames[a.name]||a.name} 다운로드</a>)}
   </div>
+  {retryLabel&&(s.commands.length||s.conflict)?<p className="caption">{s.conflict?'저장 충돌을 해결한 뒤':'편집 초안을 저장한 뒤'} 재시도할 수 있습니다.</p>:null}
   <details><summary>진단 정보</summary><p className="mono">작업 {job.jobId} · 단계 {job.step||'대기'}</p>{diagnostics?.map(a=><p key={a.artifactId}><a href={a.url} download={a.name}>{a.name}</a></p>)}{job.result?.qa?<pre>{JSON.stringify(job.result.qa,null,2)}</pre>:null}{job.result?.processing?<pre>{JSON.stringify(job.result.processing,null,2)}</pre>:null}</details>
  </article>;
 }
@@ -58,7 +59,9 @@ function ExportFailure({record,s}:{record:ExportRecord;s:Studio}) {
 }
 export function ExportStep({s,mode='export',clipId,onNavigate}:{s:Studio;mode?:'review'|'export';clipId?:string;onNavigate?:(target:WorkTarget)=>void}){
  const p=s.snapshot!;
- const [selected,setSelected]=useState<string[]>(p.clips.map(c=>c.clipId));
+ // Track exclusions so clips created after this tab opened are exported by default.
+ const [excluded,setExcluded]=useState<string[]>([]);
+ const selected=p.clips.map(c=>c.clipId).filter(id=>!excluded.includes(id));
  // undefined follows the latest successful export; null keeps an explicit close.
  const [preview,setPreview]=useState<{runtime:Runtime;url:string;projectId:string}|null|undefined>(undefined);
  const [view,setView]=useState<'preview'|'settings'>('preview');
@@ -72,7 +75,7 @@ export function ExportStep({s,mode='export',clipId,onNavigate}:{s:Studio;mode?:'
   return {...e,createdAt:job?.createdAt,completedAt:['succeeded','completed'].includes(e.status)?job?.updatedAt:undefined,attemptId:job?.attemptId};
  }).sort((a,b)=>(Date.parse(b.completedAt||b.createdAt||'')||0)-(Date.parse(a.completedAt||a.createdAt||'')||0));
  const selectedClipIds=(mode==='review'?(clipId?[clipId]:[]):selected).filter(id=>p.clips.some(c=>c.clipId===id));
- const gates=exportGates(p,selectedClipIds,!!s.commands.length||!!s.conflict||!!p.storage?.syncPending);
+ const gates=[...exportGates(p,selectedClipIds,!!s.commands.length||!!s.conflict||!!p.storage?.syncPending),...(s.service?.worker==='ready'?[]:['작업 처리기가 연결되지 않았습니다. 하단의 연결 확인으로 다시 확인해 주세요.'])];
  const clipRevisionIds=p.clips.filter(c=>selectedClipIds.includes(c.clipId)).map(c=>c.clipRevisionId);
  const bake=s.jobs.filter(j=>j.operation==='bake'&&['succeeded','completed','needs_review'].includes(j.status)&&j.result?.manifest&&j.artifacts?.some(f=>f.name==='atlas.png')&&(mode!=='review'||j.result.manifest.clips.some(c=>c.id===clipId))).slice().sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||'')||b.inputRevision-a.inputRevision)[0];
  const latest=exportHistory.find(e=>['succeeded','completed'].includes(e.status)&&e.manifest&&(mode!=='review'||e.manifest.clips.some(c=>c.id===clipId))&&e.files?.some(f=>f.name==='atlas.png'));
@@ -84,7 +87,7 @@ export function ExportStep({s,mode='export',clipId,onNavigate}:{s:Studio;mode?:'
  const clip=p.clips.find(c=>c.clipId===clipId);
  const livePreview=mode==='review'&&(!current||preview===undefined&&(current.runtime.projectRevision!==p.revision||!!s.commands.length));
  useEffect(()=>{
-  setSelected(p.clips.map(c=>c.clipId));setPreview(undefined);setView('preview');setSidebarView('settings');
+  setExcluded([]);setPreview(undefined);setView('preview');setSidebarView('settings');
   return()=>{request.current++;};
  },[p.projectId]);
  function closePreview(){request.current++;setPreview(null);}
@@ -132,12 +135,12 @@ export function ExportStep({s,mode='export',clipId,onNavigate}:{s:Studio;mode?:'
      <button disabled={s.busy||!s.service?.desktop?.fileManager||!outputFolder||p.storage?.available===false} onClick={()=>s.revealProject(p)}>프로젝트 폴더 열기</button>
      <p className="caption">프로젝트의 outputs 폴더에 출력별 하위 폴더가 생성됩니다. 아래 다운로드는 브라우저의 다운로드 설정에 따라 별도로 저장됩니다.</p>
     </div>}
-    {mode==='export'&&<details className="export-clip-options"><summary>출력할 동작 · {selectedClipIds.length} / {p.clips.length}개 선택</summary><div className="export-clip-selection" role="group" aria-label="출력할 동작">{p.clips.map(c=><Check key={c.clipId} label={`${c.name} · ${c.occurrences.length} 슬롯`} checked={selected.includes(c.clipId)} onChange={v=>setSelected(v?[...selected,c.clipId]:selected.filter(id=>id!==c.clipId))}/>)}</div></details>}
+    {mode==='export'&&<details className="export-clip-options"><summary>출력할 동작 · {selectedClipIds.length} / {p.clips.length}개 선택</summary><div className="export-clip-selection" role="group" aria-label="출력할 동작">{p.clips.map(c=><Check key={c.clipId} label={`${c.name} · ${c.occurrences.length} 슬롯`} checked={selected.includes(c.clipId)} onChange={v=>setExcluded(v?excluded.filter(id=>id!==c.clipId):[...excluded,c.clipId])}/>)}</div></details>}
     <div className="export-actions row">
-     <button disabled={s.busy||!!gates.length||s.service?.worker!=='ready'} onClick={()=>{setPreview(undefined);setView('preview');void s.job('bake',[],{clipIds:selectedClipIds,clipRevisionIds});}}>확정 미리보기 만들기</button>
-     {mode==='export'&&<button className="primary" disabled={s.busy||!!gates.length||s.service?.worker!=='ready'} onClick={async()=>{const ticket=++request.current;const result=await s.mutation(`/projects/${p.projectId}/exports`,{savedRevision:p.revision,clipRevisionIds,formats:['atlas','pngs','runtime','aseprite'],outlineMode:p.outline.mode,idempotencyKey:uid()});if(result&&ticket===request.current){setPreview(undefined);setSidebarView('history');setView('settings');}}}>게임용 파일 출력</button>}
+     <button disabled={s.busy||!!gates.length} onClick={()=>{setPreview(undefined);setView('preview');void s.job('bake',[],{clipIds:selectedClipIds,clipRevisionIds});}}>확정 미리보기 만들기</button>
+     {mode==='export'&&<button className="primary" disabled={s.busy||!!gates.length} onClick={async()=>{const ticket=++request.current;const result=await s.mutation(`/projects/${p.projectId}/exports`,{savedRevision:p.revision,clipRevisionIds,formats:['atlas','pngs','runtime','aseprite'],outlineMode:p.outline.mode,idempotencyKey:uid()});if(result&&ticket===request.current){setPreview(undefined);setSidebarView('history');setView('settings');}}}>게임용 파일 출력</button>}
     </div>
-    {gates.length?<ul className="gate-list">{gates.map(g=><li key={g}>{g}</li>)}</ul>:<p className="success-text">저장·동작 설정 준비됨. 출력 시 서버가 픽셀·경계·파일을 검사합니다.</p>}
+    {gates.length?<><ul className="gate-list">{gates.map(g=><li key={g}>{g}</li>)}</ul>{!!s.commands.length&&!s.conflict&&<button onClick={()=>void s.save()}>편집 초안 저장</button>}</>:<p className="success-text">저장·동작 설정 준비됨. 출력 시 서버가 픽셀·경계·파일을 검사합니다.</p>}
     {mode==='review'&&<InspectionPanel s={s} clip={p.clips.find(c=>c.clipId===clipId)} onNavigate={onNavigate}/>}
     {bake&&<button onClick={()=>show(bake.result?.manifest,bake.artifacts||[])}>최근 미리보기 보기 · 버전 {bake.inputRevision}</button>}
     <details className="export-format-help"><summary>출력 파일 안내</summary>
@@ -163,4 +166,4 @@ export function ExportStep({s,mode='export',clipId,onNavigate}:{s:Studio;mode?:'
   </aside>
  </div>;
 }
-export function HistoryStep({s}:{s:Studio}){const p=s.snapshot!,[restoreRevision,setRestore]=useState<number|null>(null),[duplicateName,setName]=useState(`${p.name} 사본`);return <div className="two-columns"><Panel title="저장 이력" eyebrow="VERSION HISTORY"><p className="muted">과거 상태로 돌아가도 원본과 이전 출력은 삭제되지 않습니다. 새 저장 버전이 만들어집니다.</p>{s.revisions.slice().reverse().map(r=><article className="revision" key={r.revision}><div><strong>버전 {r.revision}</strong><p>{r.reason}</p><small>{date(r.createdAt)}</small></div><button disabled={r.revision===p.revision||s.busy||!!s.commands.length} onClick={()=>setRestore(r.revision)}>이 버전 복원</button></article>)}{restoreRevision!==null&&<div className="warning" role="alert"><p>버전 {restoreRevision} 상태를 새 버전으로 복원합니다.</p><div className="row"><button onClick={()=>setRestore(null)}>취소</button><button onClick={async()=>{await s.mutation(`/projects/${p.projectId}/restore-revision`,{expectedRevision:p.revision,targetRevision:restoreRevision});setRestore(null);}}>복원 실행</button></div></div>}</Panel><div><Panel title="프로젝트 백업"><p>원본·정렬·순서·시간·생성 이력을 한 파일로 보관합니다.</p><button className="primary" disabled={s.busy||!!s.commands.length} onClick={()=>s.mutation(`/projects/${p.projectId}/backup`,{savedRevision:p.revision})}>백업 파일 만들기</button>{s.jobs.filter(j=>j.operation==='backup').slice(-1).map(j=><JobCard key={j.jobId} job={j} s={s}/>)}</Panel><Panel title="프로젝트 복제"><Input label="사본 이름" value={duplicateName} onChange={e=>setName(e.target.value)}/><button disabled={s.busy||!!s.commands.length||!duplicateName.trim()} onClick={()=>s.mutation(`/projects/${p.projectId}/duplicate`,{expectedRevision:p.revision,name:duplicateName})}>새 프로젝트로 복제</button></Panel><Panel title="초안 보관"><p className="muted">다른 창의 변경과 비교하거나 문제를 해결할 때 로컬 초안을 파일로 보관할 수 있습니다.</p><button onClick={()=>downloadJson(`${p.name}-draft.json`,{base:s.base,commands:s.commands})}>현재 초안 다운로드</button></Panel><Panel title="생성 이력">{p.generations.length?<pre>{JSON.stringify(p.generations,null,2)}</pre>:<p className="muted">실제 생성 이력이 없습니다. 가져온 이미지는 자료 목록에서 확인하세요.</p>}</Panel></div></div>}
+export function HistoryStep({s}:{s:Studio}){const p=s.snapshot!,[restoreRevision,setRestore]=useState<number|null>(null),[duplicateName,setName]=useState(`${p.name} 사본`);const draftBlocked=s.commands.length?<p className="caption">미저장 편집 초안이 있습니다. 저장한 뒤 복원·백업·복제할 수 있습니다.</p>:null;return <div className="two-columns"><Panel title="저장 이력" eyebrow="VERSION HISTORY"><p className="muted">과거 상태로 돌아가도 원본과 이전 출력은 삭제되지 않습니다. 새 저장 버전이 만들어집니다.</p>{draftBlocked}{s.revisions.slice().reverse().map(r=><article className="revision" key={r.revision}><div><strong>버전 {r.revision}</strong><p>{r.reason}</p><small>{date(r.createdAt)}</small></div><button disabled={r.revision===p.revision||s.busy||!!s.commands.length} onClick={()=>setRestore(r.revision)}>이 버전 복원</button></article>)}{restoreRevision!==null&&<div className="warning" role="alert"><p>버전 {restoreRevision} 상태를 새 버전으로 복원합니다.</p><div className="row"><button onClick={()=>setRestore(null)}>취소</button><button onClick={async()=>{await s.mutation(`/projects/${p.projectId}/restore-revision`,{expectedRevision:p.revision,targetRevision:restoreRevision});setRestore(null);}}>복원 실행</button></div></div>}</Panel><div><Panel title="프로젝트 백업"><p>원본·정렬·순서·시간·생성 이력을 한 파일로 보관합니다.</p>{draftBlocked}<button className="primary" disabled={s.busy||!!s.commands.length} onClick={()=>s.mutation(`/projects/${p.projectId}/backup`,{savedRevision:p.revision})}>백업 파일 만들기</button>{s.jobs.filter(j=>j.operation==='backup').slice(-1).map(j=><JobCard key={j.jobId} job={j} s={s}/>)}</Panel><Panel title="프로젝트 복제"><Input label="사본 이름" value={duplicateName} onChange={e=>setName(e.target.value)}/><button disabled={s.busy||!!s.commands.length||!duplicateName.trim()} onClick={()=>s.mutation(`/projects/${p.projectId}/duplicate`,{expectedRevision:p.revision,name:duplicateName})}>새 프로젝트로 복제</button></Panel><Panel title="초안 보관"><p className="muted">다른 창의 변경과 비교하거나 문제를 해결할 때 로컬 초안을 파일로 보관할 수 있습니다.</p><button onClick={()=>downloadJson(`${p.name}-draft.json`,{base:s.base,commands:s.commands})}>현재 초안 다운로드</button></Panel><Panel title="생성 이력">{p.generations.length?<pre>{JSON.stringify(p.generations,null,2)}</pre>:<p className="muted">실제 생성 이력이 없습니다. 가져온 이미지는 자료 목록에서 확인하세요.</p>}</Panel></div></div>}

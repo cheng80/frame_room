@@ -14,7 +14,7 @@ import {nextWork,type WorkTarget} from './workflow';
 import {ReviewStep} from './FinishSteps';
 import {Check,Input,Num,Select} from './ui';
 import {assetProvenanceLabel} from './assetProvenance';
-import {referenceLabel} from './referenceLabel';
+import {referenceLabel,defaultReference} from './referenceLabel';
 import {ReferenceNameInput} from './ReferenceNameInput';
 import {defaultTransform,type Point,type RGBA,type Transform} from './types';
 import './animation-workspace.css';
@@ -85,7 +85,7 @@ export function EditStep({s,clipId,onClip,onAction,onSelectionChange,navigationT
   const group=p.alignmentGroups.find(g=>g.frameVersionIds.includes(occurrence?.frameVersionId||''));
   const defaultPivot={x:(group?.cell.width||512)/2,y:(group?.cell.height||512)/2};
   const transform={...defaultTransform(defaultPivot),...occurrence?.transform,pivot:occurrence?.transform.pivot||defaultPivot};
-  const reference=p.references.find(r=>r.referenceRevisionId===(clip?clip.referenceRevisionId:p.activeReferenceRevisionId));
+  const reference=clip?p.references.find(r=>r.referenceRevisionId===clip.referenceRevisionId):defaultReference(p);
   const referenceAsset=reference?assetById.get(reference.identityAssetId):undefined;
   const duration=clip?.occurrences.reduce((n,o)=>n+o.durationMs,0)||0;
   const blocked=s.busy;
@@ -106,7 +106,7 @@ export function EditStep({s,clipId,onClip,onAction,onSelectionChange,navigationT
   const comparisonNavigation={label:`${canvasTarget==='timeline'&&occurrence?'재생 슬롯':'후보'} ${comparisonIndex+1} / ${comparisonCount}`,previous:comparisonIndex>0?()=>compareFrame(-1):undefined,next:comparisonIndex>=0&&comparisonIndex<comparisonCount-1?()=>compareFrame(1):undefined};
   function createClip(){
     if(!name.trim()||blocked)return;
-    const next=s.edit({type:'createClip',clip:{name:name.trim(),referenceRevisionId:p.activeReferenceRevisionId}});
+    const next=s.edit({type:'createClip',clip:{name:name.trim(),referenceRevisionId:defaultReference(p)?.referenceRevisionId??null}});
     if(next){selectClip(next);setNewClipOpen(false);}
   }
   function deleteClip(){

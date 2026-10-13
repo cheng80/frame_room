@@ -54,3 +54,30 @@ describe('connection refresh',()=>{
   const h=new Harness();await h.s.connect();h.render();expect(h.s.service).toEqual(ready);expect(h.s.providers).toEqual(providers);expect(h.s.providersError).toBe('');
  });
 });
+
+describe('saving edits committed in the same event',()=>{
+ it('includes an edit made just before save without waiting for a re-render',async()=>{
+  const base={projectId:'p',revision:3,clips:[],assets:[],frames:[],references:[],alignmentGroups:[],alignments:{}} as any;
+  vi.mocked(api).mockImplementation(async(path,method,body:any)=>method==='PATCH'?{savedRevision:4,snapshot:{...base,revision:4}}:{jobs:[],exports:[],revisions:[]});
+  const h=new Harness();h.s.setBase(base);h.render();
+  h.s.edit({type:'setTiming',clipId:'c',occurrenceId:'o',durationMs:200,timingMode:'explicit'});
+  expect(await h.s.save()).toBe(true);
+  const patches=vi.mocked(api).mock.calls.filter(c=>c[1]==='PATCH');
+  expect(patches).toHaveLength(1);expect(patches[0][2]).toEqual({expectedRevision:3,operations:[{type:'setTiming',clipId:'c',occurrenceId:'o',durationMs:200,timingMode:'explicit'}]});
+  h.render();expect(h.s.commands).toEqual([]);expect(h.s.base?.revision).toBe(4);
+ });
+});
+
+describe('project detail refresh failures',()=>{
+ it('reports failed lists, keeps their previous values, and clears after a successful retry',async()=>{
+  const job={jobId:'j',status:'succeeded'};let failJobs=false;
+  vi.mocked(api).mockImplementation(async path=>{
+   if(path.endsWith('/jobs')){if(failJobs)throw new Error('offline');return {jobs:[job]};}
+   return path.endsWith('/exports')?{exports:[]}:{revisions:[{revision:3}]};
+  });
+  const h=new Harness();await h.s.refreshDetails('p');h.render();expect(h.s.jobs).toEqual([job]);expect(h.s.detailsError).toBe('');
+  failJobs=true;await h.s.refreshDetails('p');h.render();
+  expect(h.s.detailsError).toContain('작업 목록을 불러오지 못했습니다');expect(h.s.detailsError).not.toContain('출력');expect(h.s.jobs).toEqual([job]);expect(h.s.error).toBe('');
+  failJobs=false;await h.s.refreshDetails('p');h.render();expect(h.s.detailsError).toBe('');
+ });
+});

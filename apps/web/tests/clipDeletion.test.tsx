@@ -65,6 +65,12 @@ describe('clip reference picture',()=>{
   expect(s.edit).toHaveBeenCalledExactlyOnceWith({type:'updateClip',clipId:'c',changes:{referenceRevisionId:'r2'}});
   expect(picture()!.props.src).toBe('/1.png');expect(s.snapshot!.clips[0].review).not.toBe('approved');
  });
+ it('links a new clip to the newest saved reference when none is active',()=>{
+  s.base!.activeReferenceRevisionId=null as any;s.snapshot=structuredClone(s.base);const h=new Harness(s);h.click('새 동작');
+  nodes(h.tree).find(n=>n.props.label==='새 동작 이름')!.props.onChange({target:{value:'달리기'}});h.render();
+  nodes(h.tree).find(n=>n.type==='form')!.props.onSubmit({preventDefault:vi.fn()});
+  expect(s.edit).toHaveBeenCalledWith({type:'createClip',clip:{name:'달리기',referenceRevisionId:'r2'}});expect(s.snapshot!.activeReferenceRevisionId).toBeNull();
+ });
  it('never substitutes the active image for an unlinked clip',()=>{
   s.snapshot!.clips[0].referenceRevisionId=null;const h=new Harness(s);
   expect(nodes(h.tree).some(n=>n.type===SpriteImage&&n.props.alt==='선택한 동작의 기준 그림')).toBe(false);
@@ -231,6 +237,27 @@ describe('library clip deletion',()=>{
   expect(text(h.tree)).not.toContain('출력할 동작을 찾을 수 없습니다.');h.click('확정 미리보기 만들기');
   expect(s.job).toHaveBeenCalledExactlyOnceWith('bake',[],{clipIds:['other'],clipRevisionIds:['other-r']});
   s.snapshot!.clips=[];h.render();expect(h.button('확정 미리보기 만들기').props.disabled).toBe(true);
+ });
+});
+
+describe('export gates and selection',()=>{
+ beforeEach(()=>{
+  s.exports=[];s.service={worker:'ready'} as Studio['service'];s.job=vi.fn();s.save=vi.fn();
+  s.snapshot!.references=[{referenceRevisionId:'r'}] as any;s.snapshot!.frames=[{frameVersionId:'f',nativeScaleGroupId:'g',review:'pending'}] as any;s.snapshot!.alignmentGroups=[{alignmentGroupId:'g',groupRevisionId:'gr',frameVersionIds:['f']}] as any;s.snapshot!.alignments={f:{frameVersionId:'f',groupRevisionId:'gr',approval:'pending'}} as any;s.snapshot!.clips.forEach(c=>{c.referenceRevisionId='r';c.occurrences=[{occurrenceId:c.clipId+'-o',frameVersionId:'f',durationMs:125,timingMode:'fps'}] as any;});
+ });
+ it('includes clips created after the export tab opened and keeps explicit exclusions',()=>{
+  const h=new Harness(s,'c',ExportStep);s.snapshot!.clips.push({...s.snapshot!.clips[1],clipId:'new',clipRevisionId:'new-r',name:'새 공격'});h.render();
+  nodes(h.tree).find(n=>n.type===Check&&n.props.label.startsWith('초안 걷기'))!.props.onChange(false);h.render();
+  h.click('확정 미리보기 만들기');expect(s.job).toHaveBeenCalledExactlyOnceWith('bake',[],{clipIds:['other','new'],clipRevisionIds:['other-r','new-r']});
+ });
+ it('names a disconnected worker instead of claiming the export is ready',()=>{
+  s.service={worker:'offline'} as any;const h=new Harness(s,'c',ExportStep);
+  expect(h.button('확정 미리보기 만들기').props.disabled).toBe(true);expect(text(h.tree)).toContain('작업 처리기가 연결되지 않았습니다.');expect(text(h.tree)).not.toContain('준비됨');
+ });
+ it('offers saving next to the unsaved-draft gate, but not during a conflict',()=>{
+  s.commands=[{operation:{type:'updateCharacter',name:'x'}}] as any;const h=new Harness(s,'c',ExportStep);
+  h.click('편집 초안 저장');expect(s.save).toHaveBeenCalledOnce();expect(s.job).not.toHaveBeenCalled();
+  s.conflict=project;h.render();expect(()=>h.button('편집 초안 저장')).toThrow();
  });
 });
 

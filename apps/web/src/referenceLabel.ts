@@ -12,6 +12,11 @@ export function referenceLabel(project:Snapshot,id:string|null|undefined):string
  return [`기준 ${index+1}`,trait,filename].filter(Boolean).join(' · ');
 }
 
+/** Project default without a linked clip: active reference, else the newest saved one. Saving never changes active. */
+export function defaultReference(project:Pick<Snapshot,'references'|'activeReferenceRevisionId'>){
+ return project.references.find(r=>r.referenceRevisionId===project.activeReferenceRevisionId)??project.references.at(-1);
+}
+
 /** Single-character image for project list/preview: active identity, visible frame image, other identity, then first asset. */
 export function projectCoverAsset(project:Partial<Pick<Snapshot,'assets'|'references'|'frames'|'activeReferenceRevisionId'>>):Asset|undefined {
  const assets=project.assets||[];

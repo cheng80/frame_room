@@ -46,6 +46,12 @@ describe('six production stages use data, not manual approval or tab visits',()=
   const p=project(),preview=bake(p,{createdAt:'2026-10-12T01:00:00Z'}),inspection=bake(p,{jobId:'inspect',operation:'inspect',createdAt:'2026-10-12T02:00:00Z',artifacts:[],result:{qa:{errors:[],frames:[{clipId:'c',errors:[]}]}}});
   expect(productionProgress(p,p.clips[0],[inspection,preview],[],false).ready[4]).toBe(true);
  });
+ it('lets the first saved draft reference unlock stage 2 without changing the active reference',()=>{
+  const p=project();p.clips=[];p.activeReferenceRevisionId=null as any;p.references.forEach(r=>r.approval='draft');const before=structuredClone(p);
+  expect(productionProgress(p,undefined,[],[],false).ready[1]).toBe(true);expect(p).toEqual(before);
+  p.references.at(-1)!.identityAssetId='missing';p.activeReferenceRevisionId=p.references[0].referenceRevisionId;
+  expect(productionProgress(p,undefined,[],[],false).ready[1]).toBe(true);
+ });
  it('does not accept an atlas without runtime as a completed export',()=>{
   const p=project(),e=output(p);e.files=e.files!.slice(0,1);expect(productionProgress(p,p.clips[0],[],[e],false).ready[5]).toBe(false);
  });
