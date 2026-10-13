@@ -144,12 +144,12 @@ node --check scripts/ego-smoke-page.mjs
 
 ## HTML 사용 설명서
 
-설명서 본문(`content.json`, 생성기, `index.html`·`manual.html`)은 2026-10-13에 6탭 흐름으로 갱신했습니다. 화면 캡처는 이전 UI 예시로 표시하며 재촬영은 남은 작업입니다. 현재 흐름은 [6단계 실행 계약](../../docs/product/SIX_STEP_WORKFLOW.md)을 따릅니다.
+설명서 본문(`content.json`, 생성기, `index.html`·`manual.html`)과 화면 캡처 12장은 2026-10-13에 6탭 흐름으로 갱신했습니다([갱신·출처 기록](../../docs/product/GUIDE_REFRESH_2026-10-13.md)). 현재 흐름은 [6단계 실행 계약](../../docs/product/SIX_STEP_WORKFLOW.md)을 따릅니다.
 
 - 퀵스타트: `/guide/index.html` · 상세 설명서: `/guide/manual.html`
 - 프로젝트 목록과 에디터의 `사용 설명서`에서 새 탭으로 엽니다.
-- `public/guide/content.json`: 기능별 본문, FAQ, 단축키. `scripts/generate-guide.mjs`: 6단계 퀵스타트와 13개 장의 상세 설명서 HTML 생성.
-- `public/guide/screens/`: 이전 UI의 에고 캡처·화면 스타일 PDF 렌더 12장. 생성된 가이드는 각 이미지를 “이전 UI 예시 · 현재 6탭 화면과 다릅니다”로 표시합니다. `media/`: 이전 6장 예제 atlas와 실제 8장 목도리 흔들림 전후 PNG/WebP. 별도 API 호출 없이 설명서에서만 재생합니다.
+- `public/guide/content.json`: 기능별 본문, FAQ, 단축키. `scripts/generate-guide.mjs`: 6단계 퀵스타트와 13개 장의 상세 설명서 HTML 생성. 작업 공간 화면의 번호 위치는 생성기 `map`, 설명은 `guide.js`의 `mapText`에서 함께 고칩니다.
+- `public/guide/screens/`: 2026-10-13 현재 앱을 격리 예제 프로젝트에서 ego 브라우저로 촬영한 실제 화면 12장(1440×1000). 단계 탭 화면과 별도 창(크기·발 정렬, 이력·백업, 두 이미지 크게 비교)을 캡션에서 구분합니다. 파일별 촬영 위치·예제 출처는 갱신 기록에 있습니다. `media/`: 이전 6장 예제 atlas와 실제 8장 목도리 흔들림 전후 PNG/WebP. 별도 API 호출 없이 설명서에서만 재생합니다.
 - `/guide/manual.html#clip-tools`: 동작 보완·검사의 위치, 영역 지정·전후 비교·새 동작 저장, 장비 표식·의심 슬롯 이동 안내. 목도리 예제는 재생 버튼으로 시작하며 `media/clip-tools-source.json`에 출처·설정·파일 해시를 기록합니다.
 - `npm run guide:build`는 HTML을 갱신하며 `npm run build`에도 포함됩니다. 이후 저장소 루트에서 `python3 scripts/package-guide.py`를 실행하면 오프라인 ZIP을 갱신합니다.
 - `frame-room-guide.zip`을 풀고 `index.html` 또는 `manual.html`을 열면 서버 없이 본문·이미지·예제가 동작합니다. 에디터로 이동할 때만 로컬 앱이 필요합니다. 인쇄/PDF 버튼은 브라우저의 인쇄 기능을 사용합니다.

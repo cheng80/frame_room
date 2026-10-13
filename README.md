@@ -8,7 +8,7 @@ React + Vite + TypeScript, FastAPI, SQLite, 독립 Python worker로 실행하는
 
 ## 가이드 영상
 
-영상과 HTML 사용 설명서의 화면 캡처는 이전 화면입니다. 설명서 본문은 6탭 흐름으로 갱신했고 캡처에 이전 UI 예시를 표시합니다. 현재 제작 흐름은 아래 여섯 단계와 [실행 계약](docs/product/SIX_STEP_WORKFLOW.md)을 따릅니다.
+HTML 사용 설명서의 본문과 화면 캡처 12장은 2026-10-13 현재 6탭 UI로 갱신했습니다([갱신 기록](docs/product/GUIDE_REFRESH_2026-10-13.md)). 영상 자료는 이전 화면입니다. 현재 제작 흐름은 아래 여섯 단계와 [실행 계약](docs/product/SIX_STEP_WORKFLOW.md)을 따릅니다.
 
 - [퀵스타트](https://youtu.be/yZgaGipvkkg)
 - [전체 가이드](https://youtu.be/MCCSBxyghXQ)
