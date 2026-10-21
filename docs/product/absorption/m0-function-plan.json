@@ -1,0 +1,3297 @@
+{
+ "schema": "frame-room-absorption-function-plan-v1",
+ "upstreamCommit": "59b2738a2e76ed7043d9691a230396ed6374a336",
+ "localTreeDigest": "1ddd35aed807606e2a0d0f92ebd41fedb40cba2bc33784e37cc1b926ce92dd67",
+ "method": "AST static extraction. App callers: _engine('m').x, v = _engine('m'); v.x, from sprite_gen.m import x. Body digest = ast.dump without line numbers. changedHelpers = same-module names the symbol references whose definition differs. Tests = test files naming both the symbol and its module leaf (textual, not coverage).",
+ "summary": {
+  "appSymbols": 80,
+  "byStatus": {
+   "body-changed": 11,
+   "same": 57,
+   "signature-changed": 12
+  },
+  "files": 61,
+  "newFunctions": 408,
+  "changedFunctions": 130,
+  "unresolvedBoundaries": 45
+ },
+ "appSymbols": [
+  {
+   "module": "sprite_gen.curate.curation",
+   "symbol": "apply_pixel_edits",
+   "callers": [
+    "alignment/pipeline.py:264"
+   ],
+   "file": "sprite_gen/curate/curation.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [],
+   "upstreamTests": [
+    "tests/curate/test_pixel_snap.py",
+    "tests/effects/test_breathe_anatomy_route.py"
+   ]
+  },
+  {
+   "module": "sprite_gen.curate.curation",
+   "symbol": "transform_matrix",
+   "callers": [
+    "alignment/pipeline.py:275"
+   ],
+   "file": "sprite_gen/curate/curation.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [],
+   "upstreamTests": [
+    "tests/curate/test_transform_resample.py"
+   ]
+  },
+  {
+   "module": "sprite_gen.frames.cutout",
+   "symbol": "CORNER_MIN_BRIGHT",
+   "callers": [
+    "adapters/spritegen/video_processing.py:161"
+   ],
+   "file": "sprite_gen/frames/cutout.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [],
+   "upstreamTests": [],
+   "protectedPolicy": "cyan 자동 감지·명시 선택 로컬 패치 유지"
+  },
+  {
+   "module": "sprite_gen.frames.cutout",
+   "symbol": "KEY_TARGETS",
+   "callers": [
+    "adapters/spritegen/video_processing.py:163",
+    "adapters/spritegen/video_processing.py:184",
+    "adapters/spritegen/video_processing.py:268"
+   ],
+   "file": "sprite_gen/frames/cutout.py",
+   "status": "body-changed",
+   "changedHelpers": [],
+   "appTests": [
+    "tests/integration/test_video_processing.py"
+   ],
+   "upstreamTests": [
+    "tests/frames/test_chroma_key_relative.py",
+    "tests/frames/test_despill_full_tint_bar.py",
+    "tests/video/test_spill_reference_window.py"
+   ],
+   "protectedPolicy": "cyan 자동 감지·명시 선택 로컬 패치 유지"
+  },
+  {
+   "module": "sprite_gen.frames.cutout",
+   "symbol": "_corner_average",
+   "callers": [
+    "adapters/spritegen/video_processing.py:258"
+   ],
+   "file": "sprite_gen/frames/cutout.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [],
+   "upstreamTests": [
+    "tests/frames/test_key_detect_banded.py"
+   ],
+   "protectedPolicy": "cyan 자동 감지·명시 선택 로컬 패치 유지"
+  },
+  {
+   "module": "sprite_gen.frames.cutout",
+   "symbol": "_detect_key_kind",
+   "callers": [
+    "adapters/spritegen/video_processing.py:156",
+    "adapters/spritegen/video_processing.py:258"
+   ],
+   "file": "sprite_gen/frames/cutout.py",
+   "status": "same",
+   "changedHelpers": [
+    "KEY_TARGETS"
+   ],
+   "appTests": [],
+   "upstreamTests": [
+    "tests/frames/test_chroma_key_relative.py"
+   ],
+   "protectedPolicy": "cyan 자동 감지·명시 선택 로컬 패치 유지"
+  },
+  {
+   "module": "sprite_gen.frames.cutout",
+   "symbol": "cutout",
+   "callers": [
+    "adapters/spritegen/video_processing.py:171",
+    "alignment/pipeline.py:221"
+   ],
+   "file": "sprite_gen/frames/cutout.py",
+   "status": "body-changed",
+   "changedHelpers": [],
+   "appTests": [
+    "tests/integration/test_api.py",
+    "tests/integration/test_pipeline.py",
+    "tests/integration/test_video_processing.py"
+   ],
+   "upstreamTests": [
+    "tests/frames/test_chroma_decontam.py",
+    "tests/frames/test_chroma_key_relative.py",
+    "tests/frames/test_cutout.py",
+    "tests/frames/test_decontam_gold.py",
+    "tests/frames/test_despill_full_tint_bar.py",
+    "tests/frames/test_key_detect_banded.py",
+    "tests/gen/test_chroma_rcb_byte_identity.py",
+    "tests/video/test_effect.py",
+    "tests/video/test_spill_reference_window.py"
+   ],
+   "protectedPolicy": "cyan 자동 감지·명시 선택 로컬 패치 유지"
+  },
+  {
+   "module": "sprite_gen.frames.extract",
+   "symbol": "component_group_image",
+   "callers": [
+    "alignment/pipeline.py:160"
+   ],
+   "file": "sprite_gen/frames/extract.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [],
+   "upstreamTests": [
+    "tests/curate/test_pixel_snap.py"
+   ],
+   "protectedPolicy": "로컬 conform_registered_row(등록 시트 행 공통 축소) 추가 유지 후 3-way 병합"
+  },
+  {
+   "module": "sprite_gen.frames.extract",
+   "symbol": "connected_components",
+   "callers": [
+    "alignment/pipeline.py:129"
+   ],
+   "file": "sprite_gen/frames/extract.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [],
+   "upstreamTests": [
+    "tests/gen/test_chroma_rcb_byte_identity.py"
+   ],
+   "protectedPolicy": "로컬 conform_registered_row(등록 시트 행 공통 축소) 추가 유지 후 3-way 병합"
+  },
+  {
+   "module": "sprite_gen.gen",
+   "symbol": "draw_layout_guide",
+   "callers": [
+    "adapters/spritegen/provider.py:339"
+   ],
+   "file": "sprite_gen/gen/__init__.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [
+    "tests/integration/test_provider.py"
+   ],
+   "upstreamTests": [],
+   "protectedPolicy": "provider_fallback과 저장된 기본값(workflow.preferences) 해석. 자동 provider 전환·전역 설정 사용 금지 계약 + 접수 불명 재시도 제거 로컬 패치 유지"
+  },
+  {
+   "module": "sprite_gen.gen",
+   "symbol": "generate_image",
+   "callers": [
+    "adapters/spritegen/provider.py:375"
+   ],
+   "file": "sprite_gen/gen/__init__.py",
+   "status": "signature-changed",
+   "changedHelpers": [
+    "layout_guide_kind",
+    "run",
+    "still_prompt",
+    "ui_kit_guide_size"
+   ],
+   "appTests": [
+    "tests/integration/test_api.py",
+    "tests/integration/test_provider.py"
+   ],
+   "upstreamTests": [
+    "tests/gen/test_facing.py",
+    "tests/gen/test_gen.py",
+    "tests/gen/test_grok_provider.py",
+    "tests/gen/test_handedness.py",
+    "tests/gen/test_openai_provider.py",
+    "tests/gen/test_prompt_assembly.py",
+    "tests/packaging/test_package_surface.py",
+    "tests/video/test_body_plan.py"
+   ],
+   "protectedPolicy": "provider_fallback과 저장된 기본값(workflow.preferences) 해석. 자동 provider 전환·전역 설정 사용 금지 계약 + 접수 불명 재시도 제거 로컬 패치 유지"
+  },
+  {
+   "module": "sprite_gen.gen",
+   "symbol": "layout_guide_text",
+   "callers": [
+    "adapters/spritegen/provider.py:340"
+   ],
+   "file": "sprite_gen/gen/__init__.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [
+    "tests/integration/test_provider.py"
+   ],
+   "upstreamTests": [
+    "tests/gen/test_layout_guide.py"
+   ],
+   "protectedPolicy": "provider_fallback과 저장된 기본값(workflow.preferences) 해석. 자동 provider 전환·전역 설정 사용 금지 계약 + 접수 불명 재시도 제거 로컬 패치 유지"
+  },
+  {
+   "module": "sprite_gen.gen.base",
+   "symbol": "provider_binary",
+   "callers": [
+    "adapters/spritegen/frame_selection.py:324"
+   ],
+   "file": "sprite_gen/gen/base.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [],
+   "upstreamTests": [
+    "tests/gen/test_gen.py"
+   ]
+  },
+  {
+   "module": "sprite_gen.gen.base",
+   "symbol": "provider_subprocess_env",
+   "callers": [
+    "adapters/spritegen/frame_selection.py:324",
+    "adapters/spritegen/provider.py:83"
+   ],
+   "file": "sprite_gen/gen/base.py",
+   "status": "signature-changed",
+   "changedHelpers": [],
+   "appTests": [],
+   "upstreamTests": [
+    "tests/gen/test_gen.py"
+   ]
+  },
+  {
+   "module": "sprite_gen.gen.handedness",
+   "symbol": "Handed",
+   "callers": [
+    "adapters/spritegen/clip_tools.py:207"
+   ],
+   "file": "sprite_gen/gen/handedness.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [],
+   "upstreamTests": [
+    "tests/gen/test_handedness.py",
+    "tests/gen/test_prompt_assembly.py"
+   ]
+  },
+  {
+   "module": "sprite_gen.gen.video",
+   "symbol": "VideoRequest",
+   "callers": [
+    "adapters/spritegen/video_provider.py:150"
+   ],
+   "file": "sprite_gen/gen/video.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [],
+   "upstreamTests": [
+    "tests/gen/test_retry.py",
+    "tests/gen/test_video.py",
+    "tests/gen/test_video_facing.py",
+    "tests/gen/test_video_modes.py"
+   ],
+   "protectedPolicy": "generate_video가 429 거절 POST를 다시 보낸다(retry.ask). 앱 adapter가 이 함수를 직접 호출하므로 그대로 교체하면 POST 1회 계약 위반 -> 로컬 패치로 POST 재전송 비활성, GET/다운로드 재시도만 채택"
+  },
+  {
+   "module": "sprite_gen.gen.video",
+   "symbol": "generate_video",
+   "callers": [
+    "adapters/spritegen/video_provider.py:150"
+   ],
+   "file": "sprite_gen/gen/video.py",
+   "status": "signature-changed",
+   "changedHelpers": [
+    "Download",
+    "VideoResult",
+    "_submit_poll_publish",
+    "http_download"
+   ],
+   "appTests": [
+    "tests/integration/test_api.py",
+    "tests/integration/test_project_folder_api.py",
+    "tests/integration/test_video_batches.py",
+    "tests/integration/test_video_jobs.py",
+    "tests/integration/test_video_prompt.py"
+   ],
+   "upstreamTests": [
+    "tests/gen/test_retry.py",
+    "tests/gen/test_video.py",
+    "tests/gen/test_video_facing.py",
+    "tests/gen/test_video_modes.py"
+   ],
+   "protectedPolicy": "generate_video가 429 거절 POST를 다시 보낸다(retry.ask). 앱 adapter가 이 함수를 직접 호출하므로 그대로 교체하면 POST 1회 계약 위반 -> 로컬 패치로 POST 재전송 비활성, GET/다운로드 재시도만 채택"
+  },
+  {
+   "module": "sprite_gen.gen.video",
+   "symbol": "http_download",
+   "callers": [
+    "adapters/spritegen/video_provider.py:147"
+   ],
+   "file": "sprite_gen/gen/video.py",
+   "status": "signature-changed",
+   "changedHelpers": [
+    "DownloadRefused"
+   ],
+   "appTests": [
+    "tests/integration/test_video_jobs.py"
+   ],
+   "upstreamTests": [
+    "tests/gen/test_video.py",
+    "tests/gen/test_video_facing.py",
+    "tests/gen/test_video_modes.py"
+   ],
+   "protectedPolicy": "generate_video가 429 거절 POST를 다시 보낸다(retry.ask). 앱 adapter가 이 함수를 직접 호출하므로 그대로 교체하면 POST 1회 계약 위반 -> 로컬 패치로 POST 재전송 비활성, GET/다운로드 재시도만 채택"
+  },
+  {
+   "module": "sprite_gen.gen.xai",
+   "symbol": "AUTH_SOURCE_GROK_LOGIN",
+   "callers": [
+    "adapters/spritegen/video_provider.py:55",
+    "adapters/spritegen/video_provider.py:120"
+   ],
+   "file": "sprite_gen/gen/xai.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [],
+   "upstreamTests": [
+    "tests/gen/test_retry.py",
+    "tests/gen/test_video.py"
+   ]
+  },
+  {
+   "module": "sprite_gen.gen.xai",
+   "symbol": "http_json",
+   "callers": [
+    "adapters/spritegen/video_provider.py:120"
+   ],
+   "file": "sprite_gen/gen/xai.py",
+   "status": "signature-changed",
+   "changedHelpers": [
+    "NOT_JSON",
+    "NO_ANSWER",
+    "TransportError",
+    "error_body",
+    "no_answer",
+    "read_whole",
+    "time_left"
+   ],
+   "appTests": [
+    "tests/integration/test_video_jobs.py"
+   ],
+   "upstreamTests": [
+    "tests/gen/test_facing.py",
+    "tests/gen/test_gen.py",
+    "tests/gen/test_retry.py",
+    "tests/gen/test_video.py",
+    "tests/gen/test_vision_read.py"
+   ]
+  },
+  {
+   "module": "sprite_gen.gen.xai",
+   "symbol": "resolve_credential",
+   "callers": [
+    "adapters/spritegen/video_provider.py:55"
+   ],
+   "file": "sprite_gen/gen/xai.py",
+   "status": "body-changed",
+   "changedHelpers": [],
+   "appTests": [],
+   "upstreamTests": [
+    "tests/gen/test_facing.py",
+    "tests/gen/test_video.py",
+    "tests/gen/test_vision_read.py"
+   ]
+  },
+  {
+   "module": "sprite_gen.qa.handed",
+   "symbol": "board",
+   "callers": [
+    "services/worker/clip_tools_task.py:110"
+   ],
+   "file": "sprite_gen/qa/handed.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [
+    "tests/integration/test_clip_tools.py"
+   ],
+   "upstreamTests": [
+    "tests/qa/test_handed_check.py"
+   ]
+  },
+  {
+   "module": "sprite_gen.qa.handed",
+   "symbol": "check",
+   "callers": [
+    "adapters/spritegen/clip_tools.py:210"
+   ],
+   "file": "sprite_gen/qa/handed.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [
+    "tests/integration/test_clip_tools.py"
+   ],
+   "upstreamTests": [
+    "tests/gen/test_retry.py",
+    "tests/qa/test_handed_check.py"
+   ]
+  },
+  {
+   "module": "sprite_gen.util.gif_utils",
+   "symbol": "_prepare_transparent_frame",
+   "callers": [
+    "adapters/spritegen/video_finish.py:44",
+    "adapters/spritegen/video_processing.py:687"
+   ],
+   "file": "sprite_gen/util/gif_utils.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [],
+   "upstreamTests": []
+  },
+  {
+   "module": "sprite_gen.video.align",
+   "symbol": "SNAP",
+   "callers": [
+    "adapters/spritegen/video_processing.py:614",
+    "adapters/spritegen/video_processing.py:616"
+   ],
+   "file": "sprite_gen/video/align.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [],
+   "upstreamTests": []
+  },
+  {
+   "module": "sprite_gen.video.align",
+   "symbol": "cycle_screen",
+   "callers": [
+    "adapters/spritegen/video_processing.py:372"
+   ],
+   "file": "sprite_gen/video/align.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [],
+   "upstreamTests": [
+    "tests/video/test_cycle_align_foot.py",
+    "tests/video/test_cycle_suspects.py",
+    "tests/video/test_loop_prop_seam_held.py"
+   ]
+  },
+  {
+   "module": "sprite_gen.video.align",
+   "symbol": "foot_strike",
+   "callers": [
+    "adapters/spritegen/video_processing.py:355"
+   ],
+   "file": "sprite_gen/video/align.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [
+    "tests/integration/test_video_processing.py"
+   ],
+   "upstreamTests": [
+    "tests/video/test_cycle_align.py"
+   ]
+  },
+  {
+   "module": "sprite_gen.video.align",
+   "symbol": "held_drawings",
+   "callers": [
+    "adapters/spritegen/video_processing.py:373"
+   ],
+   "file": "sprite_gen/video/align.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [],
+   "upstreamTests": [
+    "tests/video/test_held_drawings.py"
+   ]
+  },
+  {
+   "module": "sprite_gen.video.align",
+   "symbol": "resample",
+   "callers": [
+    "adapters/spritegen/video_processing.py:594"
+   ],
+   "file": "sprite_gen/video/align.py",
+   "status": "signature-changed",
+   "changedHelpers": [
+    "KEPT_NO_CLEAN",
+    "KEPT_RIFE"
+   ],
+   "appTests": [],
+   "upstreamTests": [
+    "tests/packaging/test_pipeline_smoke.py",
+    "tests/video/test_crossfade.py",
+    "tests/video/test_cycle_align.py",
+    "tests/video/test_edge_speck_lead_in.py",
+    "tests/video/test_ghost_retake.py",
+    "tests/video/test_ghost_screen.py",
+    "tests/video/test_outline_shift.py",
+    "tests/video/test_rife.py",
+    "tests/video/test_stop.py"
+   ]
+  },
+  {
+   "module": "sprite_gen.video.align",
+   "symbol": "retake",
+   "callers": [
+    "adapters/spritegen/video_processing.py:651"
+   ],
+   "file": "sprite_gen/video/align.py",
+   "status": "signature-changed",
+   "changedHelpers": [
+    "KEPT_NO_CLEAN",
+    "RETAKE_GHOST_KEPT_MIN",
+    "RETAKE_GHOST_REASON"
+   ],
+   "appTests": [],
+   "upstreamTests": [
+    "tests/video/test_between_cache.py",
+    "tests/video/test_ghost_given_way.py",
+    "tests/video/test_ghost_retake.py",
+    "tests/video/test_held_drawings.py",
+    "tests/video/test_loop_prop_seam_held.py"
+   ]
+  },
+  {
+   "module": "sprite_gen.video.auto_motion",
+   "symbol": "analyse",
+   "callers": [
+    "adapters/spritegen/video_processing.py:398"
+   ],
+   "file": "sprite_gen/video/auto_motion.py",
+   "status": "body-changed",
+   "changedHelpers": [
+    "discover"
+   ],
+   "appTests": [],
+   "upstreamTests": []
+  },
+  {
+   "module": "sprite_gen.video.batch",
+   "symbol": "pins_last_frame",
+   "callers": [
+    "adapters/spritegen/video_provider.py:149"
+   ],
+   "file": "sprite_gen/video/batch.py",
+   "status": "signature-changed",
+   "changedHelpers": [
+    "PIN_LAST_FRAME_STATES"
+   ],
+   "appTests": [
+    "tests/integration/test_video_processing.py"
+   ],
+   "upstreamTests": [
+    "tests/video/test_clip_prompt.py",
+    "tests/video/test_effect.py",
+    "tests/video/test_once.py",
+    "tests/video/test_play.py"
+   ]
+  },
+  {
+   "module": "sprite_gen.video.body_plan",
+   "symbol": "biped",
+   "callers": [
+    "adapters/spritegen/video_processing.py:360"
+   ],
+   "file": "sprite_gen/video/body_plan.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [],
+   "upstreamTests": [
+    "tests/gen/test_body_plan_sheets.py",
+    "tests/gen/test_prompt_freeze.py",
+    "tests/video/test_body_plan.py"
+   ]
+  },
+  {
+   "module": "sprite_gen.video.canvas",
+   "symbol": "corner_key",
+   "callers": [
+    "adapters/spritegen/video_processing.py:155"
+   ],
+   "file": "sprite_gen/video/canvas.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [],
+   "upstreamTests": []
+  },
+  {
+   "module": "sprite_gen.video.canvas",
+   "symbol": "normalize_key",
+   "callers": [
+    "adapters/spritegen/video_processing.py:164"
+   ],
+   "file": "sprite_gen/video/canvas.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [],
+   "upstreamTests": []
+  },
+  {
+   "module": "sprite_gen.video.canvas",
+   "symbol": "pad_canvas",
+   "callers": [
+    "adapters/spritegen/video_processing.py:192"
+   ],
+   "file": "sprite_gen/video/canvas.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [],
+   "upstreamTests": [
+    "tests/video/test_attack_headroom.py",
+    "tests/video/test_canvas_key_normalize.py",
+    "tests/video/test_canvas_trail.py",
+    "tests/video/test_edge_speck_lead_in.py",
+    "tests/video/test_once.py",
+    "tests/video/test_video_pipeline.py"
+   ]
+  },
+  {
+   "module": "sprite_gen.video.canvas",
+   "symbol": "profile_for",
+   "callers": [
+    "adapters/spritegen/video_processing.py:192"
+   ],
+   "file": "sprite_gen/video/canvas.py",
+   "status": "body-changed",
+   "changedHelpers": [
+    "STATE_CANVAS",
+    "STATE_SHAPE_CANVAS"
+   ],
+   "appTests": [],
+   "upstreamTests": [
+    "tests/video/test_attack_headroom.py",
+    "tests/video/test_canvas_key_normalize.py",
+    "tests/video/test_edge_speck_lead_in.py",
+    "tests/video/test_gait_guard_anchor_wide.py",
+    "tests/video/test_once.py",
+    "tests/video/test_video_pipeline.py"
+   ]
+  },
+  {
+   "module": "sprite_gen.video.follow",
+   "symbol": "GAIN_MEASURED",
+   "callers": [
+    "adapters/spritegen/clip_tools.py:178"
+   ],
+   "file": "sprite_gen/video/follow.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [],
+   "upstreamTests": [
+    "tests/video/test_follow.py",
+    "tests/video/test_follow_inspect.py",
+    "tests/video/test_follow_stretch_floor.py"
+   ]
+  },
+  {
+   "module": "sprite_gen.video.follow",
+   "symbol": "body_motion",
+   "callers": [
+    "adapters/spritegen/clip_tools.py:159"
+   ],
+   "file": "sprite_gen/video/follow.py",
+   "status": "body-changed",
+   "changedHelpers": [
+    "WORN_FROM",
+    "WORN_TO",
+    "_common",
+    "_levels",
+    "_overlay",
+    "depth"
+   ],
+   "appTests": [
+    "tests/integration/test_clip_tool_processing.py"
+   ],
+   "upstreamTests": [
+    "tests/video/test_follow_read_on.py",
+    "tests/video/test_loop_compare.py"
+   ]
+  },
+  {
+   "module": "sprite_gen.video.follow",
+   "symbol": "fold_ratio",
+   "callers": [
+    "adapters/spritegen/clip_tools.py:174"
+   ],
+   "file": "sprite_gen/video/follow.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [],
+   "upstreamTests": [
+    "tests/video/test_follow_inspect.py",
+    "tests/video/test_follow_stretch_floor.py"
+   ]
+  },
+  {
+   "module": "sprite_gen.video.follow",
+   "symbol": "follow_offsets",
+   "callers": [
+    "adapters/spritegen/clip_tools.py:143"
+   ],
+   "file": "sprite_gen/video/follow.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [
+    "tests/integration/test_clip_tool_processing.py"
+   ],
+   "upstreamTests": [
+    "tests/video/test_follow.py"
+   ]
+  },
+  {
+   "module": "sprite_gen.video.follow",
+   "symbol": "lowered_gain",
+   "callers": [
+    "adapters/spritegen/clip_tools.py:177"
+   ],
+   "file": "sprite_gen/video/follow.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [],
+   "upstreamTests": []
+  },
+  {
+   "module": "sprite_gen.video.follow",
+   "symbol": "move_regions",
+   "callers": [
+    "adapters/spritegen/clip_tools.py:182"
+   ],
+   "file": "sprite_gen/video/follow.py",
+   "status": "signature-changed",
+   "changedHelpers": [
+    "move_field"
+   ],
+   "appTests": [],
+   "upstreamTests": []
+  },
+  {
+   "module": "sprite_gen.video.frames",
+   "symbol": "SPILL_REFERENCE_MARGIN",
+   "callers": [
+    "adapters/spritegen/video_processing.py:266"
+   ],
+   "file": "sprite_gen/video/frames.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [],
+   "upstreamTests": []
+  },
+  {
+   "module": "sprite_gen.video.frames",
+   "symbol": "decide_spill",
+   "callers": [
+    "adapters/spritegen/video_processing.py:272"
+   ],
+   "file": "sprite_gen/video/frames.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [],
+   "upstreamTests": [
+    "tests/frames/test_despill_full_tint_bar.py",
+    "tests/video/test_effect.py",
+    "tests/video/test_spill_hue_evidence.py",
+    "tests/video/test_spill_reference_window.py",
+    "tests/video/test_video_spill.py"
+   ]
+  },
+  {
+   "module": "sprite_gen.video.frames",
+   "symbol": "extract",
+   "callers": [
+    "adapters/spritegen/video_processing.py:283"
+   ],
+   "file": "sprite_gen/video/frames.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [
+    "tests/integration/test_api.py",
+    "tests/integration/test_pipeline.py",
+    "tests/integration/test_video_processing.py",
+    "tests/integration/test_video_streams.py"
+   ],
+   "upstreamTests": [
+    "tests/compose/test_export_aseprite.py",
+    "tests/compose/test_layer_compose.py",
+    "tests/compose/test_layer_contract.py",
+    "tests/curate/test_anchor_selection.py",
+    "tests/curate/test_logical_height_contract.py",
+    "tests/curate/test_pixel_snap.py",
+    "tests/effects/test_breathe.py",
+    "tests/effects/test_breathe_js_mirror.py",
+    "tests/effects/test_palette_post_only.py",
+    "tests/frames/test_alpha_centroid_align.py",
+    "tests/frames/test_chroma_decontam.py",
+    "tests/frames/test_chroma_key_relative.py",
+    "tests/frames/test_decontam_gold.py",
+    "tests/frames/test_despill_full_tint_bar.py",
+    "tests/frames/test_extract_perf_equivalence.py",
+    "tests/frames/test_extraction_golden.py",
+    "tests/frames/test_grid_record_exactness.py",
+    "tests/frames/test_isolated_dots.py",
+    "tests/frames/test_key_detect_banded.py",
+    "tests/frames/test_keyed_resample.py",
+    "tests/frames/test_pitch_ground_truth.py",
+    "tests/frames/test_pitch_runlen_crosscheck.py",
+    "tests/frames/test_row_placement_align_y.py",
+    "tests/frames/test_row_scale.py",
+    "tests/frames/test_safe_area_fit.py",
+    "tests/frames/test_segment_projection.py",
+    "tests/frames/test_sliver_guard.py",
+    "tests/frames/test_takes_heal.py",
+    "tests/frames/test_taxonomy_layout.py",
+    "tests/gen/test_chroma_rcb_byte_identity.py",
+    "tests/gen/test_chroma_ycbcr.py",
+    "tests/gen/test_pixel_gates.py",
+    "tests/packaging/test_entrypoint_interpreter.py",
+    "tests/packaging/test_numpy_dependency_gate.py",
+    "tests/packaging/test_package_surface.py",
+    "tests/packaging/test_pipeline_smoke.py",
+    "tests/qa/test_inspect_score_loop.py",
+    "tests/serve/test_curation_view_contract.py",
+    "tests/spec/test_request_write_isolation.py",
+    "tests/test_cli_kwargs.py",
+    "tests/test_subject_profile.py",
+    "tests/video/test_effect.py",
+    "tests/video/test_spill_reference_window.py",
+    "tests/workflow/test_workflow.py"
+   ]
+  },
+  {
+   "module": "sprite_gen.video.frames",
+   "symbol": "key_frames",
+   "callers": [
+    "adapters/spritegen/video_processing.py:301"
+   ],
+   "file": "sprite_gen/video/frames.py",
+   "status": "signature-changed",
+   "changedHelpers": [
+    "SPECK_APART",
+    "SPECK_MIN_FRACTION",
+    "SPECK_MIN_PX",
+    "classify_edge_contact",
+    "drop_specks"
+   ],
+   "appTests": [
+    "tests/integration/test_video_processing.py"
+   ],
+   "upstreamTests": [
+    "tests/frames/test_chroma_decontam.py",
+    "tests/video/test_canvas_key_normalize.py",
+    "tests/video/test_edge_speck_lead_in.py",
+    "tests/video/test_effect.py",
+    "tests/video/test_fit_tight.py",
+    "tests/video/test_spill_hue_evidence.py",
+    "tests/video/test_video_pipeline.py",
+    "tests/video/test_video_spill.py"
+   ]
+  },
+  {
+   "module": "sprite_gen.video.gait_fallback",
+   "symbol": "LONG_CYCLE_FRACTION",
+   "callers": [
+    "adapters/spritegen/video_processing.py:392",
+    "adapters/spritegen/video_processing.py:403"
+   ],
+   "file": "sprite_gen/video/gait_fallback.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [],
+   "upstreamTests": []
+  },
+  {
+   "module": "sprite_gen.video.gait_fallback",
+   "symbol": "SCALE_DRIFT_MIN",
+   "callers": [
+    "adapters/spritegen/video_processing.py:389",
+    "adapters/spritegen/video_processing.py:393"
+   ],
+   "file": "sprite_gen/video/gait_fallback.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [],
+   "upstreamTests": [
+    "tests/video/test_edge_speck_lead_in.py",
+    "tests/video/test_gait_fallback.py"
+   ]
+  },
+  {
+   "module": "sprite_gen.video.gait_fallback",
+   "symbol": "SIZE_HOLD_MIN",
+   "callers": [
+    "adapters/spritegen/video_processing.py:340",
+    "adapters/spritegen/video_processing.py:342"
+   ],
+   "file": "sprite_gen/video/gait_fallback.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [],
+   "upstreamTests": [
+    "tests/video/test_edge_speck_lead_in.py",
+    "tests/video/test_gait_fallback.py"
+   ]
+  },
+  {
+   "module": "sprite_gen.video.gait_fallback",
+   "symbol": "cycle_drift",
+   "callers": [
+    "adapters/spritegen/video_processing.py:339"
+   ],
+   "file": "sprite_gen/video/gait_fallback.py",
+   "status": "body-changed",
+   "changedHelpers": [
+    "poses"
+   ],
+   "appTests": [],
+   "upstreamTests": [
+    "tests/video/test_gait_fallback.py"
+   ]
+  },
+  {
+   "module": "sprite_gen.video.gait_fallback",
+   "symbol": "long_window",
+   "callers": [
+    "adapters/spritegen/video_processing.py:391"
+   ],
+   "file": "sprite_gen/video/gait_fallback.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [],
+   "upstreamTests": [
+    "tests/video/test_gait_fallback.py"
+   ]
+  },
+  {
+   "module": "sprite_gen.video.gait_fallback",
+   "symbol": "scale_drift",
+   "callers": [
+    "adapters/spritegen/video_processing.py:387"
+   ],
+   "file": "sprite_gen/video/gait_fallback.py",
+   "status": "same",
+   "changedHelpers": [
+    "_trend"
+   ],
+   "appTests": [],
+   "upstreamTests": [
+    "tests/video/test_edge_speck_lead_in.py",
+    "tests/video/test_gait_fallback.py"
+   ]
+  },
+  {
+   "module": "sprite_gen.video.gait_fallback",
+   "symbol": "undo_padding",
+   "callers": [
+    "adapters/spritegen/video_processing.py:315"
+   ],
+   "file": "sprite_gen/video/gait_fallback.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [],
+   "upstreamTests": [
+    "tests/video/test_gait_fallback.py"
+   ]
+  },
+  {
+   "module": "sprite_gen.video.gait_fallback",
+   "symbol": "undo_scale",
+   "callers": [
+    "adapters/spritegen/video_processing.py:329"
+   ],
+   "file": "sprite_gen/video/gait_fallback.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [],
+   "upstreamTests": [
+    "tests/video/test_gait_fallback.py",
+    "tests/video/test_gait_fallback_resample.py"
+   ]
+  },
+  {
+   "module": "sprite_gen.video.gait_fallback",
+   "symbol": "write_frames",
+   "callers": [
+    "adapters/spritegen/video_processing.py:344",
+    "adapters/spritegen/video_processing.py:395"
+   ],
+   "file": "sprite_gen/video/gait_fallback.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [],
+   "upstreamTests": []
+  },
+  {
+   "module": "sprite_gen.video.local_cycle",
+   "symbol": "detect",
+   "callers": [
+    "adapters/spritegen/video_processing.py:399"
+   ],
+   "file": "sprite_gen/video/local_cycle.py",
+   "status": "signature-changed",
+   "changedHelpers": [
+    "REFUSED_SHOWN",
+    "_closure",
+    "_mark",
+    "_measure",
+    "_screens",
+    "_shape_rank",
+    "counted",
+    "judged"
+   ],
+   "appTests": [],
+   "upstreamTests": [
+    "tests/video/test_auto_motion.py",
+    "tests/video/test_cycle_suspects.py",
+    "tests/video/test_loop_prop_seam.py",
+    "tests/video/test_walk_steps.py"
+   ]
+  },
+  {
+   "module": "sprite_gen.video.loop",
+   "symbol": "GAIT_DOUBLE_SEARCH",
+   "callers": [
+    "adapters/spritegen/video_processing.py:402"
+   ],
+   "file": "sprite_gen/video/loop.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [],
+   "upstreamTests": [
+    "tests/video/test_cycle_suspects.py",
+    "tests/video/test_walk_steps.py"
+   ]
+  },
+  {
+   "module": "sprite_gen.video.loop",
+   "symbol": "GAIT_DOUBLE_TOL",
+   "callers": [
+    "adapters/spritegen/video_processing.py:402"
+   ],
+   "file": "sprite_gen/video/loop.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [],
+   "upstreamTests": [
+    "tests/video/test_cycle_suspects.py",
+    "tests/video/test_gait_guard_anchor_wide.py",
+    "tests/video/test_walk_steps.py"
+   ]
+  },
+  {
+   "module": "sprite_gen.video.loop",
+   "symbol": "PERIODICITY_MIN",
+   "callers": [
+    "adapters/spritegen/video_processing.py:401"
+   ],
+   "file": "sprite_gen/video/loop.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [],
+   "upstreamTests": [
+    "tests/video/test_attack_return.py",
+    "tests/video/test_cycle_suspects.py",
+    "tests/video/test_duration_window_oneshot.py",
+    "tests/video/test_one_step_cut.py",
+    "tests/video/test_video_pipeline.py",
+    "tests/video/test_walk_steps.py"
+   ]
+  },
+  {
+   "module": "sprite_gen.video.loop",
+   "symbol": "SEAM_RATIO_MAX",
+   "callers": [
+    "adapters/spritegen/video_processing.py:409",
+    "adapters/spritegen/video_processing.py:436",
+    "adapters/spritegen/video_processing.py:479",
+    "adapters/spritegen/video_processing.py:487",
+    "adapters/spritegen/video_processing.py:494",
+    "adapters/spritegen/video_processing.py:518"
+   ],
+   "file": "sprite_gen/video/loop.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [],
+   "upstreamTests": [
+    "tests/video/test_body_anchor_gate.py",
+    "tests/video/test_edge_speck_lead_in.py",
+    "tests/video/test_ghost_given_way.py",
+    "tests/video/test_idle_still.py",
+    "tests/video/test_loop_overlap.py",
+    "tests/video/test_one_step_cut.py",
+    "tests/video/test_play.py"
+   ]
+  },
+  {
+   "module": "sprite_gen.video.loop",
+   "symbol": "detect_cycle",
+   "callers": [
+    "adapters/spritegen/video_processing.py:446"
+   ],
+   "file": "sprite_gen/video/loop.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [],
+   "upstreamTests": [
+    "tests/video/test_attack_return.py",
+    "tests/video/test_cycle_suspects.py",
+    "tests/video/test_duration_window_oneshot.py",
+    "tests/video/test_gait_guard_anchor_wide.py",
+    "tests/video/test_gait_harmonic_ambiguity.py",
+    "tests/video/test_gait_window_context.py",
+    "tests/video/test_loop_sampling_and_wrap.py",
+    "tests/video/test_video_pipeline.py"
+   ]
+  },
+  {
+   "module": "sprite_gen.video.loop",
+   "symbol": "detect_one_shot",
+   "callers": [
+    "adapters/spritegen/video_processing.py:442",
+    "adapters/spritegen/video_processing.py:471"
+   ],
+   "file": "sprite_gen/video/loop.py",
+   "status": "body-changed",
+   "changedHelpers": [],
+   "appTests": [],
+   "upstreamTests": [
+    "tests/video/test_attack_return.py",
+    "tests/video/test_gait_guard_anchor_wide.py",
+    "tests/video/test_one_shot_moved.py",
+    "tests/video/test_video_pipeline.py"
+   ]
+  },
+  {
+   "module": "sprite_gen.video.loop",
+   "symbol": "distance_matrix",
+   "callers": [
+    "adapters/spritegen/video_processing.py:408",
+    "adapters/spritegen/video_processing.py:431",
+    "adapters/spritegen/video_processing.py:508"
+   ],
+   "file": "sprite_gen/video/loop.py",
+   "status": "body-changed",
+   "changedHelpers": [
+    "_distances"
+   ],
+   "appTests": [],
+   "upstreamTests": [
+    "tests/video/test_attack_return.py",
+    "tests/video/test_cycle_suspects.py",
+    "tests/video/test_duration_window_oneshot.py",
+    "tests/video/test_gait_guard_anchor_wide.py",
+    "tests/video/test_loop_sampling_and_wrap.py",
+    "tests/video/test_one_shot_moved.py",
+    "tests/video/test_video_pipeline.py"
+   ]
+  },
+  {
+   "module": "sprite_gen.video.loop",
+   "symbol": "fixed_cycle",
+   "callers": [
+    "adapters/spritegen/video_processing.py:408",
+    "adapters/spritegen/video_processing.py:510"
+   ],
+   "file": "sprite_gen/video/loop.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [],
+   "upstreamTests": []
+  },
+  {
+   "module": "sprite_gen.video.loop",
+   "symbol": "foot_centre",
+   "callers": [
+    "adapters/spritegen/video_processing.py:847"
+   ],
+   "file": "sprite_gen/video/loop.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [],
+   "upstreamTests": [
+    "tests/video/test_loop_ease.py"
+   ]
+  },
+  {
+   "module": "sprite_gen.video.loop",
+   "symbol": "frame_masses",
+   "callers": [
+    "adapters/spritegen/video_processing.py:443",
+    "adapters/spritegen/video_processing.py:472"
+   ],
+   "file": "sprite_gen/video/loop.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [],
+   "upstreamTests": [
+    "tests/video/test_attack_return.py",
+    "tests/video/test_one_shot_moved.py"
+   ]
+  },
+  {
+   "module": "sprite_gen.video.loop",
+   "symbol": "periodicity_floor",
+   "callers": [
+    "adapters/spritegen/video_processing.py:448"
+   ],
+   "file": "sprite_gen/video/loop.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [],
+   "upstreamTests": [
+    "tests/video/test_attack_return.py"
+   ]
+  },
+  {
+   "module": "sprite_gen.video.loop",
+   "symbol": "pinned_cycle",
+   "callers": [
+    "adapters/spritegen/video_processing.py:436"
+   ],
+   "file": "sprite_gen/video/loop.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [],
+   "upstreamTests": []
+  },
+  {
+   "module": "sprite_gen.video.loop",
+   "symbol": "profile_for",
+   "callers": [
+    "adapters/spritegen/video_processing.py:338",
+    "adapters/spritegen/video_processing.py:427"
+   ],
+   "file": "sprite_gen/video/loop.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [],
+   "upstreamTests": [
+    "tests/video/test_attack_headroom.py",
+    "tests/video/test_attack_return.py",
+    "tests/video/test_cycle_suspects.py",
+    "tests/video/test_duration_window_oneshot.py",
+    "tests/video/test_edge_speck_lead_in.py",
+    "tests/video/test_explicit_window.py",
+    "tests/video/test_gait_guard_anchor_wide.py",
+    "tests/video/test_once.py",
+    "tests/video/test_video_pipeline.py"
+   ]
+  },
+  {
+   "module": "sprite_gen.video.loop",
+   "symbol": "resize_cell",
+   "callers": [
+    "adapters/spritegen/video_normalization.py:39"
+   ],
+   "file": "sprite_gen/video/loop.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [],
+   "upstreamTests": [
+    "tests/compose/test_game_pack.py",
+    "tests/video/test_source_restoration.py",
+    "tests/video/test_stop.py",
+    "tests/video/test_strip_resample.py"
+   ]
+  },
+  {
+   "module": "sprite_gen.video.repair",
+   "symbol": "jolt_verdict",
+   "callers": [
+    "adapters/spritegen/video_processing.py:571"
+   ],
+   "file": "sprite_gen/video/repair.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [],
+   "upstreamTests": [
+    "tests/video/test_loop_repair.py"
+   ]
+  },
+  {
+   "module": "sprite_gen.video.repair",
+   "symbol": "measure_jolt",
+   "callers": [
+    "adapters/spritegen/video_processing.py:570"
+   ],
+   "file": "sprite_gen/video/repair.py",
+   "status": "body-changed",
+   "changedHelpers": [
+    "head_track",
+    "seam_pop"
+   ],
+   "appTests": [],
+   "upstreamTests": [
+    "tests/video/test_loop_repair.py"
+   ]
+  },
+  {
+   "module": "sprite_gen.video.repair",
+   "symbol": "repair_jumps",
+   "callers": [
+    "adapters/spritegen/video_processing.py:547"
+   ],
+   "file": "sprite_gen/video/repair.py",
+   "status": "signature-changed",
+   "changedHelpers": [
+    "FLOW_LIMIT",
+    "FLOW_SPAN",
+    "Torso",
+    "_ease",
+    "_flow",
+    "_give_way",
+    "_said_surge",
+    "_surges",
+    "between_time",
+    "flow_scores",
+    "flow_targets"
+   ],
+   "appTests": [],
+   "upstreamTests": [
+    "tests/video/test_crossfade.py",
+    "tests/video/test_ghost_given_way.py",
+    "tests/video/test_ghost_screen.py",
+    "tests/video/test_loop_ease.py",
+    "tests/video/test_loop_flow.py",
+    "tests/video/test_loop_repair.py",
+    "tests/video/test_outline_shift.py",
+    "tests/video/test_rife.py"
+   ]
+  },
+  {
+   "module": "sprite_gen.video.rife",
+   "symbol": "MODEL",
+   "callers": [
+    "adapters/spritegen/video_processing.py:110",
+    "adapters/spritegen/video_processing.py:124",
+    "adapters/spritegen/video_processing.py:125"
+   ],
+   "file": "sprite_gen/video/rife.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [],
+   "upstreamTests": [
+    "tests/release/test_lane_rife_collection.py",
+    "tests/video/test_between_cache.py",
+    "tests/video/test_rife.py",
+    "tests/video/test_rife_install.py"
+   ]
+  },
+  {
+   "module": "sprite_gen.video.rife",
+   "symbol": "RELEASE",
+   "callers": [
+    "adapters/spritegen/video_processing.py:124",
+    "adapters/spritegen/video_processing.py:125"
+   ],
+   "file": "sprite_gen/video/rife.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [],
+   "upstreamTests": [
+    "tests/video/test_rife_install.py"
+   ]
+  },
+  {
+   "module": "sprite_gen.video.rife",
+   "symbol": "Rife",
+   "callers": [
+    "adapters/spritegen/video_processing.py:114",
+    "adapters/spritegen/video_processing.py:115"
+   ],
+   "file": "sprite_gen/video/rife.py",
+   "status": "body-changed",
+   "changedHelpers": [
+    "CODE_SHA256",
+    "PASS_CALLS",
+    "_file_sha256",
+    "between",
+    "passes",
+    "tta"
+   ],
+   "appTests": [],
+   "upstreamTests": [
+    "tests/release/test_lane_rife_collection.py",
+    "tests/video/test_between_cache.py",
+    "tests/video/test_crossfade.py",
+    "tests/video/test_ghost_retake.py",
+    "tests/video/test_ghost_screen.py",
+    "tests/video/test_held_drawings.py",
+    "tests/video/test_loop_overlap.py",
+    "tests/video/test_outline_shift.py",
+    "tests/video/test_rife.py"
+   ]
+  },
+  {
+   "module": "sprite_gen.video.rife",
+   "symbol": "RifeNotInstalled",
+   "callers": [
+    "adapters/spritegen/video_processing.py:113",
+    "adapters/spritegen/video_processing.py:123",
+    "adapters/spritegen/video_processing.py:548",
+    "adapters/spritegen/video_processing.py:599"
+   ],
+   "file": "sprite_gen/video/rife.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [
+    "tests/integration/test_video_processing.py"
+   ],
+   "upstreamTests": [
+    "tests/video/test_rife.py",
+    "tests/video/test_rife_install.py"
+   ]
+  },
+  {
+   "module": "sprite_gen.video.rife",
+   "symbol": "RifeUnavailable",
+   "callers": [
+    "adapters/spritegen/video_processing.py:552",
+    "adapters/spritegen/video_processing.py:601"
+   ],
+   "file": "sprite_gen/video/rife.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [],
+   "upstreamTests": [
+    "tests/release/test_lane_rife_collection.py",
+    "tests/video/test_between_cache.py",
+    "tests/video/test_loop_repair.py",
+    "tests/video/test_rife.py"
+   ]
+  },
+  {
+   "module": "sprite_gen.video.rife",
+   "symbol": "installed_binary",
+   "callers": [
+    "adapters/spritegen/video_processing.py:109"
+   ],
+   "file": "sprite_gen/video/rife.py",
+   "status": "same",
+   "changedHelpers": [],
+   "appTests": [],
+   "upstreamTests": [
+    "tests/release/test_lane_rife_collection.py",
+    "tests/video/test_between_cache.py",
+    "tests/video/test_rife.py",
+    "tests/video/test_rife_install.py"
+   ]
+  }
+ ],
+ "files": [
+  {
+   "file": "sprite_gen/__init__.py",
+   "new": [],
+   "removed": [],
+   "changed": [],
+   "appClosure": [
+    "local",
+    "v2.45.3"
+   ],
+   "envRead": [],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": [],
+   "exports": {
+    "local": [
+     "compose",
+     "curate",
+     "effects",
+     "frames",
+     "gen",
+     "qa",
+     "serve",
+     "spec",
+     "util"
+    ],
+    "v2.45.3": [
+     "audio",
+     "compose",
+     "curate",
+     "effects",
+     "frames",
+     "gen",
+     "qa",
+     "serve",
+     "spec",
+     "util"
+    ]
+   }
+  },
+  {
+   "file": "sprite_gen/_deps.py",
+   "new": [],
+   "removed": [],
+   "changed": [],
+   "appClosure": [
+    "local",
+    "v2.45.3"
+   ],
+   "envRead": [],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": []
+  },
+  {
+   "file": "sprite_gen/compose/layers.py",
+   "new": [],
+   "removed": [],
+   "changed": [],
+   "appClosure": [
+    "local",
+    "v2.45.3"
+   ],
+   "envRead": [],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": []
+  },
+  {
+   "file": "sprite_gen/curate/anchor.py",
+   "new": [],
+   "removed": [],
+   "changed": [],
+   "appClosure": [
+    "local",
+    "v2.45.3"
+   ],
+   "envRead": [],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": []
+  },
+  {
+   "file": "sprite_gen/curate/curation.py",
+   "new": [],
+   "removed": [],
+   "changed": [],
+   "appClosure": [
+    "local",
+    "v2.45.3"
+   ],
+   "envRead": [],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": [
+    "apply_pixel_edits",
+    "transform_matrix"
+   ]
+  },
+  {
+   "file": "sprite_gen/frames/alpha_floor.py",
+   "new": [
+    "_setting",
+    "clear_haze",
+    "near"
+   ],
+   "removed": [],
+   "changed": [],
+   "appClosure": [
+    "v2.45.3"
+   ],
+   "envRead": [],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": []
+  },
+  {
+   "file": "sprite_gen/frames/cutout.py",
+   "new": [],
+   "removed": [],
+   "changed": [
+    "add_arguments",
+    "cutout"
+   ],
+   "appClosure": [
+    "local",
+    "v2.45.3"
+   ],
+   "envRead": [],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": [
+    "CORNER_MIN_BRIGHT",
+    "KEY_TARGETS",
+    "_corner_average",
+    "_detect_key_kind",
+    "cutout"
+   ],
+   "protectedPolicy": "cyan 자동 감지·명시 선택 로컬 패치 유지"
+  },
+  {
+   "file": "sprite_gen/frames/decontam.py",
+   "new": [],
+   "removed": [],
+   "changed": [],
+   "appClosure": [
+    "local",
+    "v2.45.3"
+   ],
+   "envRead": [],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": []
+  },
+  {
+   "file": "sprite_gen/frames/extract.py",
+   "new": [
+    "_anchor_x",
+    "_dots",
+    "_neighbour_code",
+    "fit_row_to_cells",
+    "fit_scale",
+    "isolated_dots",
+    "safe_area_fit"
+   ],
+   "removed": [
+    "_namespace_from_kwargs",
+    "conform_registered_row"
+   ],
+   "changed": [
+    "_cleanup_alpha_ycc",
+    "_run_locked",
+    "extract_component_frames",
+    "extract_slot_frames",
+    "fit_to_cell",
+    "remove_chroma_background",
+    "remove_chroma_background_ycbcr",
+    "run"
+   ],
+   "appClosure": [
+    "local",
+    "v2.45.3"
+   ],
+   "envRead": [],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": [
+    "component_group_image",
+    "connected_components"
+   ],
+   "protectedPolicy": "로컬 conform_registered_row(등록 시트 행 공통 축소) 추가 유지 후 3-way 병합"
+  },
+  {
+   "file": "sprite_gen/frames/segment.py",
+   "new": [],
+   "removed": [],
+   "changed": [],
+   "appClosure": [
+    "local",
+    "v2.45.3"
+   ],
+   "envRead": [],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": []
+  },
+  {
+   "file": "sprite_gen/frames/ui_kit.py",
+   "new": [
+    "Judgment",
+    "Reading",
+    "Refusal",
+    "Refusal.__init__",
+    "Slot",
+    "_Axis",
+    "_Axis.__init__",
+    "_Axis.beside",
+    "_Axis.held_at",
+    "_Axis.hinges",
+    "_Axis.least_short",
+    "_Axis.short_at",
+    "_Axis.status",
+    "_Axis.within",
+    "_Drawing",
+    "_Drawing.__init__",
+    "_Drawing.assigned",
+    "_Drawing.bound",
+    "_Drawing.count",
+    "_Drawing.named",
+    "_Drawing.outcomes",
+    "_Drawing.read",
+    "_Drawing.valid",
+    "_Search",
+    "_Search.__init__",
+    "_Search.inside",
+    "_Search.judgment",
+    "_Search.note",
+    "_Search.read",
+    "_Search.run",
+    "_Search.solve",
+    "_bbox",
+    "_centre",
+    "_centred",
+    "_considered",
+    "_decide",
+    "_drift_limits",
+    "_drifted",
+    "_element_png",
+    "_fit",
+    "_interior_run",
+    "_judge",
+    "_least_on_axis",
+    "_link_report",
+    "_linked",
+    "_make_dirs",
+    "_make_new",
+    "_middle",
+    "_off_centre",
+    "_parts",
+    "_places",
+    "_premultiplied",
+    "_publish",
+    "_read",
+    "_rect",
+    "_rename_in",
+    "_room",
+    "_runs",
+    "_sheet_parts",
+    "_split",
+    "_stretch_band",
+    "_taken",
+    "_write_kit",
+    "_write_new",
+    "add_arguments",
+    "boxes",
+    "content_rect",
+    "draw_guide",
+    "element_path",
+    "fit_inside",
+    "guide_text",
+    "main",
+    "measure_insets",
+    "measure_padding",
+    "measure_round",
+    "report_file",
+    "run",
+    "sheet_layout",
+    "split_ui_kit"
+   ],
+   "removed": [],
+   "changed": [],
+   "appClosure": [
+    "v2.45.3"
+   ],
+   "envRead": [],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": []
+  },
+  {
+   "file": "sprite_gen/gen/__init__.py",
+   "new": [
+    "_announce_switch",
+    "codex_unavailable",
+    "codex_unavailable_choice",
+    "layout_guide_kind",
+    "run_on_default",
+    "ui_kit_guide_size"
+   ],
+   "removed": [
+    "_print_json"
+   ],
+   "changed": [
+    "_codex_available",
+    "_run",
+    "add_arguments",
+    "generate_image",
+    "resolve_default_provider",
+    "run",
+    "still_prompt"
+   ],
+   "appClosure": [
+    "local",
+    "v2.45.3"
+   ],
+   "envRead": [
+    "CODEX_UNAVAILABLE_ENV",
+    "DEFAULT_PROVIDER_ENV"
+   ],
+   "envAdded": [
+    "CODEX_UNAVAILABLE_ENV"
+   ],
+   "envRemoved": [],
+   "appSymbols": [
+    "draw_layout_guide",
+    "generate_image",
+    "layout_guide_text"
+   ],
+   "protectedPolicy": "provider_fallback과 저장된 기본값(workflow.preferences) 해석. 자동 provider 전환·전역 설정 사용 금지 계약 + 접수 불명 재시도 제거 로컬 패치 유지"
+  },
+  {
+   "file": "sprite_gen/gen/base.py",
+   "new": [
+    "CodexUnavailableAsk",
+    "CodexUnavailableAsk.__init__",
+    "Provider.inspect_image",
+    "ask_codex_unavailable",
+    "asked_codex_unavailable",
+    "child_asked",
+    "codex_unavailable_question",
+    "env_api_key",
+    "flags_over_spec",
+    "print_json",
+    "run_logged"
+   ],
+   "removed": [],
+   "changed": [
+    "Provider",
+    "announce_api_billing",
+    "provider_subprocess_env"
+   ],
+   "appClosure": [
+    "local",
+    "v2.45.3"
+   ],
+   "envRead": [
+    "SPRITE_GEN_GEN_TIMEOUT_SECONDS"
+   ],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": [
+    "provider_binary",
+    "provider_subprocess_env"
+   ]
+  },
+  {
+   "file": "sprite_gen/gen/chroma.py",
+   "new": [
+    "_and_list",
+    "_checker_square",
+    "alpha_verdict",
+    "painted_checkerboard"
+   ],
+   "removed": [],
+   "changed": [
+    "classify_raw_alpha",
+    "key_transparent"
+   ],
+   "appClosure": [
+    "local",
+    "v2.45.3"
+   ],
+   "envRead": [],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": []
+  },
+  {
+   "file": "sprite_gen/gen/codex_provider.py",
+   "new": [
+    "CodexLogin",
+    "CodexProvider.inspect_image",
+    "CodexUsageLimit",
+    "CodexUsageLimit.__init__",
+    "announce_codex_billing",
+    "codex_login",
+    "usage_limit"
+   ],
+   "removed": [],
+   "changed": [
+    "CodexProvider",
+    "CodexProvider.generate"
+   ],
+   "appClosure": [
+    "local",
+    "v2.45.3"
+   ],
+   "envRead": [
+    "CODEX_HOME"
+   ],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": [],
+   "protectedPolicy": "ChatGPT 구독 경로 고정·API 키/부모 thread 환경 제거·원문 보존 로컬 패치 유지(API 키 과금 경로 자동 사용 금지)"
+  },
+  {
+   "file": "sprite_gen/gen/facing.py",
+   "new": [],
+   "removed": [],
+   "changed": [],
+   "appClosure": [
+    "local",
+    "v2.45.3"
+   ],
+   "envRead": [],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": []
+  },
+  {
+   "file": "sprite_gen/gen/facing_vision.py",
+   "new": [
+    "_tag"
+   ],
+   "removed": [],
+   "changed": [
+    "codex_inspect",
+    "grok_inspect",
+    "request_body",
+    "response_text"
+   ],
+   "appClosure": [
+    "local",
+    "v2.45.3"
+   ],
+   "envRead": [],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": []
+  },
+  {
+   "file": "sprite_gen/gen/grok_provider.py",
+   "new": [
+    "GrokProvider.inspect_image"
+   ],
+   "removed": [],
+   "changed": [
+    "GrokProvider",
+    "GrokProvider.generate"
+   ],
+   "appClosure": [
+    "local",
+    "v2.45.3"
+   ],
+   "envRead": [],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": []
+  },
+  {
+   "file": "sprite_gen/gen/handedness.py",
+   "new": [],
+   "removed": [],
+   "changed": [],
+   "appClosure": [
+    "local",
+    "v2.45.3"
+   ],
+   "envRead": [],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": [
+    "Handed"
+   ]
+  },
+  {
+   "file": "sprite_gen/gen/openai_provider.py",
+   "new": [
+    "OpenAIProvider._inspect",
+    "OpenAIProvider.inspect_image",
+    "_ask",
+    "rate_limit_headers"
+   ],
+   "removed": [],
+   "changed": [
+    "OpenAIProvider",
+    "OpenAIProvider.generate",
+    "OpenAIProvider.inspect_facing",
+    "http_image",
+    "resolve_credential"
+   ],
+   "appClosure": [
+    "local",
+    "v2.45.3"
+   ],
+   "envRead": [],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": []
+  },
+  {
+   "file": "sprite_gen/gen/prepare.py",
+   "new": [
+    "_cell_measures",
+    "add_arguments",
+    "request_with_flags"
+   ],
+   "removed": [
+    "_namespace_from_kwargs",
+    "rgb_to_hex"
+   ],
+   "changed": [
+    "_build_parser",
+    "_run",
+    "choose_chroma_key",
+    "detect_reference_background",
+    "parse_body_plan",
+    "parse_hex_color",
+    "run"
+   ],
+   "appClosure": [
+    "local",
+    "v2.45.3"
+   ],
+   "envRead": [],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": []
+  },
+  {
+   "file": "sprite_gen/gen/prompt_parts.py",
+   "new": [],
+   "removed": [],
+   "changed": [],
+   "appClosure": [
+    "local",
+    "v2.45.3"
+   ],
+   "envRead": [],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": []
+  },
+  {
+   "file": "sprite_gen/gen/refusal.py",
+   "new": [],
+   "removed": [],
+   "changed": [],
+   "appClosure": [
+    "local",
+    "v2.45.3"
+   ],
+   "envRead": [],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": []
+  },
+  {
+   "file": "sprite_gen/gen/retry.py",
+   "new": [
+    "_act_first",
+    "_refused",
+    "_sleep",
+    "again_after",
+    "ask",
+    "asking_again",
+    "backoff",
+    "out_of_time",
+    "retry_after",
+    "tail",
+    "too_late",
+    "woke_late"
+   ],
+   "removed": [],
+   "changed": [],
+   "appClosure": [
+    "v2.45.3"
+   ],
+   "envRead": [],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": [],
+   "protectedPolicy": "POST 재전송 정책 포함. GET·다운로드 backoff만 사용하고 POST 재전송 경로는 앱에서 막는다"
+  },
+  {
+   "file": "sprite_gen/gen/video.py",
+   "new": [
+    "DownloadRefused",
+    "DownloadRefused.__init__",
+    "GenerationUnfinished",
+    "GenerationUnfinished.__init__",
+    "GenerationUnfinished.to_dict",
+    "ResumeRequest",
+    "_ask_again",
+    "_build_resume_parser",
+    "_is_mp4",
+    "_poll_publish",
+    "_run_resume",
+    "add_resume_arguments",
+    "resume_video",
+    "run_resume"
+   ],
+   "removed": [
+    "_print_json",
+    "_run_kwargs",
+    "verify_mp4"
+   ],
+   "changed": [
+    "VideoResult",
+    "VideoResult.to_dict",
+    "_Published",
+    "_publish_report",
+    "_require_mp4_clip",
+    "_run",
+    "_run_edit",
+    "_run_extend",
+    "_submit_poll_publish",
+    "edit_video",
+    "extend_video",
+    "generate_video",
+    "http_download",
+    "run",
+    "run_edit",
+    "run_extend"
+   ],
+   "appClosure": [
+    "local",
+    "v2.45.3"
+   ],
+   "envRead": [
+    "SPRITE_GEN_VIDEO_TIMEOUT_SECONDS"
+   ],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": [
+    "VideoRequest",
+    "generate_video",
+    "http_download"
+   ],
+   "protectedPolicy": "generate_video가 429 거절 POST를 다시 보낸다(retry.ask). 앱 adapter가 이 함수를 직접 호출하므로 그대로 교체하면 POST 1회 계약 위반 -> 로컬 패치로 POST 재전송 비활성, GET/다운로드 재시도만 채택"
+  },
+  {
+   "file": "sprite_gen/gen/xai.py",
+   "new": [
+    "TransportError",
+    "TransportError.__init__",
+    "error_body",
+    "no_answer",
+    "no_answer_reason",
+    "post",
+    "read_whole",
+    "rejected_fix",
+    "time_left"
+   ],
+   "removed": [],
+   "changed": [
+    "http_json",
+    "resolve_credential"
+   ],
+   "appClosure": [
+    "local",
+    "v2.45.3"
+   ],
+   "envRead": [
+    "GROK_HOME"
+   ],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": [
+    "AUTH_SOURCE_GROK_LOGIN",
+    "http_json",
+    "resolve_credential"
+   ]
+  },
+  {
+   "file": "sprite_gen/qa/handed.py",
+   "new": [],
+   "removed": [],
+   "changed": [
+    "parse_marker"
+   ],
+   "appClosure": [
+    "local",
+    "v2.45.3"
+   ],
+   "envRead": [],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": [
+    "board",
+    "check"
+   ]
+  },
+  {
+   "file": "sprite_gen/spec/layout.py",
+   "new": [],
+   "removed": [],
+   "changed": [],
+   "appClosure": [
+    "local",
+    "v2.45.3"
+   ],
+   "envRead": [],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": []
+  },
+  {
+   "file": "sprite_gen/spec/runio.py",
+   "new": [],
+   "removed": [],
+   "changed": [],
+   "appClosure": [
+    "local",
+    "v2.45.3"
+   ],
+   "envRead": [],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": []
+  },
+  {
+   "file": "sprite_gen/spec/subject.py",
+   "new": [],
+   "removed": [],
+   "changed": [],
+   "appClosure": [
+    "local",
+    "v2.45.3"
+   ],
+   "envRead": [],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": []
+  },
+  {
+   "file": "sprite_gen/util/cli_kwargs.py",
+   "new": [
+    "namespace_from_kwargs"
+   ],
+   "removed": [],
+   "changed": [],
+   "appClosure": [
+    "v2.45.3"
+   ],
+   "envRead": [],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": []
+  },
+  {
+   "file": "sprite_gen/util/gif_utils.py",
+   "new": [
+    "_prepare_opaque_frame"
+   ],
+   "removed": [],
+   "changed": [
+    "save_clean_gif"
+   ],
+   "appClosure": [
+    "local",
+    "v2.45.3"
+   ],
+   "envRead": [],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": [
+    "_prepare_transparent_frame"
+   ]
+  },
+  {
+   "file": "sprite_gen/util/hexcolor.py",
+   "new": [
+    "format_hex",
+    "parse_hex"
+   ],
+   "removed": [],
+   "changed": [],
+   "appClosure": [
+    "v2.45.3"
+   ],
+   "envRead": [],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": []
+  },
+  {
+   "file": "sprite_gen/util/lsq.py",
+   "new": [
+    "line"
+   ],
+   "removed": [],
+   "changed": [],
+   "appClosure": [
+    "v2.45.3"
+   ],
+   "envRead": [],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": []
+  },
+  {
+   "file": "sprite_gen/util/resample.py",
+   "new": [
+    "mix_windows",
+    "support_bounds",
+    "window_extrema"
+   ],
+   "removed": [
+    "_support_bounds",
+    "_window_extrema"
+   ],
+   "changed": [
+    "resize_cell"
+   ],
+   "appClosure": [
+    "local",
+    "v2.45.3"
+   ],
+   "envRead": [],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": []
+  },
+  {
+   "file": "sprite_gen/video/align.py",
+   "new": [
+    "_ghost_line",
+    "_ghost_words",
+    "_look_line",
+    "_returns_said",
+    "cut_report",
+    "cut_strip",
+    "one_step",
+    "origin_of"
+   ],
+   "removed": [
+    "faults"
+   ],
+   "changed": [
+    "_fault_line",
+    "_loop_files",
+    "_rebuild",
+    "_retake_line",
+    "_suspect_line",
+    "add_arguments",
+    "align_set",
+    "resample",
+    "retake",
+    "run"
+   ],
+   "appClosure": [
+    "local",
+    "v2.45.3"
+   ],
+   "envRead": [],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": [
+    "SNAP",
+    "cycle_screen",
+    "foot_strike",
+    "held_drawings",
+    "resample",
+    "retake"
+   ]
+  },
+  {
+   "file": "sprite_gen/video/auto_motion.py",
+   "new": [
+    "_best",
+    "_match_costs"
+   ],
+   "removed": [],
+   "changed": [
+    "_match",
+    "analyse",
+    "discover"
+   ],
+   "appClosure": [
+    "local",
+    "v2.45.3"
+   ],
+   "envRead": [],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": [
+    "analyse"
+   ]
+  },
+  {
+   "file": "sprite_gen/video/batch.py",
+   "new": [
+    "_parse_end_frames",
+    "_parse_keyed",
+    "cycle_for",
+    "item_values"
+   ],
+   "removed": [],
+   "changed": [
+    "add_arguments",
+    "align_gaits",
+    "build_prompt",
+    "clip_prompt_parts",
+    "pins_last_frame",
+    "run",
+    "run_item",
+    "run_redraw_cli",
+    "run_set",
+    "run_video_cli",
+    "still_view_text",
+    "walk_start_still",
+    "write_table"
+   ],
+   "appClosure": [
+    "local",
+    "v2.45.3"
+   ],
+   "envRead": [],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": [
+    "pins_last_frame"
+   ]
+  },
+  {
+   "file": "sprite_gen/video/body_plan.py",
+   "new": [],
+   "removed": [],
+   "changed": [],
+   "appClosure": [
+    "local",
+    "v2.45.3"
+   ],
+   "envRead": [],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": [
+    "biped"
+   ]
+  },
+  {
+   "file": "sprite_gen/video/canvas.py",
+   "new": [],
+   "removed": [],
+   "changed": [
+    "profile_for",
+    "run_canvas"
+   ],
+   "appClosure": [
+    "local",
+    "v2.45.3"
+   ],
+   "envRead": [],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": [
+    "corner_key",
+    "normalize_key",
+    "pad_canvas",
+    "profile_for"
+   ]
+  },
+  {
+   "file": "sprite_gen/video/crossings.py",
+   "new": [
+    "Reading",
+    "Reading.__init__",
+    "Reading._scenario",
+    "Reading.in_phase",
+    "Reading.judge",
+    "Reading.lengths",
+    "Reading.overlap",
+    "Reading.readable",
+    "Reading.record",
+    "Reading.ring_count",
+    "Reading.scenarios",
+    "Reading.twos",
+    "_alternation",
+    "_merge_short",
+    "_motion",
+    "_moves_like",
+    "_phi",
+    "_runs",
+    "_sides",
+    "_smooth",
+    "_together",
+    "foot_signals",
+    "read"
+   ],
+   "removed": [],
+   "changed": [],
+   "appClosure": [
+    "v2.45.3"
+   ],
+   "envRead": [],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": []
+  },
+  {
+   "file": "sprite_gen/video/effect.py",
+   "new": [
+    "brightness_alpha",
+    "canvas",
+    "empty_end",
+    "frame_masses",
+    "key_frames",
+    "lifetime_ending",
+    "on_black",
+    "prompt"
+   ],
+   "removed": [],
+   "changed": [],
+   "appClosure": [
+    "v2.45.3"
+   ],
+   "envRead": [],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": []
+  },
+  {
+   "file": "sprite_gen/video/evidence.py",
+   "new": [
+    "digest",
+    "engine_identity",
+    "gait_observation",
+    "source_identity"
+   ],
+   "removed": [],
+   "changed": [],
+   "appClosure": [
+    "v2.45.3"
+   ],
+   "envRead": [],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": []
+  },
+  {
+   "file": "sprite_gen/video/facing.py",
+   "new": [],
+   "removed": [],
+   "changed": [],
+   "appClosure": [
+    "local",
+    "v2.45.3"
+   ],
+   "envRead": [],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": []
+  },
+  {
+   "file": "sprite_gen/video/follow.py",
+   "new": [
+    "Answer",
+    "Answer.carry",
+    "Answer.moved",
+    "Answer.moves_in",
+    "Answer.record",
+    "Request",
+    "Request.source_path",
+    "Request.strip_path",
+    "_cell_sha256",
+    "_cells",
+    "_common",
+    "_fft_length",
+    "_keep_floor",
+    "_levels",
+    "_overlay",
+    "_run_depth",
+    "add_request_arguments",
+    "cut_origin",
+    "depth",
+    "floor_gain",
+    "fold_notes",
+    "move_field",
+    "parse_read_on",
+    "read_on_relation",
+    "read_request",
+    "region_weight",
+    "solve",
+    "stretch_per_gain",
+    "transported_motion",
+    "wear"
+   ],
+   "removed": [],
+   "changed": [
+    "add_arguments",
+    "body_motion",
+    "follow_loop",
+    "move_regions",
+    "run"
+   ],
+   "appClosure": [
+    "local",
+    "v2.45.3"
+   ],
+   "envRead": [],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": [
+    "GAIN_MEASURED",
+    "body_motion",
+    "fold_ratio",
+    "follow_offsets",
+    "lowered_gain",
+    "move_regions"
+   ]
+  },
+  {
+   "file": "sprite_gen/video/frames.py",
+   "new": [
+    "_components",
+    "_near",
+    "drop_specks"
+   ],
+   "removed": [],
+   "changed": [
+    "add_arguments",
+    "classify_edge_contact",
+    "key_frames",
+    "run",
+    "run_frames"
+   ],
+   "appClosure": [
+    "local",
+    "v2.45.3"
+   ],
+   "envRead": [],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": [
+    "SPILL_REFERENCE_MARGIN",
+    "decide_spill",
+    "extract",
+    "key_frames"
+   ]
+  },
+  {
+   "file": "sprite_gen/video/gait_fallback.py",
+   "new": [
+    "body_size",
+    "lead_in",
+    "poses",
+    "size_change"
+   ],
+   "removed": [
+    "_poses"
+   ],
+   "changed": [
+    "_trend",
+    "cycle_drift"
+   ],
+   "appClosure": [
+    "local",
+    "v2.45.3"
+   ],
+   "envRead": [],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": [
+    "LONG_CYCLE_FRACTION",
+    "SCALE_DRIFT_MIN",
+    "SIZE_HOLD_MIN",
+    "cycle_drift",
+    "long_window",
+    "scale_drift",
+    "undo_padding",
+    "undo_scale",
+    "write_frames"
+   ]
+  },
+  {
+   "file": "sprite_gen/video/held.py",
+   "new": [],
+   "removed": [],
+   "changed": [],
+   "appClosure": [
+    "local",
+    "v2.45.3"
+   ],
+   "envRead": [],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": []
+  },
+  {
+   "file": "sprite_gen/video/interpolation_quality.py",
+   "new": [
+    "clean_beside",
+    "faults",
+    "ghost_screen",
+    "looks"
+   ],
+   "removed": [],
+   "changed": [],
+   "appClosure": [
+    "v2.45.3"
+   ],
+   "envRead": [],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": []
+  },
+  {
+   "file": "sprite_gen/video/legs.py",
+   "new": [],
+   "removed": [],
+   "changed": [],
+   "appClosure": [
+    "local",
+    "v2.45.3"
+   ],
+   "envRead": [],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": []
+  },
+  {
+   "file": "sprite_gen/video/local_cycle.py",
+   "new": [
+    "_calm",
+    "_closure",
+    "_held",
+    "_held_rank",
+    "_mark",
+    "_measure",
+    "_rank",
+    "_read",
+    "_screens",
+    "_shape_rank",
+    "_two_steps",
+    "_worse",
+    "by_steps",
+    "counted",
+    "judged",
+    "same_picture",
+    "step_verdict"
+   ],
+   "removed": [],
+   "changed": [
+    "detect"
+   ],
+   "appClosure": [
+    "local",
+    "v2.45.3"
+   ],
+   "envRead": [],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": [
+    "detect"
+   ]
+  },
+  {
+   "file": "sprite_gen/video/loop.py",
+   "new": [
+    "CutWindow",
+    "CutWindow.hold",
+    "CutWindow.of",
+    "CutWindow.past",
+    "CutWindow.said",
+    "CutWindow.within",
+    "HeldEdge",
+    "HeldEdge.__init__",
+    "HeldEdge._masks",
+    "HeldEdge.seam",
+    "HeldEdge.side",
+    "SeamFlow",
+    "SeamFlow.__call__",
+    "SeamFlow.__init__",
+    "_by_steps",
+    "_counted",
+    "_distances",
+    "_from_lead_in",
+    "_ghost_lines",
+    "_one_shot",
+    "_overlap_lines",
+    "_seam_on_cells",
+    "_shifts",
+    "coverage_verdict",
+    "cycle_apart",
+    "moved_alpha",
+    "moved_frames",
+    "once_return_cycle",
+    "resampled_cells",
+    "ring_steps",
+    "seam_on_cells",
+    "shown_runs",
+    "standing_height",
+    "wrap_on_cells",
+    "wrap_pop_on"
+   ],
+   "removed": [
+    "_drop_specks",
+    "first_frame_height"
+   ],
+   "changed": [
+    "_repair_jumps",
+    "add_arguments",
+    "build_strip",
+    "detect_one_shot",
+    "distance_matrix",
+    "run",
+    "run_loop",
+    "verify_animation",
+    "write_webp"
+   ],
+   "appClosure": [
+    "local",
+    "v2.45.3"
+   ],
+   "envRead": [],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": [
+    "GAIT_DOUBLE_SEARCH",
+    "GAIT_DOUBLE_TOL",
+    "PERIODICITY_MIN",
+    "SEAM_RATIO_MAX",
+    "detect_cycle",
+    "detect_one_shot",
+    "distance_matrix",
+    "fixed_cycle",
+    "foot_centre",
+    "frame_masses",
+    "periodicity_floor",
+    "pinned_cycle",
+    "profile_for",
+    "resize_cell"
+   ]
+  },
+  {
+   "file": "sprite_gen/video/motion_anchor.py",
+   "new": [
+    "_row_costs",
+    "_shift_blocks"
+   ],
+   "removed": [],
+   "changed": [
+    "_register"
+   ],
+   "appClosure": [
+    "local",
+    "v2.45.3"
+   ],
+   "envRead": [],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": []
+  },
+  {
+   "file": "sprite_gen/video/nonloop.py",
+   "new": [
+    "body_box",
+    "drawing_pose",
+    "end_pose",
+    "hold_ending",
+    "metadata",
+    "samples",
+    "select_cut",
+    "terminal_pose",
+    "validate_body"
+   ],
+   "removed": [],
+   "changed": [],
+   "appClosure": [
+    "v2.45.3"
+   ],
+   "envRead": [],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": []
+  },
+  {
+   "file": "sprite_gen/video/period.py",
+   "new": [
+    "leg_peaks",
+    "step_screen"
+   ],
+   "removed": [],
+   "changed": [],
+   "appClosure": [
+    "local",
+    "v2.45.3"
+   ],
+   "envRead": [],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": []
+  },
+  {
+   "file": "sprite_gen/video/play.py",
+   "new": [
+    "fixed",
+    "own_sentence",
+    "preset",
+    "resolve"
+   ],
+   "removed": [],
+   "changed": [],
+   "appClosure": [
+    "v2.45.3"
+   ],
+   "envRead": [],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": []
+  },
+  {
+   "file": "sprite_gen/video/repair.py",
+   "new": [
+    "Torso",
+    "Torso.__init__",
+    "Torso._at",
+    "Torso.said",
+    "Torso.x",
+    "_blur",
+    "_drawing_scores",
+    "_ease",
+    "_flow",
+    "_flow_on",
+    "_flow_read",
+    "_flow_scale",
+    "_frame_scores",
+    "_give_way",
+    "_head_series",
+    "_part_accel",
+    "_part_places",
+    "_said_surge",
+    "_states",
+    "_surges",
+    "between_time",
+    "clip_flow_states",
+    "drift_points",
+    "ease_times",
+    "flow_drawings",
+    "flow_scores",
+    "flow_states",
+    "flow_targets",
+    "flow_windows",
+    "held_edge",
+    "held_edge_verdict",
+    "held_side",
+    "mass_step",
+    "overlap_frame",
+    "overlap_run",
+    "overlap_weight",
+    "overlap_weights",
+    "overlap_wrap",
+    "ring_scores",
+    "seam_pop",
+    "seam_pop_verdict",
+    "side_edges",
+    "surges"
+   ],
+   "removed": [],
+   "changed": [
+    "head_track",
+    "jump_scores",
+    "measure_jolt",
+    "repair_jumps"
+   ],
+   "appClosure": [
+    "local",
+    "v2.45.3"
+   ],
+   "envRead": [],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": [
+    "jolt_verdict",
+    "measure_jolt",
+    "repair_jumps"
+   ]
+  },
+  {
+   "file": "sprite_gen/video/rife.py",
+   "new": [
+    "Cache",
+    "Cache.__init__",
+    "Cache.frame",
+    "Cache.key",
+    "Cache.record",
+    "Rife.identity",
+    "Rife.read",
+    "_core_fill",
+    "_edge_darkness",
+    "_edge_line",
+    "_file_sha256",
+    "_joined",
+    "_kept",
+    "_local_range",
+    "_luma",
+    "_square_min",
+    "_turned",
+    "_turned_back",
+    "crossfade",
+    "ghost",
+    "outline_shift",
+    "outlined",
+    "passes",
+    "torn",
+    "tta"
+   ],
+   "removed": [],
+   "changed": [
+    "Rife",
+    "Rife.__call__",
+    "Rife.__init__",
+    "Rife.describe",
+    "_call",
+    "_smear_counts",
+    "between",
+    "bleed"
+   ],
+   "appClosure": [
+    "local",
+    "v2.45.3"
+   ],
+   "envRead": [
+    "LOCALAPPDATA",
+    "SPRITE_GEN_DATA_DIR",
+    "SPRITE_GEN_RIFE",
+    "SPRITE_GEN_RIFE_MODEL",
+    "SPRITE_GEN_RIFE_TTA",
+    "XDG_DATA_HOME"
+   ],
+   "envAdded": [
+    "SPRITE_GEN_RIFE_TTA"
+   ],
+   "envRemoved": [],
+   "appSymbols": [
+    "MODEL",
+    "RELEASE",
+    "Rife",
+    "RifeNotInstalled",
+    "RifeUnavailable",
+    "installed_binary"
+   ]
+  },
+  {
+   "file": "sprite_gen/video/source.py",
+   "new": [
+    "Projection",
+    "Source",
+    "Source.read",
+    "add_arguments",
+    "add_inputs",
+    "artifact",
+    "input_paths",
+    "manifest",
+    "project",
+    "run",
+    "timestamps"
+   ],
+   "removed": [],
+   "changed": [],
+   "appClosure": [
+    "v2.45.3"
+   ],
+   "envRead": [],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": []
+  },
+  {
+   "file": "sprite_gen/workflow/catalog.py",
+   "new": [
+    "validate_general"
+   ],
+   "removed": [],
+   "changed": [],
+   "appClosure": [
+    "v2.45.3"
+   ],
+   "envRead": [],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": []
+  },
+  {
+   "file": "sprite_gen/workflow/preferences.py",
+   "new": [],
+   "removed": [],
+   "changed": [
+    "add_arguments",
+    "read_settings",
+    "run",
+    "save_settings"
+   ],
+   "appClosure": [
+    "v2.45.3"
+   ],
+   "envRead": [
+    "SPRITE_GEN_CONFIG_DIR"
+   ],
+   "envAdded": [],
+   "envRemoved": [],
+   "appSymbols": [],
+   "protectedPolicy": "SPRITE_GEN_CONFIG_DIR 또는 사용자 홈 설정을 읽는다. 앱은 프로젝트 설정만 사용하므로 gen 경로에서 차단 또는 프로젝트 범위로 주입"
+  }
+ ],
+ "unresolved": [
+  {
+   "at": "adapters/spritegen/clip_tools.py:159",
+   "reason": "return value of sprite_gen.video.follow.body_motion() is kept; later field/method uses on it (result shape) are not traced"
+  },
+  {
+   "at": "adapters/spritegen/clip_tools.py:177",
+   "reason": "return value of sprite_gen.video.follow.lowered_gain() is kept; later field/method uses on it (result shape) are not traced"
+  },
+  {
+   "at": "adapters/spritegen/clip_tools.py:210",
+   "reason": "return value of sprite_gen.qa.handed.check() is kept; later field/method uses on it (result shape) are not traced"
+  },
+  {
+   "at": "adapters/spritegen/provider.py:339",
+   "reason": "return value of sprite_gen.gen.draw_layout_guide() is kept; later field/method uses on it (result shape) are not traced"
+  },
+  {
+   "at": "adapters/spritegen/provider.py:340",
+   "reason": "return value of sprite_gen.gen.layout_guide_text() is kept; later field/method uses on it (result shape) are not traced"
+  },
+  {
+   "at": "adapters/spritegen/provider.py:375",
+   "reason": "return value of sprite_gen.gen.generate_image() is kept; later field/method uses on it (result shape) are not traced"
+  },
+  {
+   "at": "adapters/spritegen/video_finish.py:44",
+   "reason": "return value of sprite_gen.util.gif_utils._prepare_transparent_frame() is kept; later field/method uses on it (result shape) are not traced"
+  },
+  {
+   "at": "adapters/spritegen/video_normalization.py:39",
+   "reason": "return value of sprite_gen.video.loop.resize_cell() is kept; later field/method uses on it (result shape) are not traced"
+  },
+  {
+   "at": "adapters/spritegen/video_processing.py:109",
+   "reason": "return value of sprite_gen.video.rife.installed_binary() is kept; later field/method uses on it (result shape) are not traced"
+  },
+  {
+   "at": "adapters/spritegen/video_processing.py:155",
+   "reason": "return value of sprite_gen.video.canvas.corner_key() is kept; later field/method uses on it (result shape) are not traced"
+  },
+  {
+   "at": "adapters/spritegen/video_processing.py:156",
+   "reason": "return value of sprite_gen.frames.cutout._detect_key_kind() is kept; later field/method uses on it (result shape) are not traced"
+  },
+  {
+   "at": "adapters/spritegen/video_processing.py:164",
+   "reason": "return value of sprite_gen.video.canvas.normalize_key() is kept; later field/method uses on it (result shape) are not traced"
+  },
+  {
+   "at": "adapters/spritegen/video_processing.py:171",
+   "reason": "return value of sprite_gen.frames.cutout.cutout() is kept; later field/method uses on it (result shape) are not traced"
+  },
+  {
+   "at": "adapters/spritegen/video_processing.py:192",
+   "reason": "return value of sprite_gen.video.canvas.pad_canvas() is kept; later field/method uses on it (result shape) are not traced"
+  },
+  {
+   "at": "adapters/spritegen/video_processing.py:258",
+   "reason": "return value of sprite_gen.frames.cutout._detect_key_kind() is kept; later field/method uses on it (result shape) are not traced"
+  },
+  {
+   "at": "adapters/spritegen/video_processing.py:272",
+   "reason": "return value of sprite_gen.video.frames.decide_spill() is kept; later field/method uses on it (result shape) are not traced"
+  },
+  {
+   "at": "adapters/spritegen/video_processing.py:283",
+   "reason": "return value of sprite_gen.video.frames.extract() is kept; later field/method uses on it (result shape) are not traced"
+  },
+  {
+   "at": "adapters/spritegen/video_processing.py:301",
+   "reason": "return value of sprite_gen.video.frames.key_frames() is kept; later field/method uses on it (result shape) are not traced"
+  },
+  {
+   "at": "adapters/spritegen/video_processing.py:315",
+   "reason": "return value of sprite_gen.video.gait_fallback.undo_padding() is kept; later field/method uses on it (result shape) are not traced"
+  },
+  {
+   "at": "adapters/spritegen/video_processing.py:339",
+   "reason": "return value of sprite_gen.video.gait_fallback.cycle_drift() is kept; later field/method uses on it (result shape) are not traced"
+  },
+  {
+   "at": "adapters/spritegen/video_processing.py:344",
+   "reason": "return value of sprite_gen.video.gait_fallback.write_frames() is kept; later field/method uses on it (result shape) are not traced"
+  },
+  {
+   "at": "adapters/spritegen/video_processing.py:355",
+   "reason": "return value of sprite_gen.video.align.foot_strike() is kept; later field/method uses on it (result shape) are not traced"
+  },
+  {
+   "at": "adapters/spritegen/video_processing.py:387",
+   "reason": "return value of sprite_gen.video.gait_fallback.scale_drift() is kept; later field/method uses on it (result shape) are not traced"
+  },
+  {
+   "at": "adapters/spritegen/video_processing.py:391",
+   "reason": "return value of sprite_gen.video.gait_fallback.long_window() is kept; later field/method uses on it (result shape) are not traced"
+  },
+  {
+   "at": "adapters/spritegen/video_processing.py:395",
+   "reason": "return value of sprite_gen.video.gait_fallback.write_frames() is kept; later field/method uses on it (result shape) are not traced"
+  },
+  {
+   "at": "adapters/spritegen/video_processing.py:398",
+   "reason": "return value of sprite_gen.video.auto_motion.analyse() is kept; later field/method uses on it (result shape) are not traced"
+  },
+  {
+   "at": "adapters/spritegen/video_processing.py:399",
+   "reason": "return value of sprite_gen.video.local_cycle.detect() is kept; later field/method uses on it (result shape) are not traced"
+  },
+  {
+   "at": "adapters/spritegen/video_processing.py:408",
+   "reason": "return value of sprite_gen.video.loop.fixed_cycle() is kept; later field/method uses on it (result shape) are not traced"
+  },
+  {
+   "at": "adapters/spritegen/video_processing.py:427",
+   "reason": "return value of sprite_gen.video.loop.profile_for() is kept; later field/method uses on it (result shape) are not traced"
+  },
+  {
+   "at": "adapters/spritegen/video_processing.py:431",
+   "reason": "return value of sprite_gen.video.loop.distance_matrix() is kept; later field/method uses on it (result shape) are not traced"
+  },
+  {
+   "at": "adapters/spritegen/video_processing.py:436",
+   "reason": "return value of sprite_gen.video.loop.pinned_cycle() is kept; later field/method uses on it (result shape) are not traced"
+  },
+  {
+   "at": "adapters/spritegen/video_processing.py:442",
+   "reason": "return value of sprite_gen.video.loop.detect_one_shot() is kept; later field/method uses on it (result shape) are not traced"
+  },
+  {
+   "at": "adapters/spritegen/video_processing.py:446",
+   "reason": "return value of sprite_gen.video.loop.detect_cycle() is kept; later field/method uses on it (result shape) are not traced"
+  },
+  {
+   "at": "adapters/spritegen/video_processing.py:448",
+   "reason": "return value of sprite_gen.video.loop.periodicity_floor() is kept; later field/method uses on it (result shape) are not traced"
+  },
+  {
+   "at": "adapters/spritegen/video_processing.py:471",
+   "reason": "return value of sprite_gen.video.loop.detect_one_shot() is kept; later field/method uses on it (result shape) are not traced"
+  },
+  {
+   "at": "adapters/spritegen/video_processing.py:508",
+   "reason": "return value of sprite_gen.video.loop.distance_matrix() is kept; later field/method uses on it (result shape) are not traced"
+  },
+  {
+   "at": "adapters/spritegen/video_processing.py:510",
+   "reason": "return value of sprite_gen.video.loop.fixed_cycle() is kept; later field/method uses on it (result shape) are not traced"
+  },
+  {
+   "at": "adapters/spritegen/video_processing.py:547",
+   "reason": "return value of sprite_gen.video.repair.repair_jumps() is kept; later field/method uses on it (result shape) are not traced"
+  },
+  {
+   "at": "adapters/spritegen/video_processing.py:570",
+   "reason": "return value of sprite_gen.video.repair.measure_jolt() is kept; later field/method uses on it (result shape) are not traced"
+  },
+  {
+   "at": "adapters/spritegen/video_processing.py:594",
+   "reason": "return value of sprite_gen.video.align.resample() is kept; later field/method uses on it (result shape) are not traced"
+  },
+  {
+   "at": "adapters/spritegen/video_processing.py:651",
+   "reason": "return value of sprite_gen.video.align.retake() is kept; later field/method uses on it (result shape) are not traced"
+  },
+  {
+   "at": "adapters/spritegen/video_provider.py:150",
+   "reason": "return value of sprite_gen.gen.video.generate_video() is kept; later field/method uses on it (result shape) are not traced"
+  },
+  {
+   "at": "alignment/pipeline.py:55",
+   "reason": "runtime import; only literal _engine('m') callers of this loader are resolved"
+  },
+  {
+   "at": "alignment/pipeline.py:221",
+   "reason": "return value of sprite_gen.frames.cutout.cutout() is kept; later field/method uses on it (result shape) are not traced"
+  },
+  {
+   "at": "alignment/pipeline.py:275",
+   "reason": "return value of sprite_gen.curate.curation.transform_matrix() is kept; later field/method uses on it (result shape) are not traced"
+  }
+ ],
+ "notResolved": [
+  "engine-internal call graph across modules (only same-module helpers are linked; cross-module effects are covered by the file closure)",
+  "attribute uses on engine modules passed into other functions (listed in unresolved)",
+  "runtime configuration from provider settings files and CLI defaults (env reads are listed per file; file-based settings are covered by protectedPolicy notes)"
+ ]
+}

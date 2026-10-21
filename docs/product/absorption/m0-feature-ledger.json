@@ -1,0 +1,3861 @@
+{
+ "schema": "frame-room-absorption-ledger-v1",
+ "generatedAt": "2026-10-21",
+ "upstream": {
+  "repository": "https://github.com/aldegad/sprite-gen",
+  "tag": "v2.45.3",
+  "commit": "59b2738a2e76ed7043d9691a230396ed6374a336",
+  "compareBase": {
+   "tag": "v2.34.0",
+   "commit": "1fc35090fa9c359bc96d1287fbc32f733acaa7e4"
+  }
+ },
+ "statusVocabulary": [
+  "미조사",
+  "구현 예정",
+  "구현 중",
+  "검증 대기",
+  "완료",
+  "차단"
+ ],
+ "coverageVocabulary": {
+  "none": "앱 진입점 없음",
+  "partial": "일부 앱 경로만 있음(구버전 엔진 또는 기능 일부)",
+  "app-equivalent-unverified": "앱에 동등 경로가 있으나 v2.45.3 기준 앱 시험 근거 없음"
+ },
+ "rules": [
+  "함수·CLI 존재만으로 완료 처리하지 않는다",
+  "완료는 tests.appEvidence(실제 앱 경로 시험) 필수",
+  "차단은 blockers 필수",
+  "중요하지 않음/나중에 검토로 항목을 닫지 않는다",
+  "upstream.since=local-v2.34는 프로젝트 엔진에 구버전 명령이 있다는 뜻이며 앱 연결을 뜻하지 않음"
+ ],
+ "inventory": {
+  "sources": {
+   "sprite_gen/cli.py": "25f2394d813ca3f0902ed761e3b6e0aa4b0ee8611f21a0532aacf20521282279",
+   "sprite_gen/_modules.py": "e4d926fb05810845bd6a4527c8d3dbc260599145a14d91308ba807df0cc27e18",
+   "docs/README.md": "a9b5fba9e55600a9a7ab7a0efc5ca93796ad2e861b35161006f2b61dba47c904",
+   "pyproject.toml": "beee36af50a48415f478e193801d732f0aac3873e36269d9613831af983860aa"
+  },
+  "consoleScripts": [
+   "sprite-gen"
+  ],
+  "commands": {
+   "anchor": "sprite_gen.curate.anchor",
+   "background-tile": "sprite_gen.background.tile",
+   "compose": "sprite_gen.serve.serve_compose",
+   "compose-atlas": "sprite_gen.compose.compose_atlas",
+   "compose-cycle": "sprite_gen.compose.compose_cycle",
+   "compose-gif": "sprite_gen.compose.compose_gif",
+   "compose-layers": "sprite_gen.compose.compose_layers",
+   "correction-loop": "sprite_gen.qa.correction_loop",
+   "curation": "sprite_gen.serve.serve_curation",
+   "cutout": "sprite_gen.frames.cutout",
+   "defaults": "sprite_gen.workflow.preferences",
+   "export-aseprite": "sprite_gen.compose.export_aseprite",
+   "export-pngs": "sprite_gen.compose.export_pngs",
+   "extract": "sprite_gen.frames.extract",
+   "game-pack": "sprite_gen.compose.game_pack",
+   "gen": "sprite_gen.gen",
+   "gen-set": "sprite_gen.gen.gen_set",
+   "handed-check": "sprite_gen.qa.handed",
+   "inspect": "sprite_gen.qa.inspect",
+   "inspect-motion": "sprite_gen.qa.motion",
+   "logo": "sprite_gen.gen.logo",
+   "migrate-breathe": "sprite_gen.spec.migrate_breathe",
+   "migrate-request": "sprite_gen.spec.migrate_request",
+   "pixel-draw": "sprite_gen.gen.pixel_draw",
+   "prepare": "sprite_gen.gen.prepare",
+   "preview": "sprite_gen.qa.preview",
+   "recolor": "sprite_gen.effects.recolor",
+   "recolor-palette": "sprite_gen.effects.recolor",
+   "rife": "sprite_gen.video.rife_install",
+   "scene-inspect": "sprite_gen.scene.inspect_scene",
+   "scene-render": "sprite_gen.scene.render",
+   "score": "sprite_gen.qa.score",
+   "shadow": "sprite_gen.effects.shadow",
+   "slice-sheet": "sprite_gen.frames.slice_sheet",
+   "sound": "sprite_gen.audio.sound",
+   "ui-kit": "sprite_gen.frames.ui_kit",
+   "unpack-atlas": "sprite_gen.frames.unpack_atlas",
+   "video": "sprite_gen.gen.video",
+   "video-canvas": "sprite_gen.video.canvas",
+   "video-cycle-align": "sprite_gen.video.align",
+   "video-edit": "sprite_gen.gen.video",
+   "video-extend": "sprite_gen.gen.video",
+   "video-follow": "sprite_gen.video.follow",
+   "video-follow-inspect": "sprite_gen.video.follow_inspect",
+   "video-frames": "sprite_gen.video.frames",
+   "video-loop": "sprite_gen.video.loop",
+   "video-loop-compare": "sprite_gen.video.compare",
+   "video-loop-repair": "sprite_gen.video.restoration",
+   "video-prompt": "sprite_gen.video.clip_prompt",
+   "video-resume": "sprite_gen.gen.video",
+   "video-set": "sprite_gen.video.batch",
+   "video-set-sheet": "sprite_gen.video.set_sheet",
+   "video-source-manifest": "sprite_gen.video.source",
+   "video-stop": "sprite_gen.video.stop",
+   "workflow": "sprite_gen.workflow.guide"
+  },
+  "moduleDomain": {
+   "align": "video",
+   "alpha_floor": "frames",
+   "anatomy": "effects",
+   "anchor": "curate",
+   "assets": "spec",
+   "batch": "video",
+   "breathe": "effects",
+   "canvas": "video",
+   "check_visible_magenta": "frames",
+   "clip_prompt": "video",
+   "compare": "video",
+   "compose_atlas": "compose",
+   "compose_cycle": "compose",
+   "compose_gif": "compose",
+   "compose_layers": "compose",
+   "correction_loop": "qa",
+   "curation": "curate",
+   "cutout": "frames",
+   "export_aseprite": "compose",
+   "export_pngs": "compose",
+   "extract": "frames",
+   "follow": "video",
+   "follow_inspect": "video",
+   "frames": "video",
+   "game_pack": "compose",
+   "gen_set": "gen",
+   "gif_utils": "util",
+   "guide": "workflow",
+   "handed": "qa",
+   "inspect": "qa",
+   "inspect_scene": "scene",
+   "interpolate": "effects",
+   "layers": "compose",
+   "layout": "spec",
+   "logo": "gen",
+   "logo_matte": "frames",
+   "loop": "video",
+   "migrate_breathe": "spec",
+   "migrate_request": "spec",
+   "model": "scene",
+   "motion": "qa",
+   "pixel_draw": "gen",
+   "preferences": "workflow",
+   "prepare": "gen",
+   "preview": "qa",
+   "recolor": "effects",
+   "render": "scene",
+   "reroll": "effects",
+   "resample": "util",
+   "restoration": "video",
+   "rife_install": "video",
+   "runio": "spec",
+   "score": "qa",
+   "segment": "frames",
+   "serve_compose": "serve",
+   "serve_curation": "serve",
+   "set_sheet": "video",
+   "shadow": "effects",
+   "slice_sheet": "frames",
+   "sound": "audio",
+   "source": "video",
+   "stop": "video",
+   "tile": "background",
+   "ui_kit": "frames",
+   "unpack_atlas": "frames",
+   "video": "gen"
+  },
+  "catalogVerbs": [
+   "background-tile",
+   "compose-atlas",
+   "compose-layers",
+   "curation",
+   "cutout",
+   "export-aseprite",
+   "export-pngs",
+   "extract",
+   "gen",
+   "gen-set",
+   "handed-check",
+   "inspect-motion",
+   "prepare",
+   "recolor",
+   "recolor-palette",
+   "scene-inspect",
+   "scene-render",
+   "shadow",
+   "slice-sheet",
+   "ui-kit",
+   "unpack-atlas",
+   "video",
+   "video-canvas",
+   "video-cycle-align",
+   "video-follow",
+   "video-follow-inspect",
+   "video-frames",
+   "video-loop",
+   "video-prompt",
+   "video-set",
+   "video-set-sheet",
+   "video-stop"
+  ],
+  "docIndex": [
+   "architecture.md",
+   "asset-tools.md",
+   "atlas-workflow.md",
+   "breathing.md",
+   "chroma-alpha.md",
+   "curation.md",
+   "directional-anchor-workflow.md",
+   "effects.md",
+   "engine-export.md",
+   "frame-interpolation.md",
+   "game-pack.md",
+   "gen.md",
+   "interpreter.md",
+   "layer-tracks.md",
+   "locomotion-curation.md",
+   "logo.md",
+   "loop-comparison.md",
+   "loop-repair.md",
+   "loop-review.md",
+   "pixel-draw.md",
+   "pixel-unfake.md",
+   "prompt-assembly.md",
+   "qa-motion.md",
+   "recolor.md",
+   "release.md",
+   "rename-gate.md",
+   "run-contract.md",
+   "scene.md",
+   "seamless-video-loop.md",
+   "sheet-slicing.md",
+   "sound.md",
+   "states-and-frames.md",
+   "subject-profiles.md",
+   "troubleshooting.md",
+   "ui-kit.md",
+   "user-workflow.md",
+   "video-pipeline.md",
+   "video.md"
+  ],
+  "moduleEntrypoints": [
+   "sprite_gen.background.tile",
+   "sprite_gen.compose.compose_atlas",
+   "sprite_gen.compose.compose_cycle",
+   "sprite_gen.compose.compose_gif",
+   "sprite_gen.compose.compose_layers",
+   "sprite_gen.compose.export_aseprite",
+   "sprite_gen.compose.export_pngs",
+   "sprite_gen.compose.game_pack",
+   "sprite_gen.curate.anchor",
+   "sprite_gen.effects.interpolate",
+   "sprite_gen.effects.recolor",
+   "sprite_gen.effects.reroll",
+   "sprite_gen.effects.shadow",
+   "sprite_gen.frames.check_visible_magenta",
+   "sprite_gen.frames.extract",
+   "sprite_gen.frames.slice_sheet",
+   "sprite_gen.frames.ui_kit",
+   "sprite_gen.frames.unpack_atlas",
+   "sprite_gen.gen",
+   "sprite_gen.gen.gen_set",
+   "sprite_gen.gen.logo",
+   "sprite_gen.gen.pixel_draw",
+   "sprite_gen.gen.prepare",
+   "sprite_gen.gen.video",
+   "sprite_gen.qa.correction_loop",
+   "sprite_gen.qa.handed",
+   "sprite_gen.qa.inspect",
+   "sprite_gen.qa.motion",
+   "sprite_gen.qa.preview",
+   "sprite_gen.qa.score",
+   "sprite_gen.scene.inspect_scene",
+   "sprite_gen.scene.render",
+   "sprite_gen.serve.serve_compose",
+   "sprite_gen.serve.serve_curation",
+   "sprite_gen.video.align",
+   "sprite_gen.video.batch",
+   "sprite_gen.video.canvas",
+   "sprite_gen.video.clip_prompt",
+   "sprite_gen.video.follow",
+   "sprite_gen.video.follow_inspect",
+   "sprite_gen.video.frames",
+   "sprite_gen.video.loop",
+   "sprite_gen.video.rife_install",
+   "sprite_gen.video.set_sheet",
+   "sprite_gen.video.stop"
+  ],
+  "scriptWrappers": {
+   "scripts/compose_layers.py": "sprite_gen.compose.compose_layers",
+   "scripts/compose_selected_cycle.py": "sprite_gen.compose.compose_cycle",
+   "scripts/compose_sprite_atlas.py": "sprite_gen.compose.compose_atlas",
+   "scripts/compose_sprite_gif.py": "sprite_gen.compose.compose_gif",
+   "scripts/curation.py": "sprite_gen.curate.curation",
+   "scripts/dev/breathe_mutation_battery.py": null,
+   "scripts/dev/check_visible_magenta.py": "sprite_gen.frames.check_visible_magenta",
+   "scripts/dev/measure_align_sigma.py": "sprite_gen.frames.extract",
+   "scripts/dev/source_restoration_demo.py": "sprite_gen.util.gif_utils",
+   "scripts/diagnose_video_loop.py": "sprite_gen._deps",
+   "scripts/export_aseprite.py": "sprite_gen.compose.export_aseprite",
+   "scripts/export_curated_pngs.py": "sprite_gen.compose.export_pngs",
+   "scripts/extract_sprite_row_frames.py": "sprite_gen.frames.extract",
+   "scripts/gen_set.py": "sprite_gen.gen.gen_set",
+   "scripts/generate_sprite_image.py": "sprite_gen.gen",
+   "scripts/generate_sprite_video.py": "sprite_gen.gen.video",
+   "scripts/inspect_sprite_run.py": "sprite_gen.qa.inspect",
+   "scripts/interpolate_frames.py": "sprite_gen.effects.interpolate",
+   "scripts/linux_lane.sh": null,
+   "scripts/prepare_sprite_run.py": "sprite_gen.gen.prepare",
+   "scripts/preview_animation.py": "sprite_gen.qa.preview",
+   "scripts/recolor.py": "sprite_gen.effects.recolor",
+   "scripts/release_notes.py": null,
+   "scripts/release_publish.py": null,
+   "scripts/run_correction_loop.py": "sprite_gen.qa.correction_loop",
+   "scripts/score_sprite_run.py": "sprite_gen.qa.score",
+   "scripts/serve_curation.py": "sprite_gen.serve.serve_curation",
+   "scripts/slice_sheet_cells.py": "sprite_gen.frames.slice_sheet",
+   "scripts/unpack_atlas_run.py": "sprite_gen.frames.unpack_atlas",
+   "scripts/video_canvas.py": "sprite_gen.video.canvas",
+   "scripts/video_frames.py": "sprite_gen.video.frames",
+   "scripts/video_loop.py": "sprite_gen.video.loop",
+   "scripts/video_set.py": "sprite_gen.video.batch"
+  },
+  "retiredFlags": [
+   "--fit-pixel-perfect",
+   "--no-fit-pixel-perfect"
+  ]
+ },
+ "entries": [
+  {
+   "id": "cmd.workflow",
+   "kind": "command",
+   "title": "대화형 이미지/스프라이트 선택·접근 확인·다음 단계 안내",
+   "upstream": {
+    "command": "workflow",
+    "since": "local-v2.34",
+    "modules": [
+     "sprite_gen.workflow.guide"
+    ],
+    "docs": [
+     "user-workflow.md"
+    ],
+    "aliases": [],
+    "retired": []
+   },
+   "app": {
+    "entry": "none",
+    "api": "none",
+    "worker": "none",
+    "storage": "none",
+    "output": "none",
+    "recovery": "none",
+    "files": []
+   },
+   "coverage": "none",
+   "tests": {
+    "existing": [],
+    "appEvidence": [],
+    "required": "앱 6단계 흐름의 자료형별 진입 안내와 대조, 접근 확인 결과 표시 시험"
+   },
+   "phase": "M6",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": "앱은 6단계 화면이 같은 역할. CLI 대화 흐름을 그대로 복사하지 않고 진입점 대응표로 연결."
+  },
+  {
+   "id": "cmd.defaults",
+   "kind": "command",
+   "title": "작업별 기본값 저장/표시/삭제(defaults v2)",
+   "upstream": {
+    "command": "defaults",
+    "since": "local-v2.34",
+    "modules": [
+     "sprite_gen.workflow.preferences"
+    ],
+    "docs": [
+     "user-workflow.md",
+     "gen.md"
+    ],
+    "aliases": [],
+    "retired": []
+   },
+   "app": {
+    "entry": "ProviderConnections.tsx·프로젝트 generationSettings",
+    "api": "GET /v1/providers, 프로젝트 snapshot",
+    "worker": "none",
+    "storage": "project.generationSettings",
+    "output": "none",
+    "recovery": "프로젝트 revision",
+    "files": [
+     "apps/web/src/ProviderConnections.tsx"
+    ]
+   },
+   "coverage": "partial",
+   "tests": {
+    "existing": [
+     "tests/integration/test_provider.py"
+    ],
+    "appEvidence": [],
+    "required": "프로젝트 범위 기본값 변환·옵션 충돌 규칙 시험, 전역 preferences 미복사 확인"
+   },
+   "phase": "M5",
+   "status": "구현 예정",
+   "constraints": [
+    "전역 preferences 복사 금지",
+    "CLI 자동 fallback 금지"
+   ],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "cmd.prepare",
+   "kind": "command",
+   "title": "component-row run 준비(요청·레이아웃 가이드·체형/상태 정의)",
+   "upstream": {
+    "command": "prepare",
+    "since": "local-v2.34",
+    "modules": [
+     "sprite_gen.gen.prepare",
+     "sprite_gen.spec.runio",
+     "sprite_gen.spec.assets",
+     "sprite_gen.spec.layout",
+     "sprite_gen.spec.migrate_request"
+    ],
+    "docs": [
+     "run-contract.md",
+     "atlas-workflow.md",
+     "states-and-frames.md",
+     "subject-profiles.md",
+     "pixel-unfake.md"
+    ],
+    "aliases": [
+     "scripts/prepare_sprite_run.py"
+    ],
+    "retired": [
+     "--fit-pixel-perfect",
+     "--no-fit-pixel-perfect"
+    ]
+   },
+   "app": {
+    "entry": "GenerationStep.tsx 시트 생성",
+    "api": "POST jobs operation=generate(scope=sheet)",
+    "worker": "adapters/spritegen/provider.py(local layout guide draw_layout_guide)",
+    "storage": "generations.requestSnapshot(가이드 참조·전송 프롬프트)",
+    "output": "추출 후 내보내기",
+    "recovery": "접수 불명 재전송 없음",
+    "files": [
+     "adapters/spritegen/provider.py"
+    ]
+   },
+   "coverage": "partial",
+   "tests": {
+    "existing": [
+     "tests/integration/test_provider.py",
+     "tests/integration/test_asset_generation.py"
+    ],
+    "appEvidence": [],
+    "required": "상태·프레임 수·subject(character/effect)·fit 요청 변환과 run-dir 없는 앱 저장 경로 시험"
+   },
+   "phase": "M6",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": "retired --fit-pixel-perfect/--no-fit-pixel-perfect는 지원 alias가 아니라 upstream이 거절 메시지로 막는 폐기 플래그. 앱 요청 스키마에 대응 키가 없음을 시험으로 고정."
+  },
+  {
+   "id": "cmd.gen",
+   "kind": "command",
+   "title": "단일 이미지 생성(codex/grok/openai provider 선택·명세)",
+   "upstream": {
+    "command": "gen",
+    "since": "local-v2.34",
+    "modules": [
+     "sprite_gen.gen",
+     "sprite_gen.gen.base",
+     "sprite_gen.gen.codex_provider",
+     "sprite_gen.gen.grok_provider",
+     "sprite_gen.gen.openai_provider",
+     "sprite_gen.gen.chroma",
+     "sprite_gen.gen.refusal",
+     "sprite_gen.gen.retry",
+     "sprite_gen.gen.facing",
+     "sprite_gen.gen.facing_vision"
+    ],
+    "docs": [
+     "gen.md",
+     "prompt-assembly.md",
+     "chroma-alpha.md"
+    ],
+    "aliases": [
+     "scripts/generate_sprite_image.py"
+    ],
+    "retired": []
+   },
+   "app": {
+    "entry": "GenerationStep.tsx·ReferenceStep.tsx",
+    "api": "POST /v1/projects/{pid}/jobs operation=generate",
+    "worker": "services/worker/task.py -> adapters/spritegen/provider.py(codex 단일 호출)",
+    "storage": "assets(raw) + generations.requestSnapshot + 영수증",
+    "output": "후보 라이브러리 -> 추출/정렬 -> 내보내기",
+    "recovery": "접수 불명은 provider_outcome_unknown, 자동 재전송 없음",
+    "files": [
+     "apps/web/src/GenerationStep.tsx",
+     "adapters/spritegen/provider.py",
+     "services/worker/task.py"
+    ]
+   },
+   "coverage": "partial",
+   "tests": {
+    "existing": [
+     "tests/integration/test_provider.py",
+     "tests/integration/test_asset_generation.py"
+    ],
+    "appEvidence": [],
+    "required": "provider별 명시 선택·과금 경로 표시·거절 재전송 규칙의 앱 시험(모의 transport), 실제 생성은 승인 범위에서 별도"
+   },
+   "phase": "M6",
+   "status": "구현 예정",
+   "constraints": [
+    "grok/openai는 사용자 인증·과금 경로 필요, 자동 provider 전환 금지",
+    "엔진 gen/__init__ 접수 불명 재시도 제거 로컬 패치 유지"
+   ],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "gen.provider-usage",
+   "kind": "flag-feature",
+   "title": "provider 실패 이유·사용 경로·토큰/제한 정보 전달",
+   "upstream": {
+    "since": null,
+    "modules": [
+     "sprite_gen.gen.refusal",
+     "sprite_gen.gen.retry",
+     "sprite_gen.gen.xai"
+    ],
+    "docs": [
+     "gen.md",
+     "video.md"
+    ],
+    "aliases": [],
+    "retired": []
+   },
+   "app": {
+    "entry": "ProviderConnections.tsx·JobCard",
+    "api": "GET /v1/providers, /v1/jobs/{jid}",
+    "worker": "services/worker/video_task.py, task.py",
+    "storage": "job errors·영수증",
+    "output": "none",
+    "recovery": "작업 상태",
+    "files": [
+     "apps/web/src/ProviderConnections.tsx"
+    ]
+   },
+   "coverage": "partial",
+   "tests": {
+    "existing": [
+     "tests/integration/test_video_jobs.py",
+     "tests/integration/test_provider.py"
+    ],
+    "appEvidence": [],
+    "required": "실패 이유·실행 경로·조회 횟수만 공개하고 토큰·서명 URL 비노출 시험"
+   },
+   "phase": "M1",
+   "status": "구현 예정",
+   "constraints": [
+    "엔진 자동 POST 재시도·provider 전환 정책 미도입"
+   ],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "cmd.gen-set",
+   "kind": "command",
+   "title": "준비된 run의 모든 상태 행 생성(행별 보고)",
+   "upstream": {
+    "command": "gen-set",
+    "since": "local-v2.34",
+    "modules": [
+     "sprite_gen.gen.gen_set"
+    ],
+    "docs": [
+     "gen.md",
+     "atlas-workflow.md"
+    ],
+    "aliases": [
+     "scripts/gen_set.py"
+    ],
+    "retired": []
+   },
+   "app": {
+    "entry": "none",
+    "api": "none",
+    "worker": "none",
+    "storage": "none",
+    "output": "none",
+    "recovery": "none",
+    "files": []
+   },
+   "coverage": "none",
+   "tests": {
+    "existing": [],
+    "appEvidence": [],
+    "required": "행 단위 제출·실패 집계·POST 1회 보호를 앱 작업으로 연결한 시험"
+   },
+   "phase": "M6",
+   "status": "구현 예정",
+   "constraints": [
+    "provider 인증·과금"
+   ],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "cmd.anchor",
+   "kind": "command",
+   "title": "방향 anchor 기준 결정/굽기",
+   "upstream": {
+    "command": "anchor",
+    "since": "local-v2.34",
+    "modules": [
+     "sprite_gen.curate.anchor"
+    ],
+    "docs": [
+     "directional-anchor-workflow.md"
+    ],
+    "aliases": [],
+    "retired": []
+   },
+   "app": {
+    "entry": "ReferenceStep.tsx 기준 그림",
+    "api": "POST /v1/projects/{pid}/reference-revisions, /approve",
+    "worker": "none",
+    "storage": "references revision",
+    "output": "생성 요청의 기준 참조",
+    "recovery": "revision 이력",
+    "files": [
+     "apps/web/src/ReferenceStep.tsx"
+    ]
+   },
+   "coverage": "partial",
+   "tests": {
+    "existing": [
+     "tests/integration/test_api.py"
+    ],
+    "appEvidence": [],
+    "required": "방향별 anchor revision·좌우 gate를 기존 기준 그림 revision에 연결한 시험"
+   },
+   "phase": "M6",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "cmd.extract",
+   "kind": "command",
+   "title": "component-row 스트립 -> 깨끗한 RGBA 프레임",
+   "upstream": {
+    "command": "extract",
+    "since": "local-v2.34",
+    "modules": [
+     "sprite_gen.frames.extract",
+     "sprite_gen.frames.segment",
+     "sprite_gen.frames.decontam"
+    ],
+    "docs": [
+     "run-contract.md",
+     "chroma-alpha.md"
+    ],
+    "aliases": [
+     "scripts/extract_sprite_row_frames.py",
+     "scripts/dev/measure_align_sigma.py"
+    ],
+    "retired": []
+   },
+   "app": {
+    "entry": "ExtractStep.tsx",
+    "api": "POST /v1/projects/{pid}/jobs operation=extract/cutout",
+    "worker": "services/worker/task.py -> alignment/pipeline.py(frames.extract/frames.cutout)",
+    "storage": "frames(raw-v1) + derived assets",
+    "output": "정렬 후 내보내기",
+    "recovery": "작업 재시도, 원본 asset 보존",
+    "files": [
+     "apps/web/src/ExtractStep.tsx",
+     "alignment/pipeline.py"
+    ]
+   },
+   "coverage": "app-equivalent-unverified",
+   "tests": {
+    "existing": [
+     "tests/integration/test_pipeline.py"
+    ],
+    "appEvidence": [],
+    "required": "v2.45.3 extract 변경을 앱 extract 작업에 반영한 픽셀·알파 회귀(기존 raw-v1 결과 보존)"
+   },
+   "phase": "M6",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "cmd.compose-atlas",
+   "kind": "command",
+   "title": "프레임 -> 게임 atlas + runtime manifest",
+   "upstream": {
+    "command": "compose-atlas",
+    "since": "local-v2.34",
+    "modules": [
+     "sprite_gen.compose.compose_atlas"
+    ],
+    "docs": [
+     "run-contract.md",
+     "atlas-workflow.md"
+    ],
+    "aliases": [
+     "scripts/compose_sprite_atlas.py"
+    ],
+    "retired": []
+   },
+   "app": {
+    "entry": "FinishSteps.tsx 게임용 파일 출력",
+    "api": "POST /v1/projects/{pid}/exports (formats atlas/pngs/runtime/aseprite)",
+    "worker": "services/worker/main.py export -> alignment/pipeline.py·alignment/animation_exports.py",
+    "storage": "exports 테이블 + artifacts(sha256)",
+    "output": "atlas PNG, runtime JSON, Aseprite JSON, PNG/GIF/WebP, animations ZIP",
+    "recovery": "idempotencyKey, 기존 출력 덮어쓰지 않음",
+    "files": [
+     "apps/web/src/FinishSteps.tsx",
+     "alignment/animation_exports.py",
+     "alignment/pipeline.py"
+    ]
+   },
+   "coverage": "app-equivalent-unverified",
+   "tests": {
+    "existing": [
+     "tests/integration/test_animation_exports.py",
+     "tests/integration/test_pipeline.py"
+    ],
+    "appEvidence": [],
+    "required": "앱 canonical bake atlas와 upstream manifest 필드 대조, 기존 출력 결정성 회귀"
+   },
+   "phase": "M4",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "cmd.curation",
+   "kind": "command",
+   "title": "curation webview·후보 보기·완성 시트 편집",
+   "upstream": {
+    "command": "curation",
+    "since": "local-v2.34",
+    "modules": [
+     "sprite_gen.serve.serve_curation",
+     "sprite_gen.curate.curation"
+    ],
+    "docs": [
+     "curation.md"
+    ],
+    "aliases": [
+     "scripts/curation.py",
+     "scripts/serve_curation.py"
+    ],
+    "retired": []
+   },
+   "app": {
+    "entry": "EditSteps.tsx·Canvas.tsx·CandidateReview.tsx",
+    "api": "PATCH /v1/projects/{pid}/edits, /revisions, /restore-revision",
+    "worker": "services/api/edits.py, alignment/pipeline.py(curate.curation pixel edits/transform)",
+    "storage": "occurrence pixelEdits/transform + revisions",
+    "output": "canonical bake -> 내보내기",
+    "recovery": "revision 이력·복원",
+    "files": [
+     "apps/web/src/EditSteps.tsx",
+     "services/api/edits.py"
+    ]
+   },
+   "coverage": "partial",
+   "tests": {
+    "existing": [
+     "tests/integration/test_api.py",
+     "tests/integration/test_review_invalidation.py"
+    ],
+    "appEvidence": [],
+    "required": "앱 편집 화면이 대체하는 curation 기능 대응표와 미대응 기능(isometric grid 등) 연결 시험"
+   },
+   "phase": "M6",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": "독립 webview를 띄우지 않고 앱 경로로 대응."
+  },
+  {
+   "id": "cmd.compose",
+   "kind": "command",
+   "title": "composition canvas(폴더를 행으로 조립)",
+   "upstream": {
+    "command": "compose",
+    "since": "local-v2.34",
+    "modules": [
+     "sprite_gen.serve.serve_compose"
+    ],
+    "docs": [
+     "curation.md"
+    ],
+    "aliases": [],
+    "retired": []
+   },
+   "app": {
+    "entry": "AssetsStep.tsx 자료 가져오기",
+    "api": "POST /v1/projects/{pid}/assets",
+    "worker": "none",
+    "storage": "assets",
+    "output": "후보 -> 추출",
+    "recovery": "asset 해시",
+    "files": [
+     "apps/web/src/AssetsStep.tsx"
+    ]
+   },
+   "coverage": "partial",
+   "tests": {
+    "existing": [
+     "tests/integration/test_api.py"
+    ],
+    "appEvidence": [],
+    "required": "자료를 행/상태로 조립하는 앱 경로와 저장 시험"
+   },
+   "phase": "M6",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "cmd.preview",
+   "kind": "command",
+   "title": "motion-QA 미리보기",
+   "upstream": {
+    "command": "preview",
+    "since": "local-v2.34",
+    "modules": [
+     "sprite_gen.qa.preview"
+    ],
+    "docs": [
+     "qa-motion.md"
+    ],
+    "aliases": [
+     "scripts/preview_animation.py"
+    ],
+    "retired": []
+   },
+   "app": {
+    "entry": "SpriteViewport.tsx·AnimationWorkspace.tsx 미리보기, WorkflowPanel inspect",
+    "api": "POST jobs operation=inspect/bake",
+    "worker": "alignment/pipeline.py",
+    "storage": "job artifacts",
+    "output": "미리보기·검사 결과",
+    "recovery": "검사만, 원본 불변",
+    "files": [
+     "apps/web/src/SpriteViewport.tsx",
+     "apps/web/src/WorkflowPanel.tsx"
+    ]
+   },
+   "coverage": "app-equivalent-unverified",
+   "tests": {
+    "existing": [
+     "tests/integration/test_pipeline.py"
+    ],
+    "appEvidence": [],
+    "required": "앱 미리보기와 upstream preview 판단 항목 대조 시험"
+   },
+   "phase": "M6",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "cmd.compose-cycle",
+   "kind": "command",
+   "title": "수동 선택 cycle 구성",
+   "upstream": {
+    "command": "compose-cycle",
+    "since": "local-v2.34",
+    "modules": [
+     "sprite_gen.compose.compose_cycle"
+    ],
+    "docs": [
+     "locomotion-curation.md"
+    ],
+    "aliases": [
+     "scripts/compose_selected_cycle.py"
+    ],
+    "retired": []
+   },
+   "app": {
+    "entry": "EditSteps.tsx·Canvas.tsx·CandidateReview.tsx",
+    "api": "PATCH /v1/projects/{pid}/edits, /revisions, /restore-revision",
+    "worker": "services/api/edits.py, alignment/pipeline.py(curate.curation pixel edits/transform)",
+    "storage": "occurrence pixelEdits/transform + revisions",
+    "output": "canonical bake -> 내보내기",
+    "recovery": "revision 이력·복원",
+    "files": [
+     "apps/web/src/EditSteps.tsx",
+     "services/api/edits.py"
+    ]
+   },
+   "coverage": "app-equivalent-unverified",
+   "tests": {
+    "existing": [
+     "tests/integration/test_api.py"
+    ],
+    "appEvidence": [],
+    "required": "동작 occurrence 편집이 수동 cycle 선택과 같은 순서·시간을 저장하는지 시험"
+   },
+   "phase": "M6",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "cmd.compose-gif",
+   "kind": "command",
+   "title": "선택 프레임 -> 투명 GIF",
+   "upstream": {
+    "command": "compose-gif",
+    "since": "local-v2.34",
+    "modules": [
+     "sprite_gen.compose.compose_gif",
+     "sprite_gen.util.gif_utils"
+    ],
+    "docs": [
+     "locomotion-curation.md"
+    ],
+    "aliases": [
+     "scripts/compose_sprite_gif.py"
+    ],
+    "retired": []
+   },
+   "app": {
+    "entry": "FinishSteps.tsx 게임용 파일 출력",
+    "api": "POST /v1/projects/{pid}/exports (formats atlas/pngs/runtime/aseprite)",
+    "worker": "services/worker/main.py export -> alignment/pipeline.py·alignment/animation_exports.py",
+    "storage": "exports 테이블 + artifacts(sha256)",
+    "output": "atlas PNG, runtime JSON, Aseprite JSON, PNG/GIF/WebP, animations ZIP",
+    "recovery": "idempotencyKey, 기존 출력 덮어쓰지 않음",
+    "files": [
+     "apps/web/src/FinishSteps.tsx",
+     "alignment/animation_exports.py",
+     "alignment/pipeline.py"
+    ]
+   },
+   "coverage": "app-equivalent-unverified",
+   "tests": {
+    "existing": [
+     "tests/integration/test_animation_exports.py",
+     "tests/integration/test_video_finish.py"
+    ],
+    "appEvidence": [],
+    "required": "GIF 시간·팔레트·종료 표현 한계 기록과 기존 GIF 마무리 회귀"
+   },
+   "phase": "M4",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "cmd.compose-layers",
+   "kind": "command",
+   "title": "rig run composite stack 굽기",
+   "upstream": {
+    "command": "compose-layers",
+    "since": "local-v2.34",
+    "modules": [
+     "sprite_gen.compose.compose_layers",
+     "sprite_gen.compose.layers"
+    ],
+    "docs": [
+     "layer-tracks.md"
+    ],
+    "aliases": [
+     "scripts/compose_layers.py"
+    ],
+    "retired": []
+   },
+   "app": {
+    "entry": "none",
+    "api": "none",
+    "worker": "none",
+    "storage": "none",
+    "output": "none",
+    "recovery": "none",
+    "files": []
+   },
+   "coverage": "none",
+   "tests": {
+    "existing": [],
+    "appEvidence": [],
+    "required": "layer/rig 자료형·합성 결과를 새 동작으로 저장하는 앱 시험"
+   },
+   "phase": "M6",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "cmd.unpack-atlas",
+   "kind": "command",
+   "title": "완성 atlas -> curator용 run 복원",
+   "upstream": {
+    "command": "unpack-atlas",
+    "since": "local-v2.34",
+    "modules": [
+     "sprite_gen.frames.unpack_atlas"
+    ],
+    "docs": [
+     "sheet-slicing.md"
+    ],
+    "aliases": [
+     "scripts/unpack_atlas_run.py"
+    ],
+    "retired": []
+   },
+   "app": {
+    "entry": "none(스크립트 복구 이력: final-atlas-recovery-v1)",
+    "api": "none",
+    "worker": "none",
+    "storage": "frames.sourceProcessing.kind=atlas-recovery",
+    "output": "none",
+    "recovery": "none",
+    "files": []
+   },
+   "coverage": "partial",
+   "tests": {
+    "existing": [],
+    "appEvidence": [],
+    "required": "완성 atlas 가져오기 -> 셀/동작 등록 앱 경로와 시험"
+   },
+   "phase": "M6",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": "보존 프로젝트 8방향 성직자는 과거 스크립트 복구 결과(final-atlas-recovery-v1)이며 앱 기능이 아님."
+  },
+  {
+   "id": "cmd.export-pngs",
+   "kind": "command",
+   "title": "큐레이션 프레임 -> 이름 있는 PNG",
+   "upstream": {
+    "command": "export-pngs",
+    "since": "local-v2.34",
+    "modules": [
+     "sprite_gen.compose.export_pngs"
+    ],
+    "docs": [
+     "locomotion-curation.md"
+    ],
+    "aliases": [
+     "scripts/export_curated_pngs.py"
+    ],
+    "retired": []
+   },
+   "app": {
+    "entry": "FinishSteps.tsx 게임용 파일 출력",
+    "api": "POST /v1/projects/{pid}/exports (formats atlas/pngs/runtime/aseprite)",
+    "worker": "services/worker/main.py export -> alignment/pipeline.py·alignment/animation_exports.py",
+    "storage": "exports 테이블 + artifacts(sha256)",
+    "output": "atlas PNG, runtime JSON, Aseprite JSON, PNG/GIF/WebP, animations ZIP",
+    "recovery": "idempotencyKey, 기존 출력 덮어쓰지 않음",
+    "files": [
+     "apps/web/src/FinishSteps.tsx",
+     "alignment/animation_exports.py",
+     "alignment/pipeline.py"
+    ]
+   },
+   "coverage": "app-equivalent-unverified",
+   "tests": {
+    "existing": [
+     "tests/integration/test_animation_exports.py"
+    ],
+    "appEvidence": [],
+    "required": "pngs 출력 이름·순서·편집 반영 회귀"
+   },
+   "phase": "M4",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "cmd.export-aseprite",
+   "kind": "command",
+   "title": "Aseprite 호환 JSON(Phaser/Flame)",
+   "upstream": {
+    "command": "export-aseprite",
+    "since": "local-v2.34",
+    "modules": [
+     "sprite_gen.compose.export_aseprite"
+    ],
+    "docs": [
+     "engine-export.md"
+    ],
+    "aliases": [
+     "scripts/export_aseprite.py"
+    ],
+    "retired": []
+   },
+   "app": {
+    "entry": "FinishSteps.tsx 게임용 파일 출력",
+    "api": "POST /v1/projects/{pid}/exports (formats atlas/pngs/runtime/aseprite)",
+    "worker": "services/worker/main.py export -> alignment/pipeline.py·alignment/animation_exports.py",
+    "storage": "exports 테이블 + artifacts(sha256)",
+    "output": "atlas PNG, runtime JSON, Aseprite JSON, PNG/GIF/WebP, animations ZIP",
+    "recovery": "idempotencyKey, 기존 출력 덮어쓰지 않음",
+    "files": [
+     "apps/web/src/FinishSteps.tsx",
+     "alignment/animation_exports.py",
+     "alignment/pipeline.py"
+    ]
+   },
+   "coverage": "app-equivalent-unverified",
+   "tests": {
+    "existing": [
+     "tests/integration/test_animation_exports.py",
+     "tests/integration/test_animation_artifact_verifier.py"
+    ],
+    "appEvidence": [],
+    "required": "Phaser/Flame loader 필드와 앱 aseprite 출력 대조, 프레임 태그·시간 일치"
+   },
+   "phase": "M4",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "cmd.migrate-breathe",
+   "kind": "command",
+   "title": "구 breathe sidecar -> envelope schema",
+   "upstream": {
+    "command": "migrate-breathe",
+    "since": "local-v2.34",
+    "modules": [
+     "sprite_gen.spec.migrate_breathe"
+    ],
+    "docs": [
+     "breathing.md"
+    ],
+    "aliases": [],
+    "retired": []
+   },
+   "app": {
+    "entry": "none",
+    "api": "none",
+    "worker": "none",
+    "storage": "none",
+    "output": "none",
+    "recovery": "none",
+    "files": []
+   },
+   "coverage": "none",
+   "tests": {
+    "existing": [],
+    "appEvidence": [],
+    "required": "호흡 자료형 도입 시 구 형식 거절/이전 경로를 앱 가져오기 경계에서 시험"
+   },
+   "phase": "M6",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": "앱에는 upstream run-dir sidecar가 없음. 가져오기 시에만 의미."
+  },
+  {
+   "id": "cmd.migrate-request",
+   "kind": "command",
+   "title": "구 sprite-request fit 키 이전",
+   "upstream": {
+    "command": "migrate-request",
+    "since": "local-v2.34",
+    "modules": [
+     "sprite_gen.spec.migrate_request"
+    ],
+    "docs": [
+     "run-contract.md",
+     "pixel-unfake.md"
+    ],
+    "aliases": [],
+    "retired": []
+   },
+   "app": {
+    "entry": "none",
+    "api": "none",
+    "worker": "none",
+    "storage": "none",
+    "output": "none",
+    "recovery": "none",
+    "files": []
+   },
+   "coverage": "none",
+   "tests": {
+    "existing": [],
+    "appEvidence": [],
+    "required": "upstream run 가져오기 시 구 요청 키 정규화 시험"
+   },
+   "phase": "M6",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": "앱 요청 스키마는 별도. run 가져오기 경계에서만 의미."
+  },
+  {
+   "id": "cmd.slice-sheet",
+   "kind": "command",
+   "title": "다인 grid 시트 -> 셀별 컷(contain·공통 배율·추출 manifest)",
+   "upstream": {
+    "command": "slice-sheet",
+    "since": "local-v2.34",
+    "modules": [
+     "sprite_gen.frames.slice_sheet",
+     "sprite_gen.frames.alpha_floor"
+    ],
+    "docs": [
+     "sheet-slicing.md"
+    ],
+    "aliases": [
+     "scripts/slice_sheet_cells.py"
+    ],
+    "retired": []
+   },
+   "app": {
+    "entry": "ExtractStep.tsx",
+    "api": "POST /v1/projects/{pid}/jobs operation=extract/cutout",
+    "worker": "services/worker/task.py -> alignment/pipeline.py(frames.extract/frames.cutout)",
+    "storage": "frames(raw-v1) + derived assets",
+    "output": "정렬 후 내보내기",
+    "recovery": "작업 재시도, 원본 asset 보존",
+    "files": [
+     "apps/web/src/ExtractStep.tsx",
+     "alignment/pipeline.py"
+    ]
+   },
+   "coverage": "partial",
+   "tests": {
+    "existing": [
+     "tests/integration/test_pipeline.py"
+    ],
+    "appEvidence": [],
+    "required": "원본 좌표·체형 비율 보존, 행별 anchor/배율 수정 앱 시험"
+   },
+   "phase": "M5",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "cmd.ui-kit",
+   "kind": "command",
+   "title": "UI kit 시트 -> nine-slice 요소(inset/padding/fill)",
+   "upstream": {
+    "command": "ui-kit",
+    "since": "new-after-v2.34",
+    "modules": [
+     "sprite_gen.frames.ui_kit",
+     "sprite_gen.frames.alpha_floor"
+    ],
+    "docs": [
+     "ui-kit.md"
+    ],
+    "aliases": [],
+    "retired": []
+   },
+   "app": {
+    "entry": "none",
+    "api": "none",
+    "worker": "none",
+    "storage": "none",
+    "output": "none",
+    "recovery": "none",
+    "files": []
+   },
+   "coverage": "none",
+   "tests": {
+    "existing": [],
+    "appEvidence": [],
+    "required": "UI kit 자료형·가져오기·미리보기·출력·누락/모호 배치 거절 시험"
+   },
+   "phase": "M5",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": "캐릭터 동작으로 위장 저장 금지."
+  },
+  {
+   "id": "cmd.cutout",
+   "kind": "command",
+   "title": "단색 배경 제거 -> 투명 PNG",
+   "upstream": {
+    "command": "cutout",
+    "since": "local-v2.34",
+    "modules": [
+     "sprite_gen.frames.cutout"
+    ],
+    "docs": [
+     "sheet-slicing.md",
+     "chroma-alpha.md"
+    ],
+    "aliases": [],
+    "retired": []
+   },
+   "app": {
+    "entry": "ExtractStep.tsx",
+    "api": "POST /v1/projects/{pid}/jobs operation=extract/cutout",
+    "worker": "services/worker/task.py -> alignment/pipeline.py(frames.extract/frames.cutout)",
+    "storage": "frames(raw-v1) + derived assets",
+    "output": "정렬 후 내보내기",
+    "recovery": "작업 재시도, 원본 asset 보존",
+    "files": [
+     "apps/web/src/ExtractStep.tsx",
+     "alignment/pipeline.py"
+    ]
+   },
+   "coverage": "app-equivalent-unverified",
+   "tests": {
+    "existing": [
+     "tests/integration/test_pipeline.py"
+    ],
+    "appEvidence": [],
+    "required": "v2.45.3 cutout/alpha haze 변경의 앱 cutout 회귀(cyan 키 로컬 패치 보존)"
+   },
+   "phase": "M5",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "cmd.logo",
+   "kind": "command",
+   "title": "typography logo(mood -> lettering -> matte, 문자 검사)",
+   "upstream": {
+    "command": "logo",
+    "since": "new-after-v2.34",
+    "modules": [
+     "sprite_gen.gen.logo",
+     "sprite_gen.frames.logo_matte"
+    ],
+    "docs": [
+     "logo.md"
+    ],
+    "aliases": [],
+    "retired": []
+   },
+   "app": {
+    "entry": "none",
+    "api": "none",
+    "worker": "none",
+    "storage": "none",
+    "output": "none",
+    "recovery": "none",
+    "files": []
+   },
+   "coverage": "none",
+   "tests": {
+    "existing": [],
+    "appEvidence": [],
+    "required": "원본·파생·문자 검사 결과 보존, 호출 상한 표시, 자동 재생성 없음 시험"
+   },
+   "phase": "M5",
+   "status": "구현 예정",
+   "constraints": [
+    "이미지 2회+문자 검사 2회 provider 호출",
+    "provider 인증·과금"
+   ],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "cmd.pixel-draw",
+   "kind": "command",
+   "title": "Claude 픽셀 grid 그리기(8~48px, 최대 64프레임, resume)",
+   "upstream": {
+    "command": "pixel-draw",
+    "since": "new-after-v2.34",
+    "modules": [
+     "sprite_gen.gen.pixel_draw",
+     "sprite_gen.gen.pixel_grid",
+     "sprite_gen.gen.pixel_gates",
+     "sprite_gen.gen.anthropic_api",
+     "sprite_gen.gen.claude_login"
+    ],
+    "docs": [
+     "pixel-draw.md"
+    ],
+    "aliases": [],
+    "retired": []
+   },
+   "app": {
+    "entry": "none",
+    "api": "none",
+    "worker": "none",
+    "storage": "none",
+    "output": "none",
+    "recovery": "none",
+    "files": []
+   },
+   "coverage": "none",
+   "tests": {
+    "existing": [],
+    "appEvidence": [],
+    "required": "grid.txt·palette·원문 응답·후보 보존, 호출 상한 사전 표시, Batch resume 새 제출 없음 시험"
+   },
+   "phase": "M5",
+   "status": "구현 예정",
+   "constraints": [
+    "실험 기능",
+    "Claude 구독 또는 ANTHROPIC_API_KEY 과금"
+   ],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "flag.pixel-draw-effect",
+   "kind": "flag-feature",
+   "title": "pixel-draw --kind effect(lifetime 효과)",
+   "upstream": {
+    "since": null,
+    "modules": [
+     "sprite_gen.gen.pixel_draw",
+     "sprite_gen.video.effect"
+    ],
+    "docs": [
+     "effects.md",
+     "pixel-draw.md"
+    ],
+    "aliases": [],
+    "retired": []
+   },
+   "app": {
+    "entry": "none",
+    "api": "none",
+    "worker": "none",
+    "storage": "none",
+    "output": "none",
+    "recovery": "none",
+    "files": []
+   },
+   "coverage": "none",
+   "tests": {
+    "existing": [],
+    "appEvidence": [],
+    "required": "효과 자료형 저장·lifetime 재생 의미와 함께 시험(M4 lifetime 계약 선행)"
+   },
+   "phase": "M5",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "cur.sequence-pool",
+   "kind": "doc-feature",
+   "title": "재생 순서 행·후보 풀(selected/order, 여러 take에서 끌어오기)",
+   "upstream": {
+    "since": null,
+    "modules": [
+     "sprite_gen.serve.serve_curation",
+     "sprite_gen.curate.curation"
+    ],
+    "docs": [
+     "curation.md"
+    ],
+    "aliases": [],
+    "retired": []
+   },
+   "app": {
+    "entry": "EditSteps.tsx·Canvas.tsx·AnimationWorkspace.tsx",
+    "api": "PATCH /v1/projects/{pid}/edits",
+    "worker": "services/api/edits.py",
+    "storage": "clip.occurrences(order/durationMs/transform/pixelEdits) + revisions",
+    "output": "canonical bake -> 내보내기",
+    "recovery": "revision 이력·restore-revision",
+    "files": [
+     "apps/web/src/EditSteps.tsx",
+     "services/api/edits.py",
+     "alignment/pipeline.py"
+    ]
+   },
+   "coverage": "partial",
+   "tests": {
+    "existing": [
+     "tests/integration/test_api.py",
+     "tests/integration/test_review_invalidation.py"
+    ],
+    "appEvidence": [],
+    "required": "후보 풀에서 순서 행으로 옮기기·재배열 저장과 재열기 복원 시험"
+   },
+   "phase": "M6",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "cur.transform",
+   "kind": "doc-feature",
+   "title": "비파괴 프레임 변형(이동·배율·회전·shear·좌우 반전, preview=bake 동일 행렬)",
+   "upstream": {
+    "since": null,
+    "modules": [
+     "sprite_gen.serve.serve_curation",
+     "sprite_gen.curate.curation"
+    ],
+    "docs": [
+     "curation.md"
+    ],
+    "aliases": [],
+    "retired": []
+   },
+   "app": {
+    "entry": "EditSteps.tsx·Canvas.tsx·AnimationWorkspace.tsx",
+    "api": "PATCH /v1/projects/{pid}/edits",
+    "worker": "services/api/edits.py",
+    "storage": "clip.occurrences(order/durationMs/transform/pixelEdits) + revisions",
+    "output": "canonical bake -> 내보내기",
+    "recovery": "revision 이력·restore-revision",
+    "files": [
+     "apps/web/src/EditSteps.tsx",
+     "services/api/edits.py",
+     "alignment/pipeline.py"
+    ]
+   },
+   "coverage": "partial",
+   "tests": {
+    "existing": [
+     "tests/integration/test_pipeline.py",
+     "tests/integration/test_api.py"
+    ],
+    "appEvidence": [],
+    "required": "미리보기와 bake 행렬 일치·원본 PNG 불변 시험"
+   },
+   "phase": "M6",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "cur.pixel-edit",
+   "kind": "doc-feature",
+   "title": "픽셀 편집(pixels·marquee·eyedropper·palette)",
+   "upstream": {
+    "since": null,
+    "modules": [
+     "sprite_gen.serve.serve_curation",
+     "sprite_gen.curate.curation"
+    ],
+    "docs": [
+     "curation.md"
+    ],
+    "aliases": [],
+    "retired": []
+   },
+   "app": {
+    "entry": "EditSteps.tsx·Canvas.tsx·AnimationWorkspace.tsx",
+    "api": "PATCH /v1/projects/{pid}/edits",
+    "worker": "services/api/edits.py",
+    "storage": "clip.occurrences(order/durationMs/transform/pixelEdits) + revisions",
+    "output": "canonical bake -> 내보내기",
+    "recovery": "revision 이력·restore-revision",
+    "files": [
+     "apps/web/src/EditSteps.tsx",
+     "services/api/edits.py",
+     "alignment/pipeline.py"
+    ]
+   },
+   "coverage": "partial",
+   "tests": {
+    "existing": [
+     "tests/integration/test_pipeline.py"
+    ],
+    "appEvidence": [],
+    "required": "nearest 편집·원본 보존·bake 반영 시험"
+   },
+   "phase": "M6",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "cur.clone",
+   "kind": "doc-feature",
+   "title": "프레임 복제 인스턴스(clones: 별도 변형/픽셀/순서 슬롯)",
+   "upstream": {
+    "since": null,
+    "modules": [
+     "sprite_gen.serve.serve_curation",
+     "sprite_gen.curate.curation"
+    ],
+    "docs": [
+     "curation.md"
+    ],
+    "aliases": [],
+    "retired": []
+   },
+   "app": {
+    "entry": "EditSteps.tsx·Canvas.tsx·AnimationWorkspace.tsx",
+    "api": "PATCH /v1/projects/{pid}/edits",
+    "worker": "services/api/edits.py",
+    "storage": "clip.occurrences(order/durationMs/transform/pixelEdits) + revisions",
+    "output": "canonical bake -> 내보내기",
+    "recovery": "revision 이력·restore-revision",
+    "files": [
+     "apps/web/src/EditSteps.tsx",
+     "services/api/edits.py",
+     "alignment/pipeline.py"
+    ]
+   },
+   "coverage": "partial",
+   "tests": {
+    "existing": [
+     "tests/integration/test_api.py"
+    ],
+    "appEvidence": [],
+    "required": "같은 프레임 재사용 occurrence가 독립 변형·픽셀 편집을 갖는지 시험"
+   },
+   "phase": "M6",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "cur.row-fps-preview",
+   "kind": "doc-feature",
+   "title": "행 fps·실시간 미리보기(재생/일시정지·한 장씩·0.25~4배속)",
+   "upstream": {
+    "since": null,
+    "modules": [
+     "sprite_gen.serve.serve_curation",
+     "sprite_gen.curate.curation"
+    ],
+    "docs": [
+     "curation.md"
+    ],
+    "aliases": [],
+    "retired": []
+   },
+   "app": {
+    "entry": "SpriteViewport.tsx·AnimationWorkspace.tsx 미리보기, WorkflowPanel inspect",
+    "api": "POST jobs operation=inspect/bake",
+    "worker": "alignment/pipeline.py",
+    "storage": "job artifacts",
+    "output": "미리보기·검사 결과",
+    "recovery": "검사만, 원본 불변",
+    "files": [
+     "apps/web/src/SpriteViewport.tsx",
+     "apps/web/src/WorkflowPanel.tsx"
+    ]
+   },
+   "coverage": "partial",
+   "tests": {
+    "existing": [
+     "tests/integration/test_animation_exports.py"
+    ],
+    "appEvidence": [],
+    "required": "occurrence별 시간과 행 fps 의미 대응, 미리보기 속도 조절 시험"
+   },
+   "phase": "M6",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "cur.anchor-pin",
+   "kind": "doc-feature",
+   "title": "anchor 고정(anchors: 기준 프레임 지정)",
+   "upstream": {
+    "since": null,
+    "modules": [
+     "sprite_gen.serve.serve_curation",
+     "sprite_gen.curate.curation",
+     "sprite_gen.curate.anchor"
+    ],
+    "docs": [
+     "curation.md",
+     "directional-anchor-workflow.md"
+    ],
+    "aliases": [],
+    "retired": []
+   },
+   "app": {
+    "entry": "AnimationWorkspace.tsx 정렬",
+    "api": "POST jobs operation=align",
+    "worker": "alignment/pipeline.py",
+    "storage": "alignments(frameVersionId->anchor)",
+    "output": "내보내기 anchor",
+    "recovery": "STALE_ALIGNMENT 검사",
+    "files": [
+     "alignment/pipeline.py"
+    ]
+   },
+   "coverage": "partial",
+   "tests": {
+    "existing": [
+     "tests/integration/test_pipeline.py"
+    ],
+    "appEvidence": [],
+    "required": "기준 프레임 고정과 앱 정렬 anchor 대응 시험"
+   },
+   "phase": "M6",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "cur.variant-pick",
+   "kind": "doc-feature",
+   "title": "colourway 비교·채택(recolor.picked, blink 비교)",
+   "upstream": {
+    "since": null,
+    "modules": [
+     "sprite_gen.serve.serve_curation",
+     "sprite_gen.curate.curation",
+     "sprite_gen.effects.recolor"
+    ],
+    "docs": [
+     "curation.md",
+     "recolor.md"
+    ],
+    "aliases": [],
+    "retired": []
+   },
+   "app": {
+    "entry": "none",
+    "api": "none",
+    "worker": "none",
+    "storage": "none",
+    "output": "none",
+    "recovery": "none",
+    "files": []
+   },
+   "coverage": "none",
+   "tests": {
+    "existing": [],
+    "appEvidence": [],
+    "required": "변형 비교 화면·채택 결과를 원본과 별도 자료로 저장하는 시험"
+   },
+   "phase": "M6",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "cur.plain-twin",
+   "kind": "doc-feature",
+   "title": "원본 화질 토글·.plain.png twin(pixel_unfake canonical/plain)",
+   "upstream": {
+    "since": null,
+    "modules": [
+     "sprite_gen.serve.serve_curation",
+     "sprite_gen.curate.curation"
+    ],
+    "docs": [
+     "curation.md",
+     "pixel-unfake.md",
+     "architecture.md"
+    ],
+    "aliases": [],
+    "retired": []
+   },
+   "app": {
+    "entry": "none",
+    "api": "none",
+    "worker": "none",
+    "storage": "none",
+    "output": "none",
+    "recovery": "none",
+    "files": []
+   },
+   "coverage": "none",
+   "tests": {
+    "existing": [],
+    "appEvidence": [],
+    "required": "pixel-unfake 결과와 plain twin을 함께 보존·전환 표시 시험"
+   },
+   "phase": "M6",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "cur.base-edit",
+   "kind": "doc-feature",
+   "title": "기준(base) 그림 편집(같은 zoom 편집기, save-to-base, .orig 백업)",
+   "upstream": {
+    "since": null,
+    "modules": [
+     "sprite_gen.serve.serve_curation",
+     "sprite_gen.curate.curation"
+    ],
+    "docs": [
+     "curation.md"
+    ],
+    "aliases": [],
+    "retired": []
+   },
+   "app": {
+    "entry": "ReferenceStep.tsx 기준 그림",
+    "api": "POST /v1/projects/{pid}/reference-revisions",
+    "worker": "none",
+    "storage": "references revision(새 revision, 원본 보존)",
+    "output": "이후 생성 참조",
+    "recovery": "revision 이력",
+    "files": [
+     "apps/web/src/ReferenceStep.tsx"
+    ]
+   },
+   "coverage": "partial",
+   "tests": {
+    "existing": [
+     "tests/integration/test_api.py"
+    ],
+    "appEvidence": [],
+    "required": "기준 편집이 새 revision으로 저장되고 기존 추출 프레임은 바뀌지 않음 시험"
+   },
+   "phase": "M6",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "cur.standalone-view",
+   "kind": "doc-feature",
+   "title": "standalone 후보 보기(스프라이트가 아닌 이미지 후보 고르기)",
+   "upstream": {
+    "since": null,
+    "modules": [
+     "sprite_gen.serve.serve_curation",
+     "sprite_gen.curate.curation",
+     "sprite_gen.frames.unpack_atlas"
+    ],
+    "docs": [
+     "curation.md"
+    ],
+    "aliases": [],
+    "retired": []
+   },
+   "app": {
+    "entry": "CandidateLibrary.tsx",
+    "api": "GET /v1/projects/{pid}",
+    "worker": "none",
+    "storage": "assets 후보",
+    "output": "none",
+    "recovery": "asset 해시",
+    "files": [
+     "apps/web/src/CandidateLibrary.tsx"
+    ]
+   },
+   "coverage": "partial",
+   "tests": {
+    "existing": [
+     "tests/integration/test_api.py"
+    ],
+    "appEvidence": [],
+    "required": "아이콘·로고 등 일반 이미지 후보 비교·선택 저장 시험"
+   },
+   "phase": "M6",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "cur.ground-grid",
+   "kind": "doc-feature",
+   "title": "isometric 지면 격자·다국어 webview 표시",
+   "upstream": {
+    "since": null,
+    "modules": [
+     "sprite_gen.serve.serve_curation",
+     "sprite_gen.curate.curation"
+    ],
+    "docs": [
+     "curation.md"
+    ],
+    "aliases": [],
+    "retired": []
+   },
+   "app": {
+    "entry": "none",
+    "api": "none",
+    "worker": "none",
+    "storage": "none",
+    "output": "none",
+    "recovery": "none",
+    "files": []
+   },
+   "coverage": "none",
+   "tests": {
+    "existing": [],
+    "appEvidence": [],
+    "required": "편집 화면 지면 격자 표시 시험"
+   },
+   "phase": "M6",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": "다국어(Languages)는 앱 UI 언어 정책과 함께 결정 필요; 항목을 닫지 않음."
+  },
+  {
+   "id": "cmd.video",
+   "kind": "command",
+   "title": "still -> MP4(Grok Imagine, last-frame pin, references)",
+   "upstream": {
+    "command": "video",
+    "since": "local-v2.34",
+    "modules": [
+     "sprite_gen.gen.video",
+     "sprite_gen.gen.xai"
+    ],
+    "docs": [
+     "video.md",
+     "prompt-assembly.md"
+    ],
+    "aliases": [
+     "scripts/generate_sprite_video.py"
+    ],
+    "retired": []
+   },
+   "app": {
+    "entry": "VideoStep.tsx·ProductionWorkflow.tsx 영상 만들기",
+    "api": "POST /v1/projects/{pid}/jobs operation=generate_video, /v1/jobs/{jid}/retry",
+    "worker": "services/worker/video_task.py -> adapters/spritegen/video_provider.py",
+    "storage": "videos 원본 MP4 + 작업 checkpoint·영수증 + 새 동작/프레임/시간",
+    "output": "동작 미리보기 GIF/WebP, 내보내기",
+    "recovery": "POST 1회 보호, 같은 요청 ID GET 재개(checkpoint)",
+    "files": [
+     "apps/web/src/VideoStep.tsx",
+     "services/worker/video_task.py",
+     "adapters/spritegen/video_provider.py"
+    ]
+   },
+   "coverage": "partial",
+   "tests": {
+    "existing": [
+     "tests/integration/test_video_jobs.py",
+     "tests/integration/test_worker_recovery.py",
+     "tests/integration/test_video_streams.py"
+    ],
+    "appEvidence": [],
+    "required": "실제 앱 transport 경로에서 POST 수·동일 ID 재개·저장 전용 재시도 시험(잘린 body·read timeout·잘못된 MP4 로컬 서버)"
+   },
+   "phase": "M1",
+   "status": "구현 예정",
+   "constraints": [
+    "Grok 로그인 또는 XAI_API_KEY",
+    "references/종료 그림 입력은 M6"
+   ],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "video.transport-recovery",
+   "kind": "flag-feature",
+   "title": "같은 요청 poll·다운로드 재시도·전체 제한 시간",
+   "upstream": {
+    "since": null,
+    "modules": [
+     "sprite_gen.gen.video",
+     "sprite_gen.gen.retry",
+     "sprite_gen.gen.xai"
+    ],
+    "docs": [
+     "video.md"
+    ],
+    "aliases": [],
+    "retired": []
+   },
+   "app": {
+    "entry": "VideoStep.tsx·ProductionWorkflow.tsx 영상 만들기",
+    "api": "POST /v1/projects/{pid}/jobs operation=generate_video, /v1/jobs/{jid}/retry",
+    "worker": "services/worker/video_task.py -> adapters/spritegen/video_provider.py",
+    "storage": "videos 원본 MP4 + 작업 checkpoint·영수증 + 새 동작/프레임/시간",
+    "output": "동작 미리보기 GIF/WebP, 내보내기",
+    "recovery": "POST 1회 보호, 같은 요청 ID GET 재개(checkpoint)",
+    "files": [
+     "apps/web/src/VideoStep.tsx",
+     "services/worker/video_task.py",
+     "adapters/spritegen/video_provider.py"
+    ]
+   },
+   "coverage": "partial",
+   "tests": {
+    "existing": [
+     "tests/integration/test_video_jobs.py",
+     "tests/integration/test_worker_recovery.py"
+    ],
+    "appEvidence": [],
+    "required": "429/5xx/연결 실패/비JSON/401·403/ID 없음 시나리오별 POST<=1·재개 시험"
+   },
+   "phase": "M1",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": "guarded()의 GET 오류 분류와 중단/재개 경계 조정 포함."
+  },
+  {
+   "id": "cmd.video-resume",
+   "kind": "command",
+   "title": "미완료 요청을 request_id로 다시 조회(새 POST 없음)",
+   "upstream": {
+    "command": "video-resume",
+    "since": "new-after-v2.34",
+    "modules": [
+     "sprite_gen.gen.video"
+    ],
+    "docs": [
+     "video.md"
+    ],
+    "aliases": [],
+    "retired": []
+   },
+   "app": {
+    "entry": "VideoStep.tsx·ProductionWorkflow.tsx 영상 만들기",
+    "api": "POST /v1/projects/{pid}/jobs operation=generate_video, /v1/jobs/{jid}/retry",
+    "worker": "services/worker/video_task.py -> adapters/spritegen/video_provider.py",
+    "storage": "videos 원본 MP4 + 작업 checkpoint·영수증 + 새 동작/프레임/시간",
+    "output": "동작 미리보기 GIF/WebP, 내보내기",
+    "recovery": "POST 1회 보호, 같은 요청 ID GET 재개(checkpoint)",
+    "files": [
+     "apps/web/src/VideoStep.tsx",
+     "services/worker/video_task.py",
+     "adapters/spritegen/video_provider.py"
+    ]
+   },
+   "coverage": "partial",
+   "tests": {
+    "existing": [
+     "tests/integration/test_worker_recovery.py"
+    ],
+    "appEvidence": [],
+    "required": "작업 센터의 기존 요청 이어받기와 저장 단계별 복구 안내 시험"
+   },
+   "phase": "M1",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "cmd.video-extend",
+   "kind": "command",
+   "title": "기존 클립 N초 연장",
+   "upstream": {
+    "command": "video-extend",
+    "since": "local-v2.34",
+    "modules": [
+     "sprite_gen.gen.video"
+    ],
+    "docs": [
+     "video.md"
+    ],
+    "aliases": [],
+    "retired": []
+   },
+   "app": {
+    "entry": "none",
+    "api": "none",
+    "worker": "none",
+    "storage": "none",
+    "output": "none",
+    "recovery": "none",
+    "files": []
+   },
+   "coverage": "none",
+   "tests": {
+    "existing": [],
+    "appEvidence": [],
+    "required": "원본·파생·접수 ID·복구 분리, M1 계약 준수 시험"
+   },
+   "phase": "M6",
+   "status": "구현 예정",
+   "constraints": [
+    "Grok 인증·과금"
+   ],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "cmd.video-edit",
+   "kind": "command",
+   "title": "기존 클립(<=8.7s) 프롬프트 편집",
+   "upstream": {
+    "command": "video-edit",
+    "since": "local-v2.34",
+    "modules": [
+     "sprite_gen.gen.video"
+    ],
+    "docs": [
+     "video.md"
+    ],
+    "aliases": [],
+    "retired": []
+   },
+   "app": {
+    "entry": "none",
+    "api": "none",
+    "worker": "none",
+    "storage": "none",
+    "output": "none",
+    "recovery": "none",
+    "files": []
+   },
+   "coverage": "none",
+   "tests": {
+    "existing": [],
+    "appEvidence": [],
+    "required": "원본·파생·접수 ID·복구 분리 시험"
+   },
+   "phase": "M6",
+   "status": "구현 예정",
+   "constraints": [
+    "Grok 인증·과금"
+   ],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "cmd.video-prompt",
+   "kind": "command",
+   "title": "외부 영상 도구용 clip prompt 출력(prompt helper)",
+   "upstream": {
+    "command": "video-prompt",
+    "since": "local-v2.34",
+    "modules": [
+     "sprite_gen.video.clip_prompt",
+     "sprite_gen.gen.prompt_parts",
+     "sprite_gen.gen.handedness",
+     "sprite_gen.video.body_plan"
+    ],
+    "docs": [
+     "video-pipeline.md",
+     "prompt-assembly.md"
+    ],
+    "aliases": [],
+    "retired": []
+   },
+   "app": {
+    "entry": "VideoStep.tsx·VideoBasePreset.tsx",
+    "api": "none(생성 요청 내부)",
+    "worker": "adapters/spritegen/video_prompt.py",
+    "storage": "generation requestSnapshot",
+    "output": "none",
+    "recovery": "none",
+    "files": [
+     "adapters/spritegen/video_prompt.py"
+    ]
+   },
+   "coverage": "partial",
+   "tests": {
+    "existing": [
+     "tests/integration/test_video_prompt.py"
+    ],
+    "appEvidence": [],
+    "required": "외부 제작용 명세 전달과 외부 영상 가져오기·출처 기록 시험"
+   },
+   "phase": "M6",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "cmd.video-canvas",
+   "kind": "command",
+   "title": "상태별 canvas 패딩",
+   "upstream": {
+    "command": "video-canvas",
+    "since": "local-v2.34",
+    "modules": [
+     "sprite_gen.video.canvas"
+    ],
+    "docs": [
+     "video-pipeline.md"
+    ],
+    "aliases": [
+     "scripts/video_canvas.py"
+    ],
+    "retired": []
+   },
+   "app": {
+    "entry": "VideoStep.tsx·ProductionWorkflow.tsx 영상 만들기",
+    "api": "POST /v1/projects/{pid}/jobs operation=generate_video, /v1/jobs/{jid}/retry",
+    "worker": "services/worker/video_task.py -> adapters/spritegen/video_provider.py",
+    "storage": "videos 원본 MP4 + 작업 checkpoint·영수증 + 새 동작/프레임/시간",
+    "output": "동작 미리보기 GIF/WebP, 내보내기",
+    "recovery": "POST 1회 보호, 같은 요청 ID GET 재개(checkpoint)",
+    "files": [
+     "apps/web/src/VideoStep.tsx",
+     "services/worker/video_task.py",
+     "adapters/spritegen/video_provider.py"
+    ]
+   },
+   "coverage": "app-equivalent-unverified",
+   "tests": {
+    "existing": [
+     "tests/integration/test_video_processing.py"
+    ],
+    "appEvidence": [],
+    "required": "v2.45.3 canvas 차이 회귀(같은 기준 그림)"
+   },
+   "phase": "M2",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "cmd.video-frames",
+   "kind": "command",
+   "title": "클립 프레임 추출·키 제거(edge-contact 검사)",
+   "upstream": {
+    "command": "video-frames",
+    "since": "local-v2.34",
+    "modules": [
+     "sprite_gen.video.frames",
+     "sprite_gen.frames.decontam"
+    ],
+    "docs": [
+     "video-pipeline.md",
+     "chroma-alpha.md"
+    ],
+    "aliases": [
+     "scripts/video_frames.py"
+    ],
+    "retired": []
+   },
+   "app": {
+    "entry": "VideoStep.tsx 기존 영상 재처리",
+    "api": "POST /v1/projects/{pid}/jobs operation=process_video",
+    "worker": "services/worker/video_task.py -> adapters/spritegen/video_processing.py:process_clip",
+    "storage": "derived assets(raw/keyed/normalized/finished) + frames.sourceProcessing + clip occurrences(durationMs) + job.result.processing(version/options)",
+    "output": "final-preview GIF/WebP, 내보내기 atlas/pngs/runtime/aseprite",
+    "recovery": "extraction cache(complete.json), 실패 시 원본·기존 동작 보존",
+    "files": [
+     "apps/web/src/VideoStep.tsx",
+     "adapters/spritegen/video_processing.py",
+     "services/worker/video_task.py"
+    ]
+   },
+   "coverage": "app-equivalent-unverified",
+   "tests": {
+    "existing": [
+     "tests/integration/test_video_processing.py",
+     "tests/integration/test_video_quality_upgrade.py"
+    ],
+    "appEvidence": [],
+    "required": "같은 MP4의 keyed 픽셀 회귀(baseline replay) 후 신규 정책 비교"
+   },
+   "phase": "M2",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "flag.video-frames-brightness",
+   "kind": "flag-feature",
+   "title": "video-frames --alpha-mode brightness(가산 효과 알파)",
+   "upstream": {
+    "since": null,
+    "modules": [
+     "sprite_gen.video.frames",
+     "sprite_gen.video.effect"
+    ],
+    "docs": [
+     "effects.md"
+    ],
+    "aliases": [],
+    "retired": []
+   },
+   "app": {
+    "entry": "none",
+    "api": "none",
+    "worker": "none",
+    "storage": "none",
+    "output": "none",
+    "recovery": "none",
+    "files": []
+   },
+   "coverage": "none",
+   "tests": {
+    "existing": [],
+    "appEvidence": [],
+    "required": "효과 영상 알파 처리 자료형·출력 시험"
+   },
+   "phase": "M6",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "cmd.video-loop",
+   "kind": "command",
+   "title": "keyed 프레임 -> 진짜 주기 한 cycle(strip/GIF/WebP)",
+   "upstream": {
+    "command": "video-loop",
+    "since": "local-v2.34",
+    "modules": [
+     "sprite_gen.video.loop",
+     "sprite_gen.video.period",
+     "sprite_gen.video.held",
+     "sprite_gen.video.legs",
+     "sprite_gen.video.body_plan",
+     "sprite_gen.video.local_cycle",
+     "sprite_gen.video.auto_motion",
+     "sprite_gen.video.gait_fallback",
+     "sprite_gen.video.motion_anchor",
+     "sprite_gen.video.crossings",
+     "sprite_gen.video.evidence",
+     "sprite_gen.video.play",
+     "sprite_gen.util.resample"
+    ],
+    "docs": [
+     "video-pipeline.md",
+     "loop-review.md"
+    ],
+    "aliases": [
+     "scripts/video_loop.py",
+     "scripts/diagnose_video_loop.py"
+    ],
+    "retired": []
+   },
+   "app": {
+    "entry": "VideoStep.tsx 기존 영상 재처리",
+    "api": "POST /v1/projects/{pid}/jobs operation=process_video",
+    "worker": "services/worker/video_task.py -> adapters/spritegen/video_processing.py:process_clip",
+    "storage": "derived assets(raw/keyed/normalized/finished) + frames.sourceProcessing + clip occurrences(durationMs) + job.result.processing(version/options)",
+    "output": "final-preview GIF/WebP, 내보내기 atlas/pngs/runtime/aseprite",
+    "recovery": "extraction cache(complete.json), 실패 시 원본·기존 동작 보존",
+    "files": [
+     "apps/web/src/VideoStep.tsx",
+     "adapters/spritegen/video_processing.py",
+     "services/worker/video_task.py"
+    ]
+   },
+   "coverage": "partial",
+   "tests": {
+    "existing": [
+     "tests/integration/test_video_processing.py",
+     "tests/integration/test_video_quality_upgrade.py",
+     "tests/integration/test_frame_selection.py",
+     "tests/integration/test_video_normalization.py",
+     "tests/integration/test_video_finish.py"
+    ],
+    "appEvidence": [],
+    "required": "_select->_gait_fallback->_repair_selection->_align_selected_cycle->정규화->GIF->worker 저장 경로에서 현행/신규 비교"
+   },
+   "phase": "M2",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "flag.video-loop-two-step",
+   "kind": "flag-feature",
+   "title": "두 걸음 주기·반걸음·누락 발 교차·장비 독립 주기·lead-in",
+   "upstream": {
+    "since": null,
+    "modules": [
+     "sprite_gen.video.loop",
+     "sprite_gen.video.crossings",
+     "sprite_gen.video.legs",
+     "sprite_gen.video.gait_fallback"
+    ],
+    "docs": [
+     "video-pipeline.md",
+     "loop-review.md"
+    ],
+    "aliases": [],
+    "retired": []
+   },
+   "app": {
+    "entry": "none",
+    "api": "none",
+    "worker": "none",
+    "storage": "none",
+    "output": "none",
+    "recovery": "none",
+    "files": []
+   },
+   "coverage": "none",
+   "tests": {
+    "existing": [],
+    "appEvidence": [],
+    "required": "관측 가능한 발 교차 기반 판정, 불확실 시 근거와 기존 선택 유지 시험"
+   },
+   "phase": "M2",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "flag.video-loop-ghost",
+   "kind": "flag-feature",
+   "title": "잔상 화면 검사·원본 대체·filmed-ghost 재촬영 권고",
+   "upstream": {
+    "since": null,
+    "modules": [
+     "sprite_gen.video.align",
+     "sprite_gen.video.interpolation_quality"
+    ],
+    "docs": [
+     "loop-repair.md"
+    ],
+    "aliases": [],
+    "retired": []
+   },
+   "app": {
+    "entry": "none",
+    "api": "none",
+    "worker": "none",
+    "storage": "none",
+    "output": "none",
+    "recovery": "none",
+    "files": []
+   },
+   "coverage": "none",
+   "tests": {
+    "existing": [],
+    "appEvidence": [],
+    "required": "문제 슬롯·처리 내역 표시, 자동 생성 없음 시험"
+   },
+   "phase": "M2",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "flag.loop-repair-flow",
+   "kind": "flag-feature",
+   "title": "flow reading·eased retime·overlap-wrap·jolt/head-step gate",
+   "upstream": {
+    "since": null,
+    "modules": [
+     "sprite_gen.video.repair",
+     "sprite_gen.video.loop"
+    ],
+    "docs": [
+     "loop-repair.md"
+    ],
+    "aliases": [],
+    "retired": []
+   },
+   "app": {
+    "entry": "none",
+    "api": "none",
+    "worker": "none",
+    "storage": "none",
+    "output": "none",
+    "recovery": "none",
+    "files": []
+   },
+   "coverage": "none",
+   "tests": {
+    "existing": [],
+    "appEvidence": [],
+    "required": "보정 선택 시 실제 adapter 경로 연결, 몸통 보행 보호, 예산 중단을 성공으로 보고하지 않는 시험"
+   },
+   "phase": "M2",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "flag.rife-tta-cache",
+   "kind": "flag-feature",
+   "title": "RIFE TTA·상대 윤곽 손상 검사·보간 캐시(--between-cache)",
+   "upstream": {
+    "since": null,
+    "modules": [
+     "sprite_gen.video.rife",
+     "sprite_gen.video.interpolation_quality",
+     "sprite_gen.video.align"
+    ],
+    "docs": [
+     "loop-repair.md"
+    ],
+    "aliases": [],
+    "retired": []
+   },
+   "app": {
+    "entry": "VideoStep.tsx 기존 영상 재처리",
+    "api": "POST /v1/projects/{pid}/jobs operation=process_video",
+    "worker": "services/worker/video_task.py -> adapters/spritegen/video_processing.py:process_clip",
+    "storage": "derived assets(raw/keyed/normalized/finished) + frames.sourceProcessing + clip occurrences(durationMs) + job.result.processing(version/options)",
+    "output": "final-preview GIF/WebP, 내보내기 atlas/pngs/runtime/aseprite",
+    "recovery": "extraction cache(complete.json), 실패 시 원본·기존 동작 보존",
+    "files": [
+     "apps/web/src/VideoStep.tsx",
+     "adapters/spritegen/video_processing.py",
+     "services/worker/video_task.py"
+    ]
+   },
+   "coverage": "partial",
+   "tests": {
+    "existing": [
+     "tests/integration/test_video_processing.py"
+    ],
+    "appEvidence": [],
+    "required": "실제 RIFE 시험과 대역 시험 구분, cache hit/miss/손상·모델/옵션 변경·중단 시험"
+   },
+   "phase": "M2",
+   "status": "구현 예정",
+   "constraints": [
+    "RIFE 실행 시간 장치별 실측 필요"
+   ],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "flag.video-loop-playmode",
+   "kind": "flag-feature",
+   "title": "--cycle once/once-return/lifetime 재생 의미(loop/once-hold/once-return/lifetime)",
+   "upstream": {
+    "since": null,
+    "modules": [
+     "sprite_gen.video.loop",
+     "sprite_gen.video.nonloop",
+     "sprite_gen.video.playback"
+    ],
+    "docs": [
+     "video-pipeline.md",
+     "effects.md"
+    ],
+    "aliases": [],
+    "retired": []
+   },
+   "app": {
+    "entry": "AnimationWorkspace.tsx 재생(hold-last 전용)",
+    "api": "PATCH edits(endBehavior hold-last)",
+    "worker": "alignment/pipeline.py:_clip_gates",
+    "storage": "clip.loop/endBehavior",
+    "output": "runtime v1(hold-last)",
+    "recovery": "revision",
+    "files": [
+     "apps/web/src/render.ts",
+     "alignment/pipeline.py"
+    ]
+   },
+   "coverage": "partial",
+   "tests": {
+    "existing": [
+     "tests/integration/test_animation_exports.py"
+    ],
+    "appEvidence": [],
+    "required": "플레이어·편집·job 검증·snapshot·runtime·GIF/WebP·backup/restore 동시 변경과 v1 fixture 회귀"
+   },
+   "phase": "M4",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "cmd.video-loop-compare",
+   "kind": "command",
+   "title": "최종 strip/meta 비교(improved/non_regressing/regressed/unknown)",
+   "upstream": {
+    "command": "video-loop-compare",
+    "since": "new-after-v2.34",
+    "modules": [
+     "sprite_gen.video.compare"
+    ],
+    "docs": [
+     "loop-comparison.md"
+    ],
+    "aliases": [],
+    "retired": []
+   },
+   "app": {
+    "entry": "CandidateComparison.tsx",
+    "api": "none",
+    "worker": "none",
+    "storage": "none",
+    "output": "none",
+    "recovery": "none",
+    "files": [
+     "apps/web/src/CandidateComparison.tsx"
+    ]
+   },
+   "coverage": "partial",
+   "tests": {
+    "existing": [],
+    "appEvidence": [],
+    "required": "최종 셀 픽셀·좌표·시간·sample mapping 비교와 unknown 표시 시험"
+   },
+   "phase": "M3",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "cmd.video-source-manifest",
+   "kind": "command",
+   "title": "clip·canvas·keyed 원본 바이트 manifest",
+   "upstream": {
+    "command": "video-source-manifest",
+    "since": "new-after-v2.34",
+    "modules": [
+     "sprite_gen.video.source"
+    ],
+    "docs": [
+     "loop-comparison.md",
+     "loop-repair.md"
+    ],
+    "aliases": [],
+    "retired": []
+   },
+   "app": {
+    "entry": "none",
+    "api": "none",
+    "worker": "none",
+    "storage": "none",
+    "output": "none",
+    "recovery": "none",
+    "files": []
+   },
+   "coverage": "none",
+   "tests": {
+    "existing": [],
+    "appEvidence": [],
+    "required": "source/origin/baseline ID·해시 연결, 과거 증거 부족 시 unknown 시험"
+   },
+   "phase": "M3",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "cmd.video-loop-repair",
+   "kind": "command",
+   "title": "검증된 원본 픽셀로 손상 셀 복원(source-restoration-v5)",
+   "upstream": {
+    "command": "video-loop-repair",
+    "since": "new-after-v2.34",
+    "modules": [
+     "sprite_gen.video.restoration"
+    ],
+    "docs": [
+     "loop-repair.md",
+     "loop-comparison.md"
+    ],
+    "aliases": [
+     "scripts/dev/source_restoration_demo.py"
+    ],
+    "retired": []
+   },
+   "app": {
+    "entry": "none",
+    "api": "none",
+    "worker": "none",
+    "storage": "none",
+    "output": "none",
+    "recovery": "none",
+    "files": []
+   },
+   "coverage": "none",
+   "tests": {
+    "existing": [],
+    "appEvidence": [],
+    "required": "복원 셀·순서·시간이 파일과 라이브러리에 동일 기록, jump/ghost 회귀 확인 시험"
+   },
+   "phase": "M3",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "cmd.video-set",
+   "kind": "command",
+   "title": "방향 x 상태 일괄(canvas->video->frames->loop), rate-limit 인지",
+   "upstream": {
+    "command": "video-set",
+    "since": "local-v2.34",
+    "modules": [
+     "sprite_gen.video.batch"
+    ],
+    "docs": [
+     "video-pipeline.md"
+    ],
+    "aliases": [
+     "scripts/video_set.py"
+    ],
+    "retired": []
+   },
+   "app": {
+    "entry": "VideoBatchPlan.tsx 방향별 영상 묶음",
+    "api": "POST /v1/projects/{pid}/video-batches",
+    "worker": "services/worker/video_task.py(generate_video 반복, matchClipId 주기 맞춤)",
+    "storage": "방향별 개별 동작",
+    "output": "동작별 일반 내보내기",
+    "recovery": "항목별 작업·POST 1회 보호",
+    "files": [
+     "apps/web/src/VideoBatchPlan.tsx",
+     "services/api/main.py"
+    ]
+   },
+   "coverage": "partial",
+   "tests": {
+    "existing": [
+     "tests/integration/test_video_batches.py"
+    ],
+    "appEvidence": [],
+    "required": "방향 세트 선택·항목별 보고·POST 1회 보호 시험"
+   },
+   "phase": "M4",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "cmd.handed-check",
+   "kind": "command",
+   "title": "한쪽 장비 색 마커 좌우 검사",
+   "upstream": {
+    "command": "handed-check",
+    "since": "local-v2.34",
+    "modules": [
+     "sprite_gen.qa.handed",
+     "sprite_gen.gen.handedness"
+    ],
+    "docs": [
+     "video-pipeline.md"
+    ],
+    "aliases": [],
+    "retired": []
+   },
+   "app": {
+    "entry": "ClipToolsPanel.tsx 결과 확인",
+    "api": "POST /v1/projects/{pid}/jobs operation=preview_follow/apply_follow/check_handed",
+    "worker": "services/worker/clip_tools_task.py -> adapters/spritegen/clip_tools.py",
+    "storage": "apply_follow: 새 동작 + frames.sourceProcessing(clip-follow, clip-tools-v1)",
+    "output": "새 동작의 일반 내보내기",
+    "recovery": "revision 검증, 실패 시 기존 동작 유지",
+    "files": [
+     "apps/web/src/ClipToolsPanel.tsx",
+     "services/worker/clip_tools_task.py",
+     "adapters/spritegen/clip_tools.py"
+    ]
+   },
+   "coverage": "app-equivalent-unverified",
+   "tests": {
+    "existing": [
+     "tests/integration/test_clip_tools.py",
+     "tests/integration/test_clip_tool_processing.py"
+    ],
+    "appEvidence": [],
+    "required": "v2.45.3 handed 판정 회귀"
+   },
+   "phase": "M3",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "cmd.video-cycle-align",
+   "kind": "command",
+   "title": "방향 세트 공통 주기 길이(RIFE 중간 시각만)",
+   "upstream": {
+    "command": "video-cycle-align",
+    "since": "local-v2.34",
+    "modules": [
+     "sprite_gen.video.align",
+     "sprite_gen.video.rife"
+    ],
+    "docs": [
+     "loop-repair.md",
+     "video-pipeline.md"
+    ],
+    "aliases": [],
+    "retired": []
+   },
+   "app": {
+    "entry": "VideoStep.tsx 기존 영상 재처리",
+    "api": "POST /v1/projects/{pid}/jobs operation=process_video",
+    "worker": "services/worker/video_task.py -> adapters/spritegen/video_processing.py:process_clip",
+    "storage": "derived assets(raw/keyed/normalized/finished) + frames.sourceProcessing + clip occurrences(durationMs) + job.result.processing(version/options)",
+    "output": "final-preview GIF/WebP, 내보내기 atlas/pngs/runtime/aseprite",
+    "recovery": "extraction cache(complete.json), 실패 시 원본·기존 동작 보존",
+    "files": [
+     "apps/web/src/VideoStep.tsx",
+     "adapters/spritegen/video_processing.py",
+     "services/worker/video_task.py"
+    ]
+   },
+   "coverage": "partial",
+   "tests": {
+    "existing": [
+     "tests/integration/test_video_processing.py"
+    ],
+    "appEvidence": [],
+    "required": "matchClipId 경로 회귀, between-cache·ghost 대체 연결 시험"
+   },
+   "phase": "M2",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "cmd.video-follow",
+   "kind": "command",
+   "title": "부드러운 부위 follow-through(--read-on, --stretch-floor)",
+   "upstream": {
+    "command": "video-follow",
+    "since": "local-v2.34",
+    "modules": [
+     "sprite_gen.video.follow"
+    ],
+    "docs": [
+     "video-pipeline.md"
+    ],
+    "aliases": [],
+    "retired": []
+   },
+   "app": {
+    "entry": "ClipToolsPanel.tsx 결과 확인",
+    "api": "POST /v1/projects/{pid}/jobs operation=preview_follow/apply_follow/check_handed",
+    "worker": "services/worker/clip_tools_task.py -> adapters/spritegen/clip_tools.py",
+    "storage": "apply_follow: 새 동작 + frames.sourceProcessing(clip-follow, clip-tools-v1)",
+    "output": "새 동작의 일반 내보내기",
+    "recovery": "revision 검증, 실패 시 기존 동작 유지",
+    "files": [
+     "apps/web/src/ClipToolsPanel.tsx",
+     "services/worker/clip_tools_task.py",
+     "adapters/spritegen/clip_tools.py"
+    ]
+   },
+   "coverage": "partial",
+   "tests": {
+    "existing": [
+     "tests/integration/test_clip_tools.py",
+     "tests/integration/test_clip_tool_processing.py"
+    ],
+    "appEvidence": [],
+    "required": "영역별 검사·stretch floor·read-on, uncertain 사유, stale preview 저장 차단 시험"
+   },
+   "phase": "M3",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "cmd.video-follow-inspect",
+   "kind": "command",
+   "title": "follow 이동 없이 셀별 기록·보드",
+   "upstream": {
+    "command": "video-follow-inspect",
+    "since": "new-after-v2.34",
+    "modules": [
+     "sprite_gen.video.follow_inspect"
+    ],
+    "docs": [
+     "video-pipeline.md"
+    ],
+    "aliases": [],
+    "retired": []
+   },
+   "app": {
+    "entry": "ClipToolsPanel.tsx 결과 확인",
+    "api": "POST /v1/projects/{pid}/jobs operation=preview_follow/apply_follow/check_handed",
+    "worker": "services/worker/clip_tools_task.py -> adapters/spritegen/clip_tools.py",
+    "storage": "apply_follow: 새 동작 + frames.sourceProcessing(clip-follow, clip-tools-v1)",
+    "output": "새 동작의 일반 내보내기",
+    "recovery": "revision 검증, 실패 시 기존 동작 유지",
+    "files": [
+     "apps/web/src/ClipToolsPanel.tsx",
+     "services/worker/clip_tools_task.py",
+     "adapters/spritegen/clip_tools.py"
+    ]
+   },
+   "coverage": "partial",
+   "tests": {
+    "existing": [
+     "tests/integration/test_clip_tools.py"
+    ],
+    "appEvidence": [],
+    "required": "preview_follow와 대조한 셀별 영역 증거 표시 시험"
+   },
+   "phase": "M3",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "cmd.video-set-sheet",
+   "kind": "command",
+   "title": "방향 세트 한 시트·같은 지면선",
+   "upstream": {
+    "command": "video-set-sheet",
+    "since": "new-after-v2.34",
+    "modules": [
+     "sprite_gen.video.set_sheet"
+    ],
+    "docs": [
+     "video-pipeline.md"
+    ],
+    "aliases": [],
+    "retired": []
+   },
+   "app": {
+    "entry": "none",
+    "api": "none",
+    "worker": "none",
+    "storage": "none",
+    "output": "none",
+    "recovery": "none",
+    "files": []
+   },
+   "coverage": "none",
+   "tests": {
+    "existing": [],
+    "appEvidence": [],
+    "required": "clip ID/revision·방향·지면선·공통 크기 묶음 출력 시험"
+   },
+   "phase": "M4",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "cmd.video-stop",
+   "kind": "command",
+   "title": "걷기/달리기 정지 동작(도입부 역재생)",
+   "upstream": {
+    "command": "video-stop",
+    "since": "new-after-v2.34",
+    "modules": [
+     "sprite_gen.video.stop"
+    ],
+    "docs": [
+     "video-pipeline.md"
+    ],
+    "aliases": [],
+    "retired": []
+   },
+   "app": {
+    "entry": "none",
+    "api": "none",
+    "worker": "none",
+    "storage": "none",
+    "output": "none",
+    "recovery": "none",
+    "files": []
+   },
+   "coverage": "none",
+   "tests": {
+    "existing": [],
+    "appEvidence": [],
+    "required": "역재생 출처·접합 거절 이유 표시, 생성 없는 파생 동작 저장 시험"
+   },
+   "phase": "M4",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "cmd.rife",
+   "kind": "command",
+   "title": "고정 RIFE 설치(sha256 확인)",
+   "upstream": {
+    "command": "rife",
+    "since": "local-v2.34",
+    "modules": [
+     "sprite_gen.video.rife_install"
+    ],
+    "docs": [
+     "loop-repair.md"
+    ],
+    "aliases": [
+     "sprite-gen rife install",
+     "python -m sprite_gen.video.rife_install install"
+    ],
+    "retired": []
+   },
+   "app": {
+    "entry": "none(프로젝트 .data/tools/rife 설치)",
+    "api": "none",
+    "worker": "adapters/spritegen/video_processing.py:rife_capability",
+    "storage": "engine-lock localTools.rife 해시",
+    "output": "none",
+    "recovery": "없으면 repairMode auto는 원본 유지",
+    "files": [
+     "adapters/spritegen/video_processing.py"
+    ]
+   },
+   "coverage": "partial",
+   "tests": {
+    "existing": [
+     "tests/integration/test_video_processing.py"
+    ],
+    "appEvidence": [],
+    "required": "binary·model·TTA identity를 recipe에 기록하는 시험"
+   },
+   "phase": "M2",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "cmd.recolor",
+   "kind": "command",
+   "title": "결정적 팔레트 교환 변형",
+   "upstream": {
+    "command": "recolor",
+    "since": "local-v2.34",
+    "modules": [
+     "sprite_gen.effects.recolor"
+    ],
+    "docs": [
+     "recolor.md"
+    ],
+    "aliases": [
+     "scripts/recolor.py"
+    ],
+    "retired": []
+   },
+   "app": {
+    "entry": "none",
+    "api": "none",
+    "worker": "none",
+    "storage": "none",
+    "output": "none",
+    "recovery": "none",
+    "files": []
+   },
+   "coverage": "none",
+   "tests": {
+    "existing": [],
+    "appEvidence": [],
+    "required": "원본 색·사용자 편집 보존한 새 변형 저장 시험"
+   },
+   "phase": "M6",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "cmd.recolor-palette",
+   "kind": "command",
+   "title": "기본 시트에서 팔레트 맵 초안",
+   "upstream": {
+    "command": "recolor-palette",
+    "since": "local-v2.34",
+    "modules": [
+     "sprite_gen.effects.recolor"
+    ],
+    "docs": [
+     "recolor.md"
+    ],
+    "aliases": [],
+    "retired": []
+   },
+   "app": {
+    "entry": "none",
+    "api": "none",
+    "worker": "none",
+    "storage": "none",
+    "output": "none",
+    "recovery": "none",
+    "files": []
+   },
+   "coverage": "none",
+   "tests": {
+    "existing": [],
+    "appEvidence": [],
+    "required": "팔레트 맵 초안 편집·저장 시험"
+   },
+   "phase": "M6",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "doc.breathing",
+   "kind": "doc-feature",
+   "title": "호흡 후처리 레이어(compose 단계 굽기)",
+   "upstream": {
+    "since": null,
+    "modules": [
+     "sprite_gen.effects.breathe",
+     "sprite_gen.effects.anatomy"
+    ],
+    "docs": [
+     "breathing.md"
+    ],
+    "aliases": [
+     "scripts/dev/breathe_mutation_battery.py"
+    ],
+    "retired": []
+   },
+   "app": {
+    "entry": "none",
+    "api": "none",
+    "worker": "none",
+    "storage": "none",
+    "output": "none",
+    "recovery": "none",
+    "files": []
+   },
+   "coverage": "none",
+   "tests": {
+    "existing": [],
+    "appEvidence": [],
+    "required": "호흡 파생 결과·검사 근거 보존 시험"
+   },
+   "phase": "M6",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "doc.frame-interpolation",
+   "kind": "module-tool",
+   "title": "생성형 중간 프레임(take로 기록, curator Tween 버튼)",
+   "upstream": {
+    "since": null,
+    "modules": [
+     "sprite_gen.effects.interpolate"
+    ],
+    "docs": [
+     "frame-interpolation.md",
+     "curation.md"
+    ],
+    "aliases": [
+     "scripts/interpolate_frames.py"
+    ],
+    "retired": []
+   },
+   "app": {
+    "entry": "none",
+    "api": "none",
+    "worker": "none",
+    "storage": "none",
+    "output": "none",
+    "recovery": "none",
+    "files": []
+   },
+   "coverage": "none",
+   "tests": {
+    "existing": [],
+    "appEvidence": [],
+    "required": "생성 원본/take·입력 identity·요청·사용 경로 보존, 기존 프레임 대체 없음 시험"
+   },
+   "phase": "M6",
+   "status": "구현 예정",
+   "constraints": [
+    "codex/grok provider 호출"
+   ],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "tool.reroll",
+   "kind": "module-tool",
+   "title": "상태 행 reroll(새 take로 후보 추가, curator Reroll 버튼)",
+   "upstream": {
+    "since": null,
+    "modules": [
+     "sprite_gen.effects.reroll"
+    ],
+    "docs": [
+     "curation.md"
+    ],
+    "aliases": [],
+    "retired": []
+   },
+   "app": {
+    "entry": "none",
+    "api": "none",
+    "worker": "none",
+    "storage": "none",
+    "output": "none",
+    "recovery": "none",
+    "files": []
+   },
+   "coverage": "none",
+   "tests": {
+    "existing": [],
+    "appEvidence": [],
+    "required": "후보 추가만, primary 교체 없음 시험"
+   },
+   "phase": "M6",
+   "status": "구현 예정",
+   "constraints": [
+    "provider 호출"
+   ],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "doc.seamless-video-loop",
+   "kind": "doc-feature",
+   "title": "ambient 영상 무한 루프(RIFE seam bridge)",
+   "upstream": {
+    "since": null,
+    "modules": [],
+    "docs": [
+     "seamless-video-loop.md"
+    ],
+    "aliases": [],
+    "retired": []
+   },
+   "app": {
+    "entry": "none",
+    "api": "none",
+    "worker": "none",
+    "storage": "none",
+    "output": "none",
+    "recovery": "none",
+    "files": []
+   },
+   "coverage": "none",
+   "tests": {
+    "existing": [],
+    "appEvidence": [],
+    "required": "별도 영상 자료로 저장, 수치·영상 검증 시험"
+   },
+   "phase": "M6",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": "upstream 엔진 모듈 없음(외부 rife-ncnn-vulkan·ffmpeg 절차 문서)."
+  },
+  {
+   "id": "cmd.background-tile",
+   "kind": "command",
+   "title": "반복 RGBA 배경 타일(--axis xy)·이음새 측정",
+   "upstream": {
+    "command": "background-tile",
+    "since": "local-v2.34",
+    "modules": [
+     "sprite_gen.background.tile"
+    ],
+    "docs": [
+     "asset-tools.md"
+    ],
+    "aliases": [],
+    "retired": []
+   },
+   "app": {
+    "entry": "none",
+    "api": "none",
+    "worker": "none",
+    "storage": "none",
+    "output": "none",
+    "recovery": "none",
+    "files": []
+   },
+   "coverage": "none",
+   "tests": {
+    "existing": [],
+    "appEvidence": [],
+    "required": "타일 자료형·양축 반복·alpha haze/checkerboard 거절 시험"
+   },
+   "phase": "M5",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "cmd.shadow",
+   "kind": "command",
+   "title": "실루엣 투영 그림자",
+   "upstream": {
+    "command": "shadow",
+    "since": "local-v2.34",
+    "modules": [
+     "sprite_gen.effects.shadow"
+    ],
+    "docs": [
+     "asset-tools.md"
+    ],
+    "aliases": [],
+    "retired": []
+   },
+   "app": {
+    "entry": "none",
+    "api": "none",
+    "worker": "none",
+    "storage": "none",
+    "output": "none",
+    "recovery": "none",
+    "files": []
+   },
+   "coverage": "none",
+   "tests": {
+    "existing": [],
+    "appEvidence": [],
+    "required": "그림자 파생 자료 저장 시험"
+   },
+   "phase": "M6",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "cmd.inspect-motion",
+   "kind": "command",
+   "title": "타이밍·접지 측정(애니메이션 불변)",
+   "upstream": {
+    "command": "inspect-motion",
+    "since": "local-v2.34",
+    "modules": [
+     "sprite_gen.qa.motion"
+    ],
+    "docs": [
+     "asset-tools.md",
+     "qa-motion.md"
+    ],
+    "aliases": [],
+    "retired": []
+   },
+   "app": {
+    "entry": "none",
+    "api": "none",
+    "worker": "none",
+    "storage": "none",
+    "output": "none",
+    "recovery": "none",
+    "files": []
+   },
+   "coverage": "none",
+   "tests": {
+    "existing": [],
+    "appEvidence": [],
+    "required": "결과 확인 화면의 움직임/접지 근거 표시 시험"
+   },
+   "phase": "M6",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "cmd.inspect",
+   "kind": "command",
+   "title": "행 프레임 수·identity·motion 결함 검사",
+   "upstream": {
+    "command": "inspect",
+    "since": "local-v2.34",
+    "modules": [
+     "sprite_gen.qa.inspect"
+    ],
+    "docs": [
+     "qa-motion.md"
+    ],
+    "aliases": [
+     "scripts/inspect_sprite_run.py"
+    ],
+    "retired": []
+   },
+   "app": {
+    "entry": "SpriteViewport.tsx·AnimationWorkspace.tsx 미리보기, WorkflowPanel inspect",
+    "api": "POST jobs operation=inspect/bake",
+    "worker": "alignment/pipeline.py",
+    "storage": "job artifacts",
+    "output": "미리보기·검사 결과",
+    "recovery": "검사만, 원본 불변",
+    "files": [
+     "apps/web/src/SpriteViewport.tsx",
+     "apps/web/src/WorkflowPanel.tsx"
+    ]
+   },
+   "coverage": "partial",
+   "tests": {
+    "existing": [
+     "tests/integration/test_pipeline.py"
+    ],
+    "appEvidence": [],
+    "required": "앱 inspect 작업과 upstream 검사 항목 대조"
+   },
+   "phase": "M6",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "cmd.score",
+   "kind": "command",
+   "title": "inspect 보고 점수·수정 힌트",
+   "upstream": {
+    "command": "score",
+    "since": "local-v2.34",
+    "modules": [
+     "sprite_gen.qa.score"
+    ],
+    "docs": [
+     "qa-motion.md"
+    ],
+    "aliases": [
+     "scripts/score_sprite_run.py"
+    ],
+    "retired": []
+   },
+   "app": {
+    "entry": "none",
+    "api": "none",
+    "worker": "none",
+    "storage": "none",
+    "output": "none",
+    "recovery": "none",
+    "files": []
+   },
+   "coverage": "none",
+   "tests": {
+    "existing": [],
+    "appEvidence": [],
+    "required": "점수를 미술 완성도로 표시하지 않는 결과 확인 시험"
+   },
+   "phase": "M6",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "cmd.correction-loop",
+   "kind": "command",
+   "title": "inspect->score->수정 힌트 제한 루프",
+   "upstream": {
+    "command": "correction-loop",
+    "since": "local-v2.34",
+    "modules": [
+     "sprite_gen.qa.correction_loop"
+    ],
+    "docs": [
+     "qa-motion.md"
+    ],
+    "aliases": [
+     "scripts/run_correction_loop.py"
+    ],
+    "retired": []
+   },
+   "app": {
+    "entry": "none",
+    "api": "none",
+    "worker": "none",
+    "storage": "none",
+    "output": "none",
+    "recovery": "none",
+    "files": []
+   },
+   "coverage": "none",
+   "tests": {
+    "existing": [],
+    "appEvidence": [],
+    "required": "provider 재제출 없는 dry-run/명시 실행 경계 시험"
+   },
+   "phase": "M6",
+   "status": "구현 예정",
+   "constraints": [
+    "--provider-command는 외부 호출, 명시 선택 필요"
+   ],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "tool.check-visible-magenta",
+   "kind": "module-tool",
+   "title": "보이는 magenta 잔여 검사",
+   "upstream": {
+    "since": null,
+    "modules": [
+     "sprite_gen.frames.check_visible_magenta"
+    ],
+    "docs": [
+     "chroma-alpha.md"
+    ],
+    "aliases": [
+     "scripts/dev/check_visible_magenta.py"
+    ],
+    "retired": []
+   },
+   "app": {
+    "entry": "none",
+    "api": "none",
+    "worker": "none",
+    "storage": "none",
+    "output": "none",
+    "recovery": "none",
+    "files": []
+   },
+   "coverage": "none",
+   "tests": {
+    "existing": [],
+    "appEvidence": [],
+    "required": "키 잔여 진단을 가져오기/추출 결과에 표시하는 시험"
+   },
+   "phase": "M5",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "cmd.game-pack",
+   "kind": "command",
+   "title": "다중 atlas·크기·재생 메타데이터·이벤트 game-pack",
+   "upstream": {
+    "command": "game-pack",
+    "since": "new-after-v2.34",
+    "modules": [
+     "sprite_gen.compose.game_pack",
+     "sprite_gen.video.playback"
+    ],
+    "docs": [
+     "game-pack.md"
+    ],
+    "aliases": [],
+    "retired": []
+   },
+   "app": {
+    "entry": "FinishSteps.tsx 게임용 파일 출력",
+    "api": "POST /v1/projects/{pid}/exports (formats atlas/pngs/runtime/aseprite)",
+    "worker": "services/worker/main.py export -> alignment/pipeline.py·alignment/animation_exports.py",
+    "storage": "exports 테이블 + artifacts(sha256)",
+    "output": "atlas PNG, runtime JSON, Aseprite JSON, PNG/GIF/WebP, animations ZIP",
+    "recovery": "idempotencyKey, 기존 출력 덮어쓰지 않음",
+    "files": [
+     "apps/web/src/FinishSteps.tsx",
+     "alignment/animation_exports.py",
+     "alignment/pipeline.py"
+    ]
+   },
+   "coverage": "partial",
+   "tests": {
+    "existing": [
+     "tests/integration/test_animation_exports.py"
+    ],
+    "appEvidence": [],
+    "required": "canonical bake 입력, 결정적 pack, 기존 출력 유지 시험"
+   },
+   "phase": "M4",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "pack.v2-assets-audio",
+   "kind": "flag-feature",
+   "title": "game-pack v2 images/tiles/ui·audio·sound-only pack",
+   "upstream": {
+    "since": null,
+    "modules": [
+     "sprite_gen.compose.game_pack",
+     "sprite_gen.audio.manifest"
+    ],
+    "docs": [
+     "game-pack.md",
+     "sound.md"
+    ],
+    "aliases": [],
+    "retired": []
+   },
+   "app": {
+    "entry": "none",
+    "api": "none",
+    "worker": "none",
+    "storage": "none",
+    "output": "none",
+    "recovery": "none",
+    "files": []
+   },
+   "coverage": "none",
+   "tests": {
+    "existing": [],
+    "appEvidence": [],
+    "required": "자료형별 import->preview->output->folder->backup/restore->pack 시험"
+   },
+   "phase": "M5",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "cmd.sound",
+   "kind": "command",
+   "title": "SFX/BGM 생성·정규화·loop·캐시·사용량·Web Audio export",
+   "upstream": {
+    "command": "sound",
+    "since": "new-after-v2.34",
+    "modules": [
+     "sprite_gen.audio.sound",
+     "sprite_gen.audio.provider",
+     "sprite_gen.audio.cache",
+     "sprite_gen.audio.processing",
+     "sprite_gen.audio.playback",
+     "sprite_gen.audio.manifest"
+    ],
+    "docs": [
+     "sound.md"
+    ],
+    "aliases": [],
+    "retired": []
+   },
+   "app": {
+    "entry": "none",
+    "api": "none",
+    "worker": "none",
+    "storage": "none",
+    "output": "none",
+    "recovery": "none",
+    "files": []
+   },
+   "coverage": "none",
+   "tests": {
+    "existing": [],
+    "appEvidence": [],
+    "required": "생성·가져오기·듣기·정규화·loop/crossfade·원본 요청 캐시·프레임 이벤트·Opus/AAC·백업/복구 시험"
+   },
+   "phase": "M5",
+   "status": "구현 예정",
+   "constraints": [
+    "ELEVENLABS_API_KEY 호출당 과금(구독 로그인 없음)",
+    "ffmpeg(libopus, aac)·ffprobe 필요"
+   ],
+   "blockers": [],
+   "notes": "이 장치 ffmpeg 인코더와 provider 인증은 M0에서 확인하지 않음(인증 접근 금지)."
+  },
+  {
+   "id": "cmd.scene-render",
+   "kind": "command",
+   "title": "scene spec 배치·camera·lighting 렌더",
+   "upstream": {
+    "command": "scene-render",
+    "since": "local-v2.34",
+    "modules": [
+     "sprite_gen.scene.render",
+     "sprite_gen.scene.model"
+    ],
+    "docs": [
+     "scene.md"
+    ],
+    "aliases": [],
+    "retired": []
+   },
+   "app": {
+    "entry": "none",
+    "api": "none",
+    "worker": "none",
+    "storage": "none",
+    "output": "none",
+    "recovery": "none",
+    "files": []
+   },
+   "coverage": "none",
+   "tests": {
+    "existing": [],
+    "appEvidence": [],
+    "required": "scene spec·참조 asset revision 저장, 원본 수정 없이 새 결과 시험"
+   },
+   "phase": "M6",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "cmd.scene-inspect",
+   "kind": "command",
+   "title": "scene loop·viewport clipping·반복 이음새 측정",
+   "upstream": {
+    "command": "scene-inspect",
+    "since": "local-v2.34",
+    "modules": [
+     "sprite_gen.scene.inspect_scene"
+    ],
+    "docs": [
+     "scene.md"
+    ],
+    "aliases": [],
+    "retired": []
+   },
+   "app": {
+    "entry": "none",
+    "api": "none",
+    "worker": "none",
+    "storage": "none",
+    "output": "none",
+    "recovery": "none",
+    "files": []
+   },
+   "coverage": "none",
+   "tests": {
+    "existing": [],
+    "appEvidence": [],
+    "required": "장면 검사 결과 보존 시험"
+   },
+   "phase": "M6",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": ""
+  },
+  {
+   "id": "maint.cli-launch",
+   "kind": "maintenance",
+   "title": "CLI·모듈 실행 형식",
+   "upstream": {
+    "since": null,
+    "modules": [],
+    "docs": [
+     "architecture.md",
+     "interpreter.md"
+    ],
+    "aliases": [
+     "sprite-gen",
+     "python -m sprite_gen.<domain>.<step>"
+    ],
+    "retired": []
+   },
+   "app": {
+    "entry": "none(앱은 _engine() 모듈 import)",
+    "api": "none",
+    "worker": "alignment/pipeline.py:_engine",
+    "storage": "none",
+    "output": "none",
+    "recovery": "공용 엔진 import 차단",
+    "files": [
+     "alignment/pipeline.py"
+    ]
+   },
+   "coverage": "partial",
+   "tests": {
+    "existing": [
+     "tests/integration/test_engine_guard.py"
+    ],
+    "appEvidence": [],
+    "required": "프로젝트 전용 엔진 import 보장(test_engine_guard) 유지"
+   },
+   "phase": "M0",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": "사용자 버튼 대상 아님. 이식 무결성 지원."
+  },
+  {
+   "id": "maint.process-docs",
+   "kind": "maintenance",
+   "title": "rename gate·troubleshooting 이식 기준",
+   "upstream": {
+    "since": null,
+    "modules": [],
+    "docs": [
+     "rename-gate.md",
+     "troubleshooting.md"
+    ],
+    "aliases": [],
+    "retired": []
+   },
+   "app": {
+    "entry": "none",
+    "api": "none",
+    "worker": "none",
+    "storage": "none",
+    "output": "none",
+    "recovery": "none",
+    "files": []
+   },
+   "coverage": "none",
+   "tests": {
+    "existing": [],
+    "appEvidence": [],
+    "required": "어휘/키 변경 시 함께 바뀌는 계약 목록을 각 단계 리뷰 체크에 반영"
+   },
+   "phase": "M0",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": "사용자 기능 아님. 각 단계 이식 리뷰 기준."
+  },
+  {
+   "id": "maint.release",
+   "kind": "maintenance",
+   "title": "upstream 릴리스 lane",
+   "upstream": {
+    "since": null,
+    "modules": [],
+    "docs": [
+     "release.md"
+    ],
+    "aliases": [
+     "scripts/release_notes.py",
+     "scripts/release_publish.py",
+     "scripts/linux_lane.sh"
+    ],
+    "retired": []
+   },
+   "app": {
+    "entry": "none",
+    "api": "none",
+    "worker": "none",
+    "storage": "none",
+    "output": "none",
+    "recovery": "none",
+    "files": []
+   },
+   "coverage": "none",
+   "tests": {
+    "existing": [],
+    "appEvidence": [],
+    "required": "이식 시 무결성·회귀 지원만 유지(배포 명령은 앱 기능 아님)"
+   },
+   "phase": "M0",
+   "status": "구현 예정",
+   "constraints": [],
+   "blockers": [],
+   "notes": "게시·배포는 사용자 요청 범위 밖."
+  }
+ ]
+}

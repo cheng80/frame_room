@@ -12,6 +12,8 @@
 
 | 문서 | 내용 |
 | --- | --- |
+| [sprite-gen 전체 기능 흡수 계획](SPRITE_GEN_ABSORPTION_PLAN_2026-10-21.md) | v2.45.3 공개 기능 전체 필수 범위, 품질·복구부터 M0–M6 단계별 통합 (M0 완료, 다음 M1) |
+| [M0 구현·검증 보고](absorption/M0_REPORT_2026-10-21.md) | 전체 기능 대장·파일/함수 이식 목록·회귀 기준·재현 한계와 독립 검수 통과 |
 | [HANDOFF.md](HANDOFF.md) | 새 환경 실행·프로젝트 이전·코드 탐색·비용/원본 보존·남은 제한 |
 | [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) | 날짜별 실제 실행 결과와 자동/수동 검증 범위 |
 | [6단계 제작 실행 계약](SIX_STEP_WORKFLOW.md) | 단계별 준비 상태·수정 복귀·승인 기록 보존·출력 위치/시각/탭/접기 |
