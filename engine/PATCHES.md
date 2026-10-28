@@ -57,3 +57,18 @@ requirements.lock.txt는 직접/전이 의존성 28개를 설치 버전으로 �
    - 앱 걷기 기본값은 최신 엔진의 32장과 다르게 사용자 지정 **8장**이다. 기존 GIF 마무리·nearest 픽셀 편집·원본 시간은 보존한다. 앱의 WebP exact 수정은 `alignment/animation_exports.py`에서 별도로 구현했다.
 
    검증: 엔진 관련 9,211 PASS / 1 SKIP, 앱 통합 652 PASS, 웹 282 PASS와 production build 성공. 실제 보존 MP4 3개를 8장으로 추출했고 별도 실제 RIFE 보간 11장/손상 원본 대체 13장을 확인했다. 추가 생성 호출은 0건이다. `doctor.py`는 기존 inventory와 신규 patch 경로의 합집합 407개 파일을 검사한다.
+
+## M1 복구 경계 (2026-10-22)
+
+`gen/video.py`의 `http_download`에 선택 timeout/deadline·시도 계수 callback을 추가하고 `gen/xai.py`에 앱 전용 절대 수신 deadline을 추가했다. socket의 매 수신 전에 남은 시간을 적용해 느린 header/body도 예산을 공유한다. 기존 독립 CLI는 deadline을 생략하여 기존 transport를 유지한다. 앱 adapter가 GET 재시도·전체 잔여 시간·MP4 검사를 담당한다. 기존 POST 1회·기반 pin·`qualityVersion`은 유지하며 v2.45.3 전체 이식으로 표시하지 않는다. MP4 게시는 고정 `.part` 대신 독점 `mkstemp`·fsync·replace를 사용하고 실패 임시 파일을 정리한다. 최종 출력 symlink는 거절하여 다른 원본을 따라가지 않는다. 현재 해시는 lock의 `patches`·`localAdaptations`, M0 당시 해시는 `m0-port-plan.json`·`m0-function-plan.json`·`m0-baseline-manifest.json`에 보존한다.
+
+## M2 영상 helper 묶음 (2026-10-22)
+
+고정 v2.45.3 `59b2738a2e76ed7043d9691a230396ed6374a336`의 loop/align/repair/rife/frames와 crossings/interpolation_quality, gait·period·motion·evidence·source 및 필요한 공용 resample/lsq/GIF helper를 선별 반영했다. source는 loop/align의 출처 영수증 전이 의존이며 M3 복원 UI를 제공했다는 뜻이 아니다. 기반 pin·`qualityVersion=2.34.0`과 M1 gen/video·xai 보호 패치를 유지하고 이 부분은 `videoQualityVersion=2.45.3-m2`로 구분한다. 공용 sprite-gen과 전역 설정은 변경하지 않는다.
+
+앱은 기존 선택→보정→주기맞춤→정규화→마무리→worker 저장 경로를 사용한다. 실제 소스 digest와 새 VERSION으로 구 작업의 최신 처리 재개를 막으며 완성 결과 저장 복구를 유지한다. RIFE Cache와 입력/품질 helper를 재사용하고 앱 전용 context의 절대 deadline·취소/TTA, cache symlink·손상/쓰기 실패 경계 및 repair/overlap 검색 확인을 로컬 적응했다. 새 TTA/overlap은 off 기본값·명시 opt-in이다. 현재/이식/원본 해시와 관련 시험은 `engine-lock.json.localAdaptations[M2]`를 기준으로 검사한다. 실제 검증·미검증은 M2 구현 보고서에 기록한다.
+
+
+## M3 비교·원본 복원·follow 검사 (2026-10-22)
+
+같은 고정 v2.45.3 commit의 compare/restoration/playback/follow/follow_inspect와 해당 5개 시험 묶음을 추가·선별 반영한다. 기존 follow 시험은 삭제하지 않는다. body_motion의4번째 worn 결과와 그룹별 move_regions 호출 계약을 앱에서 적응한다. 기존 기반pin/qualityVersion·M1 transport·M2 원본보호를 유지하며 `clipToolsQualityVersion=2.45.3-m3`로 식별한다. 앱 source bridge는 별도 policy이며 canonical 가변시간·원본 keyed 재투영·최초 origin·복원chain·캡의 정확한 좌표 조건을 검사한다. 엔진 전체 CLI의 나머지 기능을 흡수 완료로 표시하지 않는다. 현재 해시는 `localAdaptations[M3]`를 따른다.

@@ -1,4 +1,5 @@
 """The gait fallback: a slow walk and a walk toward the camera, on synthetic frames."""
+import hashlib
 import json
 import math
 
@@ -92,12 +93,62 @@ def test_drift_is_measured_on_the_fitted_height_and_undone_about_the_feet():
     assert abs(gait_fallback.scale_drift([walker(k) for k in range(73)])['drift']) < 0.02
 
 
+def other_lapack(monkeypatch, seed):
+    """np.polyfit as another machine's LAPACK might solve it: every coefficient off by up to 1e-12 of
+    itself, seed by seed. Machines differ by less (on the 10-05 grid, lines a few 1e-13 px apart);
+    a line read exactly is unmoved by any of it."""
+    rng = np.random.default_rng(seed)
+    polyfit = np.polyfit
+
+    def solved_elsewhere(x, y, deg, *args, **kwargs):
+        coef = polyfit(x, y, deg, *args, **kwargs)
+        return coef*(1+rng.uniform(-1e-12, 1e-12, np.shape(coef)))
+    monkeypatch.setattr(np, 'polyfit', solved_elsewhere)
+
+
+def test_a_body_that_keeps_its_place_and_size_reads_them_exactly():
+    """A line through equal values is that value: the fitted foot point and height of a walker that
+    neither moves nor grows are its box's, to the bit, so nothing about them is left to rounding."""
+    frames = [walker(0)]*73
+    x0, y0, x1, y1 = gait_fallback.subject_boxes(frames[:1])[0]
+    measured = gait_fallback.scale_drift(frames)
+    assert np.all(measured['foot_y'] == y1) and np.all(measured['foot_x'] == (x0+x1)/2)
+    assert np.all(measured['height'] == y1-y0) and measured['drift'] == 0
+
+
+def test_the_size_hold_is_the_same_whatever_the_lapack_rounding(monkeypatch):
+    """Feet that stand on the frame's bottom edge in every frame: the hold scales about them, so
+    nothing reaches past that edge and no room is added below. The foot point is read off a fitted
+    line; np.polyfit's last bit put it a hair past the edge or short of it, and the frames got 2 px
+    of room below or none (v2.36.0). On the exact line the foot point, the room and every held pixel
+    are the same under any rounding."""
+    full = [walker(k, grow=0.03) for k in range(73)]
+    floor = int(np.nanmax(gait_fallback.subject_boxes(full)[:, 3]))
+    frames = [im.crop((0, 0, im.width, floor)) for im in full]
+    assert np.all(gait_fallback.subject_boxes(frames)[:, 3] == floor)
+    seen = set()
+    for seed in range(8):
+        other_lapack(monkeypatch, seed)
+        measured = gait_fallback.cycle_drift(frames, min_lag=12, max_lag=36)
+        pad = gait_fallback.undo_padding(frames, measured)
+        held = gait_fallback.undo_scale(frames, measured, pad=pad)
+        seen.add((pad, measured['foot_x'].tobytes(), measured['foot_y'].tobytes(),
+                  hashlib.sha256(b''.join(im.tobytes() for im in held)).hexdigest()))
+        monkeypatch.undo()
+    assert len(seen) == 1
+    assert next(iter(seen))[0][3] == 0
+
+
 def test_a_clip_the_first_search_cuts_is_cut_without_the_fallback(tmp_path):
     code, report, output = run(tmp_path, [walker(k) for k in range(73)])
     assert code == 0
     assert report['cycle']['length'] == 24
     assert 'gait_fallback' not in report
     assert not (output/loop.FALLBACK_FRAMES_DIR).exists()
+    # A clip that keeps its size is not held.
+    assert report['size_hold']['applied'] is False
+    assert abs(report['size_hold']['drift']) < gait_fallback.SIZE_HOLD_MIN
+    assert 'padding_ltrb' not in report['size_hold']
 
 
 def test_a_cycle_longer_than_half_the_clip_is_found_by_the_fallback(tmp_path):
@@ -110,12 +161,6 @@ def test_a_cycle_longer_than_half_the_clip_is_found_by_the_fallback(tmp_path):
     assert fallback['scale_undone'] is False
     assert fallback['window'] == [12, gait_fallback.long_window(12, 73, 24.0)]
     assert not (output/loop.FALLBACK_FRAMES_DIR).exists()
-
-
-def test_an_explicit_max_len_stays_the_ceiling(tmp_path):
-    code, report, _ = run(tmp_path, [walker(k, period=40) for k in range(73)], '--max-len', '36')
-    assert str(code).startswith('video-loop: no periodic cycle found')
-    assert report['gait_fallback']['window'] == [12, 36]
 
 
 def test_a_walk_toward_the_camera_is_held_at_its_size_before_the_first_search(tmp_path):
@@ -146,14 +191,6 @@ def test_a_small_change_of_size_is_held_too(tmp_path):
     assert report_off['size_hold'] == {'applied': False, 'why': '--size-hold off'}
     fallback = report_off['gait_fallback']
     assert fallback['scale_undone'] is False and fallback['scale_drift']['drift'] < gait_fallback.SCALE_DRIFT_MIN
-
-
-def test_a_clip_that_keeps_its_size_is_not_held(tmp_path):
-    code, report, output = run(tmp_path, [walker(k) for k in range(73)])
-    assert code == 0
-    assert report['size_hold']['applied'] is False
-    assert abs(report['size_hold']['drift']) < gait_fallback.SIZE_HOLD_MIN
-    assert 'padding_ltrb' not in report['size_hold']
 
 
 def test_the_size_is_read_one_cycle_on():
@@ -283,3 +320,18 @@ def test_no_cycle_in_either_search_says_so_and_keeps_the_gate_line(tmp_path):
 @pytest.mark.parametrize('n, fps, expected', [(73, 24.0, 43), (145, 24.0, 48), (37, 24.0, 22)])
 def test_the_long_window_is_bounded_by_the_clip_and_by_seconds(n, fps, expected):
     assert gait_fallback.long_window(12, n, fps) == expected
+
+
+def test_a_clip_that_keeps_its_size_is_not_held(tmp_path):
+    code, report, output = run(tmp_path, [walker(k) for k in range(73)])
+    assert code == 0
+    assert report['size_hold']['applied'] is False
+    assert abs(report['size_hold']['drift']) < gait_fallback.SIZE_HOLD_MIN
+    assert 'padding_ltrb' not in report['size_hold']
+
+
+def test_an_explicit_max_len_stays_the_ceiling(tmp_path):
+    code, report, _ = run(tmp_path, [walker(k, period=40) for k in range(73)], '--max-len', '36')
+    assert str(code).startswith('video-loop: no periodic cycle found')
+    assert report['gait_fallback']['window'] == [12, 36]
+

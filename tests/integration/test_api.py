@@ -847,3 +847,46 @@ def test_extract_public_lineage_requires_both_matching_snapshots(client,missing_
         elif missing_evidence=='revision': legacy['result'].pop('savedRevision')
         elif missing_evidence=='other_project': legacy['projectId']='different-project'
     assert 'frameVersionIds' not in s.public_job(legacy)['result']
+
+@pytest.mark.parametrize('operation',['export','job'])
+def test_delete_waits_between_resource_check_and_registration(client,monkeypatch,operation):
+    """Force the M0 existence/read interleaving under the real SQLite writer lock."""
+    from concurrent.futures import ThreadPoolExecutor,TimeoutError
+    from threading import Event
+    from services.api import project_folders
+    c=client;p,_=approved(c)
+    p=edit(c,p,[{'type':'updateClip','clipId':p['clips'][0]['clipId'],'changes':{'review':'approved'}}])
+    with s.connect() as db:before_jobs=db.execute('SELECT count(*) FROM jobs WHERE project_id=?',(p['projectId'],)).fetchone()[0]
+    pid=p['projectId'];url='/v1/projects/'+pid;checked=Event();release=Event();deleting=Event()
+    real_path=project_folders.resource_path;real_get=s.get_project;real_delete=project_folders.delete_project
+    def path(kind,ident,row):
+        value=real_path(kind,ident,row)
+        if kind=='assets' and not checked.is_set():
+            checked.set();assert release.wait(5)
+        return value
+    def get(project_id,c=None):
+        value=real_get(project_id,c)
+        if operation=='job' and c is not None and project_id==pid and not checked.is_set():
+            checked.set();assert release.wait(5)
+        return value
+    def remove(*args):
+        deleting.set();return real_delete(*args)
+    monkeypatch.setattr(project_folders,'resource_path',path if operation=='export' else real_path)
+    monkeypatch.setattr(s,'get_project',get);monkeypatch.setattr(project_folders,'delete_project',remove)
+    def submit():
+        if operation=='export':return c.post(url+'/exports',json={'savedRevision':p['revision'],'clipRevisionIds':[p['clips'][0]['clipRevisionId']],'idempotencyKey':s.uid()})
+        return c.post(url+'/jobs',json={'operation':'inspect','inputRevision':p['revision'],'idempotencyKey':s.uid()})
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        registering=pool.submit(submit);assert checked.wait(5)
+        removing=pool.submit(c.request,'DELETE',url,json={'expectedRevision':p['revision']})
+        try:
+            assert deleting.wait(5)
+            with pytest.raises(TimeoutError):removing.result(timeout=.1)
+            assert s.project_folder(pid).is_dir()
+        finally:release.set()
+        registered=registering.result(timeout=10);deleted=removing.result(timeout=10)
+    assert registered.status_code==202,registered.text
+    assert deleted.status_code==409 and deleted.json()['code']=='PROJECT_BUSY'
+    with s.connect() as db:
+        assert db.execute('SELECT count(*) FROM jobs WHERE project_id=?',(pid,)).fetchone()[0]==before_jobs+1
+        if operation=='export':assert db.execute('SELECT count(*) FROM exports WHERE project_id=?',(pid,)).fetchone()[0]==1

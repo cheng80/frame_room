@@ -8,6 +8,25 @@ describe('saved video diagnostics', () => {
     expect(videoDiagnostics(value)).toEqual([]);
     expect(renderToStaticMarkup(<VideoDiagnostics processing={value}/>)).toBe('');
   });
+  it('distinguishes source steps, rendered seam, overlap skips and cache gates', () => {
+    const rows = videoDiagnostics({interpolation: {cache: {hits: 2, misses: 1}}, selection: {
+      metrics: {stepCount: {cut: {verdict: 'uncertain'}}}, ghostScreen: {ghosts: [{frame: 1}]},
+      renderedSeam: {measurement: 'final-rendered-cells'}, repair: {overlapWrap: {applied: false}},
+    }});
+    expect(rows.find(row => row.id === 'steps')?.level).toBe('warning');
+    expect(rows.find(row => row.id === 'overlap')?.message).toContain('적용하지 않았습니다');
+    expect(rows.find(row => row.id === 'rendered')?.message).toContain('실제 출력 셀');
+    expect(rows.find(row => row.id === 'cache')?.message).toContain('현재 품질 검사');
+    expect(rows.find(row => row.id === 'ghost')?.message).toContain('자동 생성하지 않습니다');
+  });
+  it('distinguishes actual clipping from insufficient safe margin', () => {
+    const selection = {renderedBounds: {frames: [{safeOverflowPx: {left: 1}, canvasClipping: false}]}};
+    expect(videoDiagnostics({selection})[0]).toMatchObject({id: 'margin', level: 'warning'});
+    selection.renderedBounds.frames[0].canvasClipping = true;
+    const rows = videoDiagnostics({selection});
+    expect(rows[0]).toMatchObject({id: 'clipping', level: 'warning'});
+    expect(rows.some(row => row.id === 'margin')).toBe(false);
+  });
   it('shows actual upstream period suspects as advice without claiming an automatic cut', () => {
     const data = {selection: {period: {suspects: [{cycles: 2, why: 'repeat'}], checked: []}}};
     const rows = videoDiagnostics(data);

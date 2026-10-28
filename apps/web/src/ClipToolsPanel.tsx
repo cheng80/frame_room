@@ -14,7 +14,7 @@ import './clip-tools.css';
 import {SpriteImage, SpriteViewport} from './SpriteViewport';
 
 interface Props {s: Studio; clipId: string; onClip: (id: string) => void; onSelectOccurrence: (id: string) => void}
-type Session = {selection: string; mode: 'follow' | 'handed'; follow: FollowFields; handed: HandedFields; preview?: ToolRequest; check?: ToolRequest; apply?: ToolRequest; sending: boolean; error: string};
+type Session = {selection: string; mode: 'follow' | 'handed' | 'restore' | 'compare'; candidateClipId?: string; follow: FollowFields; handed: HandedFields; preview?: ToolRequest; check?: ToolRequest; apply?: ToolRequest; sending: boolean; error: string};
 const freshSession = (selection: string): Session => ({selection, mode: 'follow', follow: defaultFollow(), handed: defaultHanded(), sending: false, error: ''});
 const message = (error: unknown) => error instanceof Error ? error.message : '요청을 완료하지 못했습니다.';
 function validationError(check: () => unknown) {try {check(); return '';} catch (error) {return message(error);}}
@@ -39,7 +39,8 @@ export function ClipTools({s, clipId, onClip, onSelectOccurrence}: Props) {
   const followError = snapshot && clip ? validationError(() => followParams(snapshot, clip, state.follow)) : '저장된 동작을 먼저 선택하세요.';
   const checkError = snapshot && clip ? validationError(() => handedParams(snapshot, clip, state.handed)) : '저장된 동작을 먼저 선택하세요.';
   const followResult = readClipToolResult(previewJob), checkResult = readClipToolResult(checkJob);
-  const validPreview = !!source && previewMatches(state.preview, previewJob, source, state.follow);
+  const previewKey = state.mode === 'restore' ? settingsKey({mode: 'restore'}) : state.mode === 'compare' ? settingsKey({mode: 'compare', candidateClipId: state.candidateClipId}) : settingsKey(state.follow);
+  const validPreview = !!source && (state.mode === 'follow' ? previewMatches(state.preview, previewJob, source, state.follow) : jobSucceeded(previewJob) && !!followResult && (followResult.tool === 'restore' || followResult.tool === 'compare') && followResult.tool === state.mode && followResult.report.canApply && !!state.preview && state.preview.settingsKey === previewKey && sameSource(followResult.source, source));
   const canSave = validPreview && !locked && !jobSucceeded(applyJob);
   const newClipId = jobSucceeded(applyJob) ? applyJob?.result?.clipId : undefined;
   // Polling may report job success before the refreshed project contains its new clip.
@@ -51,25 +52,29 @@ export function ClipTools({s, clipId, onClip, onSelectOccurrence}: Props) {
 
   function updateFollow<K extends keyof FollowFields>(key: K, value: FollowFields[K]) {setSession(old => ({...old, follow: {...old.follow, [key]: value}, error: ''}));}
   function updateHanded(key: keyof HandedFields, value: string) {setSession(old => ({...old, handed: {...old.handed, [key]: value}, error: ''}));}
-  async function submit(operation: 'preview_follow' | 'check_handed' | 'apply_follow') {
+  async function submit(operation: 'preview_follow' | 'check_handed' | 'apply_follow' | 'preview_restore' | 'compare_clips') {
     if (toolBlockReason(s) || inFlight.current || pending || !snapshot || !clip || !source || activeSelection.current !== selection) return;
     let params: Record<string, unknown>;
     try {
       if (operation === 'apply_follow') {
         if (!canSave || !previewJob) return;
         params = {previewJobId: previewJob.jobId};
+      } else if (operation === 'preview_restore' || operation === 'compare_clips') {
+        const candidate = snapshot.clips.find(c => c.clipId === state.candidateClipId);
+        if (operation === 'compare_clips' && !candidate) throw new Error('비교할 동작을 선택하세요.');
+        params = {clipId: clip.clipId, clipRevisionId: clip.clipRevisionId, ...(candidate && operation === 'compare_clips' ? {candidateClipId: candidate.clipId, candidateClipRevisionId: candidate.clipRevisionId} : {})};
       } else params = operation === 'preview_follow' ? followParams(snapshot, clip, state.follow) : handedParams(snapshot, clip, state.handed);
     } catch (error) {setSession(old => ({...old, error: message(error)})); return;}
     inFlight.current = true;
     const requestEpoch = ++epoch.current;
-    const key = operation === 'check_handed' ? settingsKey(state.handed) : settingsKey(state.follow);
+    const key = operation === 'check_handed' ? settingsKey(state.handed) : previewKey;
     setSession(old => ({...old, sending: true, error: ''}));
     try {
       const response = await s.job(operation, [], params);
       if (!mounted.current || epoch.current !== requestEpoch || activeSelection.current !== selection) return;
       if (!response?.jobId) {setSession(old => ({...old, error: '작업 접수를 확인하지 못했습니다. 작업 센터의 오류를 확인하세요.'})); return;}
       const request: ToolRequest = {job: {status: 'queued', operation, inputRevision: snapshot.revision, ...response} as Job, source, settingsKey: key};
-      setSession(old => operation === 'preview_follow' ? {...old, preview: request, apply: undefined} : operation === 'check_handed' ? {...old, check: request} : {...old, apply: request});
+      setSession(old => ['preview_follow', 'preview_restore', 'compare_clips'].includes(operation) ? {...old, preview: request, apply: undefined} : operation === 'check_handed' ? {...old, check: request} : {...old, apply: request});
     } catch (error) {
       if (mounted.current && epoch.current === requestEpoch && activeSelection.current === selection) setSession(old => ({...old, error: message(error)}));
     } finally {
@@ -81,10 +86,10 @@ export function ClipTools({s, clipId, onClip, onSelectOccurrence}: Props) {
     const occurrenceId = result.source.occurrenceIds[index];
     if (occurrenceId && clip?.occurrences.some(o => o.occurrenceId === occurrenceId)) onSelectOccurrence(occurrenceId);
   }
-  const shownJob = state.mode === 'follow' ? previewJob : checkJob;
-  const shownResult = state.mode === 'follow' ? followResult : checkResult;
-  const shownRequest = state.mode === 'follow' ? state.preview : state.check;
-  const stale = !!shownResult && (!source || !sameSource(shownResult.source, source) || shownRequest?.settingsKey !== settingsKey(state.mode === 'follow' ? state.follow : state.handed));
+  const shownJob = state.mode !== 'handed' ? previewJob : checkJob;
+  const shownResult = state.mode !== 'handed' ? followResult : checkResult;
+  const shownRequest = state.mode !== 'handed' ? state.preview : state.check;
+  const stale = !!shownResult && (!source || !sameSource(shownResult.source, source) || shownRequest?.settingsKey !== (state.mode === 'handed' ? settingsKey(state.handed) : previewKey));
   const canNavigate = !!source && !!shownResult && sameSource(shownResult.source, source) && !s.commands.length && !s.conflict && !s.busy;
 
   return <details className="clip-tools aw-property-group" onToggle={event => setOpen(event.currentTarget.open)}>
@@ -92,13 +97,19 @@ export function ClipTools({s, clipId, onClip, onSelectOccurrence}: Props) {
     <p className="caption">저장된 동작의 전체 슬롯을 처리합니다. 외부 이미지 생성이나 생성 과금은 없습니다.</p>
     {block ? <p className="warning" role="status">{block}</p> : null}
     <Select label="보완·검사 도구" value={state.mode} onChange={event => setSession(old => ({...old, mode: event.target.value as Session['mode'], error: ''}))}>
-      <option value="follow">부위 흔들림</option><option value="handed">장비 좌우 검사</option>
+      <option value="follow">부위 흔들림</option><option value="restore">원본 복원</option><option value="compare">동작 비교</option><option value="handed">장비 좌우 검사</option>
     </Select>
     {snapshot && clip ? <>
       <p className="caption">입력: {clip.name} · 저장 버전 {snapshot.revision} · {clip.occurrences.length}슬롯 · {clip.occurrences.reduce((sum, o) => sum + o.durationMs, 0)}ms</p>
-      {state.mode === 'follow' ? <form onSubmit={event => {event.preventDefault(); void submit('preview_follow');}}>
+      {state.mode === 'restore' || state.mode === 'compare' ? <form onSubmit={event => {event.preventDefault(); void submit(state.mode === 'restore' ? 'preview_restore' : 'compare_clips');}}>
+        <p className="caption">원본 영상의 같은 시점·좌표를 증명한 셀만 복원합니다. 사용자 픽셀 편집과 과거 증거가 부족한 결과는 판단 불가로 표시합니다.</p>
+        {state.mode === 'compare' ? <Select label="비교할 동작" value={state.candidateClipId || ''} onChange={event => setSession(old => ({...old, candidateClipId: event.target.value}))}><option value="">선택</option>{snapshot.clips.map(c => <option key={c.clipId} value={c.clipId}>{c.name}</option>)}</Select> : null}
+        <button type="submit" disabled={locked || state.mode === 'compare' && !state.candidateClipId}>{state.mode === 'restore' ? '원본 복원 미리보기' : '최종 셀 비교'}</button>
+      </form> : state.mode === 'follow' ? <form onSubmit={event => {event.preventDefault(); void submit('preview_follow');}}>
         <p className="caption">첫 슬롯에서 흔들 부위를 드래그하거나 타원 좌표를 입력하세요. 모든 프레임에서 움직이는 타원이 셀 안에 있어야 합니다. 밖으로 나가면 영역을 줄이거나 옮기세요.</p>
-        <RegionSelector key={selection} snapshot={snapshot} clip={clip} fields={state.follow} enabled={open} disabled={locked} onRegion={region => updateFollow('region', region)}/>
+        <Select label="영역을 읽은 동작 (선택)" value={state.follow.readOnClipId || ''} onChange={event => updateFollow('readOnClipId', event.target.value)}><option value="">현재 첫 슬롯에서 지정</option>{snapshot.clips.filter(c => c.clipId !== clip.clipId).map(c => <option key={c.clipId} value={c.clipId}>{c.name}</option>)}</Select>
+        <p className="caption">다른 동작에서 읽은 영역은 같은 영상·좌표의 원본 셀 대응을 증명할 때만 운반합니다. 보간·다른 구간·변경된 그림은 판단 불가입니다.</p>
+        <RegionSelector key={selection + state.follow.readOnClipId} snapshot={snapshot} clip={snapshot.clips.find(c => c.clipId === state.follow.readOnClipId) || clip} fields={state.follow} enabled={open} disabled={locked} onRegion={region => updateFollow('region', region)}/>
         <fieldset disabled={locked}>
           <legend>부위 흔들림 설정</legend>
           <div className="clip-tools-grid">{(['중심 X', '중심 Y', '반지름 X', '반지름 Y'] as const).map((label, index) => <Input key={label} label={label} type="number" required step="any" min={index > 1 ? 0.01 : 0} value={state.follow.region[index]} onChange={event => {const region = [...state.follow.region] as FollowFields['region']; region[index] = event.target.value; updateFollow('region', region);}}/>)}</div>
@@ -107,6 +118,8 @@ export function ClipTools({s, clipId, onClip, onSelectOccurrence}: Props) {
             <Input label="반응 주파수 (Hz)" type="number" required min={0.2} max={12} step="any" value={state.follow.freq} onChange={event => updateFollow('freq', event.target.value)}/>
             <Input label="감쇠" type="number" required min={0.05} max={4} step="any" value={state.follow.damping} onChange={event => updateFollow('damping', event.target.value)}/>
           </div>
+          <Input label="최소 픽셀 면적 (선택, 0~0.99)" type="number" min={0} max={0.99} step="any" value={state.follow.stretchFloor || ''} onChange={event => updateFollow('stretchFloor', event.target.value)}/>
+          <Input label="영역을 읽은 시트 SHA-256 (선택)" value={state.follow.readOn || ''} onChange={event => updateFollow('readOn', event.target.value)}/>
           <Select label="과도한 접힘이 생길 때" value={state.follow.onFold} onChange={event => updateFollow('onFold', event.target.value as FollowFields['onFold'])}><option value="lower">강도를 낮추고 알림</option><option value="refuse">처리 중단</option></Select>
           {followError ? <p className="caption">{followError}</p> : null}
           <button type="submit" className="aw-wide" disabled={locked || !!followError}>흔들림 미리보기</button>
@@ -137,8 +150,10 @@ export function ClipTools({s, clipId, onClip, onSelectOccurrence}: Props) {
         {stale ? <p className="warning" role="status">원본·프로젝트 버전 또는 설정이 달라졌습니다. 현재 설정으로 다시 실행하세요.</p> : null}
         {shownResult.tool === 'follow' ? <>
           {shownResult.report.foldLimited ? <p className="warning" role="alert">접힘을 막기 위해 강도를 낮췄습니다: 요청 {shownResult.report.gainRequested} → 적용 {shownResult.report.gainApplied}. 결과를 확인하세요.</p> : null}
+          {shownResult.report.readOn?.relation === 'uncertain' ? <p className="warning" role="alert">영역 대응이 불확실합니다. 현재 첫 슬롯에서 영역을 다시 지정하세요. {shownResult.report.readOn.reason}</p> : null}
+          {shownResult.report.regionInspection ? <details><summary>영역별 실제 변형 검사</summary><p>몸통 윤곽으로 영역을 옮깁니다. 영역 안 부위의 소유 관계는 판단하지 않습니다.</p><ol>{shownResult.report.regionInspection.cells.map(c => <li key={c.index}>슬롯 {c.index + 1}: 최소 면적 {c.jacobianMin.toFixed(3)} · 불투명 {c.solidPx}px · 변경 {c.changedPx}px</li>)}</ol></details> : null}
           {shownResult.report.unchanged ? <p className="warning">움직임 변화가 없습니다. 선택 영역과 강도를 확인하세요.</p> : null}
-        </> : <>
+        </> : shownResult.tool === 'restore' || shownResult.tool === 'compare' ? <ComparisonVerdict report={shownResult.report}/> : <>
           <p className={shownResult.report.verdict === 'clear' && shownResult.report.framesShown > 0 ? 'caption' : 'warning'} role="status">{handedWarning(shownResult.report)}</p>
           <p className="caption">표식 확인 {shownResult.report.framesShown} / {shownResult.report.frameCount}프레임 · 자동 수정 없음</p>
           {shownResult.report.unchecked.length ? <div className="warning"><strong>검사하지 못한 항목</strong><ul>{shownResult.report.unchecked.map((reason, i) => <li key={i}>{reason}</li>)}</ul></div> : null}
@@ -146,7 +161,7 @@ export function ClipTools({s, clipId, onClip, onSelectOccurrence}: Props) {
         </>}
         <ClipToolComparison key={shownJob.jobId} job={shownJob} result={shownResult} enabled={open} canNavigate={canNavigate} onSelectFrame={index => selectResultFrame(shownResult, index)}/>
       </> : null}
-      {state.mode === 'follow' && previewJob ? <>
+      {state.mode !== 'handed' && previewJob ? <>
         <button type="button" className="primary aw-wide" disabled={!canSave} onClick={() => void submit('apply_follow')}>새 동작으로 저장</button>
         <p className="caption">확인한 미리보기를 새 동작으로 저장합니다.</p>
         <ToolJobStatus job={applyJob}/>
@@ -208,7 +223,7 @@ export function RegionSelector({snapshot, clip, fields, enabled, disabled, onReg
 export function ClipToolComparison({job, result, enabled, canNavigate, onSelectFrame}: {job: Job; result: ClipToolResult; enabled: boolean; canNavigate: boolean; onSelectFrame: (index: number) => void}) {
   const [index, setIndex] = useState(0), [error, setError] = useState('');
   const canvas = useRef<HTMLCanvasElement>(null), id = useId();
-  const preview = result.preview, after = result.tool === 'follow';
+  const preview = result.preview, after = result.tool !== 'handed';
   const beforeUrl = artifactUrl(job, preview.before), afterUrl = artifactUrl(job, preview.after);
   const beforeStrip = artifactUrl(job, preview.beforeStrip), afterStrip = artifactUrl(job, preview.afterStrip), board = artifactUrl(job, preview.board);
   useEffect(() => {
@@ -228,7 +243,7 @@ export function ClipToolComparison({job, result, enabled, canNavigate, onSelectF
   return <section className="clip-tools-comparison" aria-label="처리 전후 비교">
     <div className="clip-tools-previews">
       {beforeUrl ? <figure><figcaption>저장된 원본 동작</figcaption><SpriteImage src={beforeUrl} width={preview.width} height={preview.height} alt="처리 전 원본 동작 WebP"/></figure> : null}
-      {after && afterUrl ? <figure><figcaption>흔들림 미리보기</figcaption><SpriteImage src={afterUrl} width={preview.width} height={preview.height} alt="흔들림 적용 후 동작 WebP"/></figure> : null}
+      {after && afterUrl ? <figure><figcaption>선택 후보 미리보기</figcaption><SpriteImage src={afterUrl} width={preview.width} height={preview.height} alt="흔들림 적용 후 동작 WebP"/></figure> : null}
     </div>
     {missing ? <p className="warning" role="alert">비교 산출물을 찾지 못했습니다. 미리보기를 다시 실행하세요.</p> : null}
     <p className="caption">아래 프레임 비교는 원본 표시 시간을 기준으로 맞춥니다.{after ? ' 왼쪽: 이전 · 오른쪽: 이후' : ''}</p>
@@ -241,4 +256,13 @@ export function ClipToolComparison({job, result, enabled, canNavigate, onSelectF
     <details><summary>원본 슬롯별 표시 시간</summary><ol>{preview.durationsMs.map((duration, i) => <li key={i}>슬롯 {i + 1}: {duration}ms</li>)}</ol></details>
     {board ? <figure><figcaption>장비 좌우 검사 보드</figcaption><SpriteImage src={board} alt="장비 표식 위치와 의심 프레임 검사 보드"/><a href={board} target="_blank" rel="noreferrer">검사 보드 새 창에서 보기</a> <a href={board} download>검사 보드 PNG 다운로드</a></figure> : null}
   </section>;
+}
+
+export function ComparisonVerdict({report}: {report: import('./clipTools').ComparisonReport}) {
+  const labels = {improved: '측정 결함 개선', non_regressing: '측정 회귀 없음', regressed: '측정 회귀', unknown: '판단 불가'};
+  return <div role="status" className={report.verdict === 'unknown' || report.verdict === 'regressed' ? 'warning' : 'caption'}>
+    <strong>{labels[report.verdict]}</strong>{report.sourceStatus ? <p>source: {report.sourceStatus.source === 'verified-full-extraction' ? `전체 추출 확인 · raw ${report.sourceStatus.rawFrames} / keyed ${report.sourceStatus.keyedFrames}` : report.sourceStatus.source === 'recorded-canonical-source' ? '원본 셀 증거 보관됨' : '증거 불충분'} · origin: {report.sourceStatus.origin === 'unsupported-legacy' ? '과거 최초 결과 미기록' : '최초 결과 별도 보관'}</p> : null}<p>최종 셀·좌표·개별 시간과 원본 대응 검사입니다. 미술 완성도 점수가 아닙니다.</p>
+    <ul>{report.reasons.map((reason, i) => <li key={i}>{reason}</li>)}</ul>
+    <details><summary>원본·최초 결과·비교 기준 식별자</summary><p>source {report.source?.id || 'unknown'}<br/>origin {report.origin?.id || 'unsupported-legacy'}<br/>baseline {report.baseline?.id || 'unknown'}<br/>candidate {report.candidate?.id || 'unknown'}</p><p>{report.metric_version} · schema {report.schema_version} · {report.policy_version}</p></details>
+  </div>;
 }

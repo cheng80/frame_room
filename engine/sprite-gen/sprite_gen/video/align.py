@@ -6,24 +6,42 @@ set measured 16 to 27 frames). A game that turns a character mid-stride wants ev
 to be the same number of frames and to start on the same step. So every loop of the set is
 resampled to the set's median length L*: frame k of the new loop is the source loop at time
 k·L/L* (cyclic, offset 0), so a time that lands on a source frame takes that frame as filmed
-and only the times between two frames are made by RIFE — each kept unless it smeared or lost its
-outline, where the nearer source frame is taken instead (`--between auto`, the default; `rife`
-keeps every made frame and warns, `nearest` makes none). Then each loop is turned to start as a
-heel lands — read off the stride, the lowest row or the body's top line (`foot_strike`), never off
-the frame's top edge, which a long ear owns. docs/loop-repair.md section 4.
+and only the times between two frames are made by RIFE — each kept unless it smeared, lost its
+outline or carries a ghost, where the nearer source frame is taken instead (`--between auto`, the
+default; `rife` keeps every made frame and warns, `nearest` makes none); a made frame kept that
+cross-fades two drawings inside its silhouette is named to look at. Every frame delivered,
+filmed or made, passes the ghost screen (`interpolation_quality.ghost_screen`): a filmed frame half
+drawn between two drawings gives way to a clean source frame beside it, named in `ghost_at`. Then
+each loop is turned to start as a heel lands — read off the stride, the lowest row or the body's
+top line (`foot_strike`), never off the frame's top edge, which a long ear owns.
+docs/loop-repair.md section 4.
 
 Every frame between two source frames softens a little, so the length is the median (the one
-that needs the fewest made frames across the set), and a loop already that long is not touched.
+that needs the fewest made frames across the set), and a loop already that long is not resampled
+(its frames still pass the ghost screen).
 
 A loop whose cut holds each drawing for two or three frames (`held_drawings`, sprite_gen/video/
 held.py), that the length leaves at under RETAKE_DRAWINGS_MIN drawings a second, with frames
 between them that could not be made, is aligned all the same — and named in the report's `retake`
 (reason `held-drawings`, with its numbers) and in a warning: the gap is wider than any interpolator
-bridges, and only a new take fixes it.
+bridges, and only a new take fixes it. So is a loop that delivers a filmed ghost where neither source
+frame beside it is clean (reason `filmed-ghost`, its cells and source frames under `ghost`): no frame of
+the take shows the drawing there. A loop named for both carries one record, `reason` the first of them
+and `reasons` both.
 
 The loop directories are `video-loop` output directories. Their first alignment keeps the cut
 as filmed in `cycle.source/`; every later alignment reads from there, so running it again — or
 with another length — never resamples a resampled loop.
+
+Every alignment records where each cell of the new strip is from (`cycle_align.cells_from`): a frame
+of `cycle.source/` (`{"source": i}`, as many times as it is taken) or a frame made between two of them
+(`{"between": [i, j], "t": t}`). The first also records the strip as cut (`cycle_align.origin`,
+`follow.cut_origin`: its sha256, cell size, scale and crop origin, its cells, and the body's motion as
+`video-follow` reads it there), and every later one keeps it: regions somebody located on the cut's
+first cell are carried to the aligned loop by these two (`video-follow --read-on`), not read again on a
+first cell that is another. Neither changes a pixel of the strip, the GIF or the WebP. A loop never aligned whose
+strip as cut is not there (`cut_strip`) is refused by name before any loop of the set is touched: no later
+alignment could record its origin.
 
 Resampling to one length assumes every loop holds one cycle. A loop that holds two (a cut that
 took two strides as one) would come out walking twice as fast as the rest, and pixels cannot tell
@@ -36,6 +54,16 @@ it is, `--cycles <loop>=k` takes one cycle — a k-th of it, from the start whos
 is the most like it — out of the loop as filmed (`take_cycle`) and aligns that. Nothing changes the
 number of cycles in a loop but `--cycles`.
 
+The other way round, a loop may be one step of a cycle twice as long: a slow walk whose cycle the
+cut's window could not hold, its legs drawn alike. Nothing in the loop shows that — the next step
+is not in it — so the screen is the one `video-loop --anchor motion-auto` ran over the whole clip
+(`cycle.step_screen` in the cut's report, found beside the loop: `one_step`). Such a loop stops the
+set the same way (`--multi-cycle`), and align cannot settle it: whoever counts its steps cuts it
+again (`video-loop --steps 1`) and aligns the set anew, or says it holds a whole cycle
+(`--cycles <loop>=1`). A loop whose steps were counted — cut again on that count, or two lengths
+taken so a held part closes (its strip metadata says `steps: 2`) — returns half way at its second
+step: that return is no suspect (status `steps`), and the loop is aligned as the one cycle it is.
+
 Where a loop's view cannot tell its feet apart (`start_foot` null, with `foot_why`), it starts on its
 larger strike, and the report names it under `unnamed_feet` with its two strike frames as they now
 stand in `cycle/` (`candidates`, the first being the frame it starts on) — for whoever looks, a
@@ -45,6 +73,12 @@ says which own foot lands on the first candidate, and that loop alone starts as 
 
 A set that needs a made frame where no RIFE is installed raises `rife.RifeNotInstalled` with
 nothing rewritten: this command fails on it, `video-set` skips the alignment with a warning.
+
+A caller that aligns a set more than once — again with the feet told, or with a retake in place of
+one loop — names one directory for every pass (`--between-cache`): each frame made between two source
+frames is kept there (`rife.Cache`), and a later pass takes it instead of making it again where both
+source frames, the fraction and the RIFE that made it are byte for byte the same. The report counts
+the frames taken and made (`between_cache`). Nothing is kept without it.
 """
 
 from __future__ import annotations
@@ -63,11 +97,13 @@ from sprite_gen._deps import np
 from sprite_gen.gen import handedness as handed_mod
 from sprite_gen.spec.runio import atomic_write_text
 from sprite_gen.util.gif_utils import save_clean_gif
+from sprite_gen.video import follow as follow_mod
 from sprite_gen.video import held as held_mod
 from sprite_gen.video import legs as legs_mod
 from sprite_gen.video import loop as loop_mod
 from sprite_gen.video import period as period_mod
 from sprite_gen.video import rife as rife_mod
+from sprite_gen.video.interpolation_quality import CROSSFADE_LOOK, SMEAR_WARN, OUTLINE_WARN, clean_beside, faults, ghost_screen, looks
 
 SNAP = 0.03  # a sample time within this of a source frame takes that frame
 SOURCE_DIR = loop_mod.CYCLE_SOURCE_DIR  # removed by video-loop whenever it cuts the loop again
@@ -96,14 +132,6 @@ DEFAULT_BETWEEN = "auto"
 # set before anything is rewritten, warn aligns it as it is and names the loop in the warnings.
 MULTI_CYCLE = ("fail", "warn")
 CYCLES = (1, 2, 3)  # what --cycles <loop>=k may say a loop holds
-# A made frame whose dark pixels inside the body exceed both neighbours' by this fraction of its
-# solid pixels is named in the report's warnings: a smear, not a dark part that moved.
-SMEAR_WARN = 0.001
-# A made frame whose coverage edge has no outline beyond both neighbours' by this fraction of its
-# edge (`rife.smear`'s `outline_loss`) has melted: legs that crossed too far for the flow became one
-# shape of fill, or a limb a pale ghost. Outlined legs crossing too far melt at 32 %, a short step
-# the flow follows stays under 3 % (tests/video/test_rife.py; docs/loop-repair.md section 4).
-OUTLINE_WARN = 0.05
 # A loop whose source holds its drawings (two or three frames each, sprite_gen/video/held.py) and that
 # the set's length leaves at fewer than this many drawings a second, with at least UNMADE_MIN of the
 # frames between them not made (taken from the nearer source frame, or kept with a fault), is a take
@@ -114,6 +142,14 @@ OUTLINE_WARN = 0.05
 RETAKE_DRAWINGS_MIN = 13.0
 RETAKE_UNMADE_MIN = 1
 RETAKE_REASON = "held-drawings"
+# A filmed ghost the screen names is kept where it is the ghost itself that is delivered (`ghost_at`
+# `kept`): `no-clean-frame` where neither source frame beside its time is clean, `between-rife` where
+# `--between rife` kept it beside a clean one. A loop with RETAKE_GHOST_KEPT_MIN or more cells kept with no
+# clean frame is a take to film again, the reason `filmed-ghost`: no frame of the take shows the drawing
+# there. One kept under rife is the choice of whoever aligned it, and no reason.
+RETAKE_GHOST_KEPT_MIN = 1
+RETAKE_GHOST_REASON = "filmed-ghost"
+KEPT_NO_CLEAN, KEPT_RIFE = "no-clean-frame", "between-rife"
 
 
 def held_drawings(frames: list[Image.Image], *, fps: float, clip: dict[str, Any] | None = None,
@@ -142,84 +178,132 @@ def held_drawings(frames: list[Image.Image], *, fps: float, clip: dict[str, Any]
     return {"source": "cycle", **held_mod.measure([float(D[k, (k + 1) % n]) for k in range(n)], fps=fps, cyclic=True)}
 
 
-def retake(drawings: dict[str, Any], facts: dict[str, Any], *, fps: float) -> dict[str, Any] | None:
-    """The reason to film a loop again, with its numbers, or None. `drawings` is the source's
-    `held_drawings`, `facts` its `resample` facts: a held source stretched to under
-    RETAKE_DRAWINGS_MIN drawings a second, with RETAKE_UNMADE_MIN or more frames between them not made
-    — taken from the nearer source frame (`nearest_at`), or made with a fault and kept (`--between rife`)."""
-    if not drawings.get("hold") or drawings["hold"] < 2:
+def retake(drawings: dict[str, Any], facts: dict[str, Any], ghost_at: list[dict[str, Any]], *, fps: float) -> dict[str, Any] | None:
+    """The reasons to film a loop again, with their numbers, in one record, or None. `drawings` is the
+    source's `held_drawings`, `facts` its `resample` facts, `ghost_at` its cells where a filmed ghost
+    gave way or was kept, as the loop's row records them (each cell where it now stands).
+
+    `held-drawings`: a held source stretched to under RETAKE_DRAWINGS_MIN drawings a second, with
+    RETAKE_UNMADE_MIN or more frames between them not made — taken from the nearer source frame
+    (`nearest_at`), or made with a fault and kept (`--between rife`); its numbers stand in the record
+    only where it applies. `filmed-ghost`: RETAKE_GHOST_KEPT_MIN or more cells where the ghost itself
+    was kept, neither frame beside its time clean (`kept` no-clean-frame) — `ghost` names them (`kept`),
+    their frames of the source (`sources`), the highest reading (`ghost_max`) and the screen's `limit`.
+    `reason` is the first that applies, in that order, `reasons` all of them, `limits` each one's."""
+    reasons: list[str] = []
+    record: dict[str, Any] = {}
+    limits: dict[str, Any] = {}
+    if drawings.get("hold") and drawings["hold"] >= 2:
+        per_second = drawings["drawings"] / (facts["to"] / fps)
+        unmade = len(facts.get("nearest_at", [])) + sum(1 for m in facts.get("smear", []) if m["method"] == "rife" and m["faults"])
+        if per_second < RETAKE_DRAWINGS_MIN and unmade >= RETAKE_UNMADE_MIN:
+            reasons.append(RETAKE_REASON)
+            record |= {"hold": drawings["hold"], "source": drawings["source"], "drawings": drawings["drawings"],
+                       "drawings_per_second_filmed": drawings["drawings_per_second"], "drawings_per_second": round(per_second, 3),
+                       "frames_per_drawing": round(facts["to"] / drawings["drawings"], 3), "unmade": unmade}
+            limits |= {"drawings_per_second_min": RETAKE_DRAWINGS_MIN, "unmade_min": RETAKE_UNMADE_MIN}
+    kept = [g for g in ghost_at if g.get("kept") == KEPT_NO_CLEAN]
+    if len(kept) >= RETAKE_GHOST_KEPT_MIN:
+        reasons.append(RETAKE_GHOST_REASON)
+        record["ghost"] = {"kept": [g["at"] for g in kept], "sources": sorted({g["source"] for g in kept}),
+                           "ghost_max": max(g["ghost"] for g in kept), "limit": facts["ghost_screen"]["limit"]}
+        limits["ghost_kept_min"] = RETAKE_GHOST_KEPT_MIN
+    if not reasons:
         return None
-    seconds = facts["to"] / fps
-    per_second = drawings["drawings"] / seconds
-    unmade = len(facts.get("nearest_at", [])) + sum(1 for m in facts.get("smear", []) if m["method"] == "rife" and m["faults"])
-    if per_second >= RETAKE_DRAWINGS_MIN or unmade < RETAKE_UNMADE_MIN:
-        return None
-    return {"reason": RETAKE_REASON, "hold": drawings["hold"], "source": drawings["source"], "drawings": drawings["drawings"],
-            "drawings_per_second_filmed": drawings["drawings_per_second"], "drawings_per_second": round(per_second, 3),
-            "frames_per_drawing": round(facts["to"] / drawings["drawings"], 3), "unmade": unmade,
-            "limits": {"drawings_per_second_min": RETAKE_DRAWINGS_MIN, "unmade_min": RETAKE_UNMADE_MIN}}
+    return {"reason": reasons[0], "reasons": reasons, **record, "limits": limits}
 
 
-def _retake_line(name: str, r: dict[str, Any]) -> str:
-    """A loop to film again, in words."""
-    return (f"{name}: film this direction again ({r['reason']}) — its {'clip' if r['source'] == 'clip' else 'cut'} shows each drawing for {r['hold']} frames "
+def _retake_line(name: str, r: dict[str, Any], reason: str) -> str:
+    """A loop to film again for `reason` (one of its `reasons`), in words."""
+    if reason == RETAKE_GHOST_REASON:
+        g = r["ghost"]
+        cells, sources = ", ".join(map(str, g["kept"])), ", ".join(map(str, g["sources"]))
+        return (f"{name}: film this direction again ({reason}) — frame(s) {cells} show source frame(s) {sources} of {SOURCE_DIR}/, "
+                f"filmed ghosts (up to {_ghost_words(g['ghost_max'])}), and the source frames beside each are filmed ghosts too: "
+                "no clean frame stands there, so the loop shows the ghost. A new take fixes it; no frame of this one shows the "
+                "drawing there (docs/loop-repair.md section 4)")
+    return (f"{name}: film this direction again ({reason}) — its {'clip' if r['source'] == 'clip' else 'cut'} shows each drawing for {r['hold']} frames "
             f"({r['drawings']:g} drawings in the cycle, {r['drawings_per_second_filmed']:g} a second as filmed); at the set's length "
             f"that is {r['drawings_per_second']:g} drawings a second, {r['frames_per_drawing']:g} frames apart, and {r['unmade']} "
             "frame(s) between them could not be made, so the loop halts there. A new take that draws every frame "
             "fixes it; no interpolator draws legs that swap places across a gap this wide (docs/loop-repair.md section 4)")
 
 
-def faults(measure: dict[str, float]) -> list[str]:
-    """What is wrong with a made frame, by its `rife.smear` measure: `smear` (dark beyond both
-    neighbours, SMEAR_WARN) and `outline` (outline lost beyond both, OUTLINE_WARN)."""
-    return ([*(["smear"] if measure["dark_excess"] > SMEAR_WARN else []),
-             *(["outline"] if measure["outline_loss"] > OUTLINE_WARN else [])])
-
-
 def resample(frames: list[Image.Image], length: int, interpolate: rife_mod.Interpolate | None,
-             *, between: str = DEFAULT_BETWEEN) -> tuple[list[Image.Image], dict[str, Any]]:
-    """`frames` as one cycle, resampled to `length` frames at times k·L/length (offset 0).
+             *, between: str = DEFAULT_BETWEEN, cells_from: list[dict[str, Any]] | None = None) -> tuple[list[Image.Image], dict[str, Any]]:
+    """`frames` as one cycle, resampled to `length` frames at times k·L/length (offset 0). Where `cells_from` is a
+    list, where each frame came from is appended to it: `{"source": i}` for a frame of `frames` taken as it is, `{"between":
+    [i, j], "t": t}` for one made between two.
 
     A time between two source frames is made by `interpolate`, with what it added and the outline it
-    lost measured (`rife.smear`) and judged (`faults`); `between` auto keeps a made frame with no
-    fault and takes the nearer source frame where it has one, rife keeps every made frame, nearest
-    makes none and takes the nearer source frame (the motion keeps the filmed frames at up to half a
-    frame off their time). Every made frame is listed in `smear` with its `method`: rife (kept) or
-    nearest (the nearer source frame taken instead)."""
+    lost measured (`rife.smear`), its own ghost read (`rife.ghost`), and judged (`faults`); `between`
+    auto keeps a made frame with no fault and takes the nearer source frame where it has one, rife
+    keeps every made frame, nearest makes none and takes the nearer source frame (the motion keeps the
+    filmed frames at up to half a frame off their time). Every made frame is listed in `smear` with
+    its `method`: rife (kept) or nearest (a source frame beside it taken instead), and its `crossfade`
+    (`rife.crossfade`: two drawings cross-faded inside its silhouette) with what to `look` at — named,
+    never a reason to give it way.
+
+    Every frame delivered passes the ghost screen (`ghost_screen`, the source loop's, recorded as it is):
+    a source frame it names is not taken under auto or nearest — at a time on it, the frame after it is,
+    or the one before it; where it is the nearer frame, the other beside the time is — and rife keeps it.
+    Each such cell is listed in `ghost_at`: `at`, the ghost `source` and its reading, and the frame
+    `taken` — the ghost itself where rife kept it beside a clean frame (`kept` between-rife), or where
+    neither frame beside it is clean (`kept` no-clean-frame, under any `between`)."""
     count = len(frames)
     if length < 2:
         raise ValueError(f"cycle length {length} is too short")
     if between not in BETWEEN:
         raise ValueError(f"between must be one of {', '.join(BETWEEN)}, not {between!r}")
+    screen = ghost_screen(frames)
+    ghosts = {g["frame"]: g["ghost"] for g in screen["ghosts"]}
     out: list[Image.Image] = []
     made_at: list[int] = []
     nearest_at: list[int] = []
     smears: list[dict[str, Any]] = []
+    ghost_at: list[dict[str, Any]] = []
+
+    def clean(k: int, first: int, other: int | None) -> int:
+        """`first` where the screen passes it, else `other`, the clean frame beside it, where there is one
+        (rife takes `first` as it is); each ghost passed over or taken is listed in `ghost_at`, a ghost
+        taken with why it was kept."""
+        if first not in ghosts:
+            return first
+        taken_ = first if between == "rife" or other is None else other
+        ghost_at.append({"at": k, "source": first, "ghost": ghosts[first], "taken": taken_,
+                         **({"kept": KEPT_NO_CLEAN if other is None else KEPT_RIFE} if taken_ == first else {})})
+        return taken_
+
     for k in range(length):
         t = k * count / length
         i = int(np.floor(t))
         frac = t - i
-        nearer = frames[(i + (frac >= 0.5)) % count]
-        if frac < SNAP:
-            out.append(frames[i % count])
-        elif frac > 1 - SNAP:
-            out.append(frames[(i + 1) % count])
+        nearer = (i + (frac >= 0.5)) % count
+        beside = (i + (frac < 0.5)) % count  # the other frame beside the time
+        if frac < SNAP or frac > 1 - SNAP:  # on a source frame (the nearer); a ghost there gives way to the frame after it, else before
+            taken: dict[str, Any] = {"source": clean(k, nearer, clean_beside(nearer, ghosts, count))}
         elif between == "nearest":
-            out.append(nearer)
+            taken = {"source": clean(k, nearer, None if beside in ghosts else beside)}
             nearest_at.append(k)
         else:
             if interpolate is None:
                 raise ValueError(f"frame {k} of {length} falls between source frames and no interpolator is available")
             a, b = frames[i % count], frames[(i + 1) % count]
             made = interpolate(a, b, frac)
-            measure = rife_mod.smear(made, a, b)
+            measure = {**rife_mod.smear(made, a, b), "outline_shift": rife_mod.outline_shift(made, a, b),
+                       "ghost": rife_mod.ghost(made) if screen["reads"] else None,
+                       "crossfade": rife_mod.crossfade(made, a, b, frac)}
             wrong = faults(measure)
             keep = between == "rife" or not wrong
-            out.append(made if keep else nearer)
+            taken = ({"between": [i % count, (i + 1) % count], "t": round(frac, 4)} if keep
+                     else {"source": clean(k, nearer, None if beside in ghosts else beside)})
             (made_at if keep else nearest_at).append(k)
-            smears.append({"at": k, "method": "rife" if keep else "nearest", **measure, "faults": wrong})
+            smears.append({"at": k, "method": "rife" if keep else "nearest", **measure, "faults": wrong, "look": looks(measure)})
+        out.append(made if "between" in taken else frames[taken["source"]])
+        if cells_from is not None:
+            cells_from.append(taken)
     facts: dict[str, Any] = {"from": count, "to": length, "between": between, "taken": length - len(made_at),
-                             "made_by_rife": len(made_at), "made_at": made_at}
+                             "made_by_rife": len(made_at), "made_at": made_at, "ghost_screen": screen, "ghost_at": ghost_at}
     if between != "rife":
         facts["nearest_at"] = nearest_at
     if between != "nearest":
@@ -442,15 +526,68 @@ class CycleSuspects(SystemExit):
         self.command = command
 
 
+def cut_report(loop_dir: Path, meta_path: Path, meta: dict[str, Any]) -> tuple[Path, dict[str, Any]] | None:
+    """The report `video-loop` wrote for this loop's cut, or None: a JSON of kind
+    sprite-gen-video-loop-report, passed, in the loop's directory or the one above it (a video-set
+    item keeps it there), whose strip is this loop's and whose cut (start, length) is the one the strip
+    metadata records (`cycle_drawings`) — a report of another cut of the same clip is not it."""
+    cut = meta.get("cycle_drawings") or {}
+    if "start" not in cut or "length" not in cut:
+        return None
+    strip_name = meta_path.name[: -len(".strip.json")] + ".strip.png"
+    for folder in (loop_dir, loop_dir.parent):
+        for path in sorted(folder.glob("*.json")):
+            if path.name.endswith(".strip.json"):
+                continue
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            if not isinstance(data, dict) or data.get("kind") != "sprite-gen-video-loop-report" or data.get("status") != "passed":
+                continue
+            cycle = data.get("cycle") or {}
+            if (Path(str((data.get("strip") or {}).get("path", ""))).name == strip_name
+                    and (cycle.get("start"), cycle.get("length")) == (cut["start"], cut["length"])):
+                return path, data
+    return None
+
+
+def one_step(loop_dir: Path, meta_path: Path, meta: dict[str, Any]) -> dict[str, Any] | None:
+    """A loop the cut's step screen suspects of being one step (`cut_report`, `cycle.step_screen`), and
+    whose steps nobody counted (no `steps` in its strip metadata): the screen's evidence and the report
+    it is in. None otherwise — and where no report is found."""
+    if meta.get("steps") is not None:
+        return None
+    found = cut_report(loop_dir, meta_path, meta)
+    if found is None:
+        return None
+    path, data = found
+    screen = (data.get("cycle") or {}).get("step_screen") or {}
+    if not screen.get("suspect"):
+        return None
+    return {**{k: screen[k] for k in ("length", "lag", "ratio", "depth", "pairs", "coverage", "leg_peaks", "why") if k in screen},
+            "seconds": round(screen["lag"] / float(data["fps"]), 3), "report": str(path)}
+
+
 def _suspect_line(entry: dict[str, Any]) -> str:
     """One loop's suspects, in words: where it returns, how, and what that would make it."""
+    if "one_step" in entry:
+        step = entry["one_step"]
+        line = (f"{entry['dir']}: may be one step of a cycle {step['lag']} frames long ({step['seconds']:.3f} s) — it repeats "
+                f"{step['ratio']:.2f}x as far two lengths on in its clip as one length on; count its steps, and if it is one, cut it "
+                f"again with `sprite-gen video-loop … --steps 1` (the arguments are in {step['report']}) and align the set anew")
+        return line + ("; it may also hold " + "; or ".join(_returns_said(entry)) if entry["candidates"] else "")
+    return f"{entry['dir']}: may hold " + "; or ".join(_returns_said(entry))
+
+
+def _returns_said(entry: dict[str, Any]) -> list[str]:
     parts = []
     for row in entry["candidates"]:
         evidence = [f"pose {row['pose']:.2f}" if row.get("pose") is not None else None,
                     f"steps {row['steps']:.2f}" if row.get("steps") is not None else None]
         parts.append(f"{row['cycles']} cycles of {row['period']} frames ({row['seconds']:.3f} s) — {row['why']}"
                      + (f" [{', '.join(e for e in evidence if e)}]" if any(evidence) else ""))
-    return f"{entry['dir']}: may hold " + "; or ".join(parts)
+    return parts
 
 
 def _resolve_loops(flag: str, given: dict[str, Any] | None, loops: list[tuple[Path, Path, dict[str, Any], float]],
@@ -490,6 +627,11 @@ def _loop_files(loop_dir: Path) -> tuple[Path, dict[str, Any]]:
     for key in ("cycle_frames", "cycle_seconds", "cell_height_cap", "kind"):
         if key not in meta:
             raise ValueError(f"{metas[0]}: no `{key}` — cut the loop again with this sprite-gen (video-loop) before aligning it")
+    strip = cut_strip(loop_dir, metas[0], meta)
+    if strip is not None and not strip.is_file():
+        raise ValueError(f"{loop_dir}: no {strip.name} — a first alignment reads the strip as cut to record where its cells are from "
+                         "(cycle_align.origin, which video-follow --read-on carries regions by); put the loop's strip back, or cut "
+                         "the loop again with video-loop, before aligning it")
     return metas[0], meta
 
 
@@ -510,9 +652,30 @@ def _source_frames(loop_dir: Path) -> list[Image.Image]:
     return [Image.open(f).convert("RGBA") for f in files]
 
 
+def cut_strip(loop_dir: Path, meta_path: Path, meta: dict[str, Any]) -> Path | None:
+    """The file `origin_of` reads the strip as cut from: on a loop never aligned its strip now (`follow.source.png` where a
+    follow-through moved it); None on a loop aligned before, whose origin its first alignment recorded."""
+    if "cycle_align" in meta:
+        return None
+    source = loop_dir / loop_mod.FOLLOW_SOURCE
+    return source if source.exists() else loop_dir / f"{meta_path.name[: -len('.strip.json')]}.strip.png"
+
+
+def origin_of(loop_dir: Path, meta_path: Path, meta: dict[str, Any]) -> dict[str, Any] | None:
+    """The strip as cut that this loop is aligned from (`follow.cut_origin`), read before anything is rewritten from
+    `cut_strip`; on a loop aligned before, the origin its first alignment recorded, kept as it is — None where that
+    alignment recorded none (the cut is no longer there to read)."""
+    strip = cut_strip(loop_dir, meta_path, meta)
+    if strip is None:
+        return meta["cycle_align"].get("origin")
+    return follow_mod.cut_origin(strip.read_bytes(), meta)
+
+
 def _rebuild(loop_dir: Path, meta_path: Path, meta: dict[str, Any], frames: list[Image.Image], fps: float,
-             record: dict[str, Any]) -> dict[str, Any]:
-    """Write the aligned cycle, strip, GIF and WebP over the loop's own, at the loop's own cell size rules."""
+             record: dict[str, Any], *, cells_from: list[dict[str, Any]] | None = None,
+             origin: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Write the aligned cycle, strip, GIF and WebP over the loop's own, at the loop's own cell size rules. `cells_from`
+    says where each of `frames` is from; the record keeps it per cell of the strip, with the cut's `origin`."""
     name = meta_path.name[: -len(".strip.json")]
     cycle_dir = loop_dir / "cycle"
     cycle_dir.mkdir(exist_ok=True)
@@ -521,16 +684,19 @@ def _rebuild(loop_dir: Path, meta_path: Path, meta: dict[str, Any], frames: list
     for k, im in enumerate(frames):
         im.save(cycle_dir / f"frame-{k:03d}.png")
     cycle_seconds = len(frames) / fps
-    standing = meta.get("body_src_h") if meta.get("body_ref") == "first-frame" else None
+    standing = meta.get("body_src_h") if meta.get("body_ref") in ("first-frame", "cut-first-frame") else None
     strip, strip_meta = loop_mod.build_strip(
         frames, max_height=int(meta["cell_height_cap"]), cycle_seconds=cycle_seconds, body_height=meta.get("body_height_target"),
-        anchor="feet" if meta.get("foot_anchor") == "feet" else "none", kind=str(meta["kind"]), standing_src=standing)
+        anchor="feet" if meta.get("foot_anchor") == "feet" else "none", kind=str(meta["kind"]), standing_src=standing,
+        standing_frame=int(meta.get("body_ref_frame") or 0))
     # what build_strip does not own (how the cut was anchored) is carried over as it was; a
     # follow-through moved the old cycle's cells, so it is cleared and the record says so
     if "follow" in meta or (loop_dir / loop_mod.FOLLOW_SOURCE).exists():
         record["follow_cleared"] = True
     (loop_dir / loop_mod.FOLLOW_SOURCE).unlink(missing_ok=True)
-    merged = {**{k: v for k, v in meta.items() if k not in strip_meta and k not in ("cycle_align", "follow")}, **strip_meta}
+    # a loop one cycle of which was taken out (`--cycles` k > 1) no longer holds the steps it was counted with
+    merged = {**{k: v for k, v in meta.items() if k not in strip_meta and k not in ("cycle_align", "follow")
+                 and not (k == "steps" and "cycle_taken" in record)}, **strip_meta}
     if meta.get("foot_anchor") and meta.get("foot_anchor") != "feet":
         merged["foot_anchor"] = meta["foot_anchor"]
     cells = [strip.crop((k * strip_meta["w"], 0, (k + 1) * strip_meta["w"], strip_meta["h"])) for k in range(strip_meta["frames"])]
@@ -538,6 +704,10 @@ def _rebuild(loop_dir: Path, meta_path: Path, meta: dict[str, Any], frames: list
     adjacent = float(np.abs(flat[1:] - flat[:-1]).mean())
     seam = float(np.abs(flat[-1] - flat[0]).mean())
     record["seam_ratio"] = round(seam / adjacent, 4) if adjacent > 0 else None
+    if origin is not None:
+        record["origin"] = origin
+    if cells_from is not None:  # per cell of the strip, which may hold fewer of the frames than the cycle (`sample_indices`)
+        record["cells_from"] = [cells_from[i] for i in strip_meta["sample_indices"]]
     merged["cycle_align"] = record
     strip.save(loop_dir / f"{name}.strip.png")
     atomic_write_text(meta_path, json.dumps(merged, indent=2) + "\n")
@@ -548,7 +718,7 @@ def _rebuild(loop_dir: Path, meta_path: Path, meta: dict[str, Any], frames: list
     shutil.rmtree(loop_dir / ".webp-frames", ignore_errors=True)
     # a GIF or WebP holds a frame shown twice in a row (`--between nearest` stretching a loop) as one
     # frame of twice the delay, so each is checked for one frame per run of identical cells
-    runs = 1 + sum(1 for a, b in zip(cells, cells[1:]) if a.tobytes() != b.tobytes())
+    runs = loop_mod.shown_runs(cells)
     record["gif"] = loop_mod.verify_animation(gif_path, expect_frames=runs, check_stale=False)
     record["webp"] = loop_mod.verify_animation(webp_path, expect_frames=runs, check_stale=True)
     return merged
@@ -564,22 +734,53 @@ def _unnamed_foot(row: dict[str, Any]) -> dict[str, Any]:
             "settle": [f"--foot {row['dir']}={s}" for s in handed_mod.SIDES]}
 
 
-def _fault_line(name: str, m: dict[str, Any]) -> str:
-    """A made frame's faults, in words, and what became of it."""
+def _ghost_words(reading: float) -> str:
+    return f"a part-covered band over {100 * reading:.2f} % of its body, at least {rife_mod.GHOST_THICK} px thick"
+
+
+def _fault_line(name: str, m: dict[str, Any], ghost: dict[str, Any] | None = None) -> str:
+    """A made frame's faults, in words, and what became of it; `ghost` is its cell's `ghost_at` entry
+    where the nearer source frame is a filmed ghost — the other beside it taken, or the ghost kept, the
+    other a filmed ghost too (`_ghost_line` names both)."""
     what = [*([f"has {100 * m['dark_excess']:.2f} % more dark pixels inside the body than either source frame beside it — a smear"]
               if "smear" in m["faults"] else []),
-            *([f"lost its outline on {100 * m['outline_loss']:.2f} % of its edge beyond either source frame beside it — "
-               "a melted or ghost limb"] if "outline" in m["faults"] else [])]
+            *([f"lost its outline on {100 * m['outline_loss']:.2f} % of its edge beyond either source frame beside it"
+               + ("" if m["outline_shift"] is None else f", {100 * m['outline_shift']:.2f} % lighter than theirs at the same rank")
+               + " — a melted or ghost limb"] if "outline" in m["faults"] else []),
+            *([f"carries {_ghost_words(m['ghost'])} — a ghost"] if "ghost" in m["faults"] else [])]
     if m["method"] == "nearest":
-        return f"{name}: frame {m['at']}: RIFE's frame " + "; ".join(what) + ", so the nearer source frame was taken there (--between auto)"
+        return (f"{name}: frame {m['at']}: RIFE's frame " + "; ".join(what)
+                + (", so the nearer source frame was taken there (--between auto)" if ghost is None else
+                   ", so the source frame on its other side was taken there, the nearer being a filmed ghost (--between auto)"
+                   if ghost["taken"] != ghost["source"] else
+                   ", so the nearer source frame, a filmed ghost, was kept there, the frames beside it being filmed ghosts too "
+                   "(--between auto)"))
     return (f"{name}: frame {m['at']} (made by RIFE) " + "; ".join(what)
             + "; see it in cycle/, or align with --between auto (the nearer source frame there) or --between nearest")
+
+
+def _look_line(name: str, m: dict[str, Any]) -> str:
+    """A made frame kept that cross-fades two drawings inside its silhouette, in words."""
+    return (f"{name}: frame {m['at']} (made by RIFE) may cross-fade two drawings inside its outline — where the source frames "
+            f"beside it differ it shows their blend and lost their strong edges (crossfade {m['crossfade']:.4f}, over {CROSSFADE_LOOK}); "
+            "kept, a reading to look at and not a fault — see it in cycle/, and where the legs show twice, align with "
+            "--between nearest or film the direction again (docs/loop-repair.md section 4)")
+
+
+def _ghost_line(name: str, g: dict[str, Any]) -> str:
+    """A cell where a filmed ghost frame would have been delivered, and what was instead."""
+    line = f"{name}: frame {g['at']}: source frame {g['source']} is a filmed ghost ({_ghost_words(g['ghost'])})"
+    if g["taken"] != g["source"]:
+        return line + f", so source frame {g['taken']} beside it was taken there"
+    if g["kept"] == KEPT_RIFE:
+        return line + "; kept (--between rife) — see it in cycle/, or align with --between auto or nearest (a clean frame beside it there)"
+    return line + ", and so are the frames beside it; kept — film this direction again"
 
 
 def align_set(loop_dirs: list[Path], *, length: int | None = None, interpolate: rife_mod.Interpolate | None = None,
               report_path: Path | None = None, between: str = DEFAULT_BETWEEN, views: list[str | None] | None = None,
               start_foot: str = START_FOOT, multi_cycle: str = "fail", cycles: dict[str, int] | None = None,
-              state: str | None = None, feet: dict[str, str] | None = None) -> dict[str, Any]:
+              state: str | None = None, feet: dict[str, str] | None = None, between_cache: Path | None = None) -> dict[str, Any]:
     """Resample every loop of a set to one length (default: the median), turned to a foot strike —
     where `views` (one per loop: `front`, `back`, `side@right`, `front_diagonal@left`, …) lets it,
     the strike of the same own foot (`start_foot`) in every loop.
@@ -595,9 +796,19 @@ def align_set(loop_dirs: list[Path], *, length: int | None = None, interpolate: 
     whoever looked saw it (`--foot`): that loop starts where `start_foot` lands, recorded
     `start_foot_source` "given" (`foot_strike`). A loop whose foot nobody named is listed under the
     report's `unnamed_feet`, with its two strike frames in the rebuilt `cycle/` (`candidates`) and the
-    `--foot` arguments that settle it."""
+    `--foot` arguments that settle it.
+
+    `between_cache` is a directory every frame made between two source frames is kept in and taken from
+    (`rife.Cache`), for a caller that aligns the same set again: a frame is taken only for the same two
+    source frames, fraction and interpolator (its `identity()`, which an injected one must have). The
+    report's `between_cache` counts the frames taken (`hits`), made (`misses`), kept but unreadable, and
+    made while what they are made from changed, so not kept (`not_kept`); it is None without a
+    directory, and nothing is kept."""
     if len(loop_dirs) < 1:
         raise SystemExit("video-cycle-align: at least one --loop-dir")
+    if between_cache is not None and interpolate is not None and not callable(getattr(interpolate, "identity", None)):
+        raise SystemExit("video-cycle-align: --between-cache keeps each frame under what made it, and the interpolator given "
+                         "names no identity (`identity()`, as rife.Rife names its binary, model and machine)")
     if views is not None and len(views) != len(loop_dirs):
         raise SystemExit(f"video-cycle-align: {len(views)} --view for {len(loop_dirs)} --loop-dir; give one per loop, in the same order")
     if start_foot not in handed_mod.SIDES:
@@ -608,6 +819,10 @@ def align_set(loop_dirs: list[Path], *, length: int | None = None, interpolate: 
         if v is not None:
             name, _, facing = v.partition("@")
             handed_mod.validate_view(name, facing or None)
+    try:
+        cache = rife_mod.Cache(between_cache) if between_cache is not None else None
+    except OSError as exc:
+        raise SystemExit(f"video-cycle-align: --between-cache {between_cache}: {exc}") from exc
     loops = []
     for d in loop_dirs:
         d = d.expanduser().resolve()
@@ -634,16 +849,23 @@ def align_set(loop_dirs: list[Path], *, length: int | None = None, interpolate: 
     suspects: list[dict[str, Any]] = []
     taken: dict[int, dict[str, Any]] = {}
     cycle_warnings: list[str] = []
-    for i, ((d, meta_path, _, _), screen) in enumerate(zip(loops, screens)):
+    for i, ((d, meta_path, meta, _), screen) in enumerate(zip(loops, screens)):
         k = given.get(i)
-        if screen["suspects"]:
-            status = "stopped" if k is None and multi_cycle == "fail" else "warned" if k is None else "counted"
+        # A loop counted two steps long (`steps`) returns half way at its second step: not a second cycle.
+        stepped = [row for row in screen["suspects"] if meta.get("steps") == 2 and row["cycles"] == 2]
+        rows = [row for row in screen["suspects"] if row not in stepped]
+        step = one_step(d, meta_path, meta)
+        if rows or step or stepped:
+            status = ("counted" if k is not None else "steps" if not rows and not step
+                      else "stopped" if multi_cycle == "fail" else "warned")
             suspects.append({"dir": str(d), "name": meta_path.name[: -len(".strip.json")], "length": len(sources[i]),
                              "status": status, "cycles_given": k,
                              "candidates": [{key: row[key] for key in ("period", "seconds", "divisor", "cycles", "periodicity", "pose",
                                                                        "off_path", "distance", "steps", "follow", "why") if key in row}
-                                            for row in screen["suspects"]],
-                             "settle": [f"--cycles {d}={c}" for c in sorted({1, *(row["cycles"] for row in screen["suspects"])})]})
+                                            for row in (rows or stepped)],
+                             **({"one_step": step} if step else {}),
+                             **({"steps": meta["steps"]} if stepped else {}),
+                             "settle": [f"--cycles {d}={c}" for c in sorted({1, *(row["cycles"] for row in rows)})]})
         if k is not None and k > 1:
             if not any(row["cycles"] == k for row in screen["suspects"]):
                 cycle_warnings.append(f"{d}: --cycles {k} given, but the screen found no return at 1/{k} of it; "
@@ -657,13 +879,15 @@ def align_set(loop_dirs: list[Path], *, length: int | None = None, interpolate: 
                  *(f"--view {v}" for v in (views or []) if v is not None), *([f"--length {length}"] if length is not None else []),
                  *([f"--between {between}"] if between != DEFAULT_BETWEEN else []), *([f"--start-foot {start_foot}"] if start_foot != START_FOOT else []),
                  *([f"--state {state}"] if state else []), *([f"--report {report_path}"] if report_path is not None else []),
+                 *([f"--between-cache {cache.directory}"] if cache is not None else []),
                  *(f"--cycles {loops[i][0]}={k}" for i, k in sorted(given.items())),
                  *(f"--foot {loops[i][0]}={f}" for i, f in sorted(told.items())),
                  *(f"--cycles {e['dir']}=<{'|'.join(s.rpartition('=')[2] for s in e['settle'])}>" for e in stopped)]
         command = " ".join(rerun)
         message = ("video-cycle-align: " + "; ".join(_suspect_line(e) for e in stopped)
-                   + ". Stopped before anything was rewritten: pixels cannot tell two cycles from one cycle whose steps look alike. "
-                   "Count the cycles in each (look at it, or ask a vision model how often each foot lands), then run, with each count "
+                   + ". Stopped before anything was rewritten: pixels cannot tell two cycles from one cycle whose steps look alike"
+                   + (", nor one step from a cycle" if any("one_step" in e for e in stopped) else "")
+                   + ". Count the cycles in each (look at it, or ask a vision model how often each foot lands), then run, with each count "
                    f"filled in (1: it holds one, aligned as it is; more: one cycle is taken out of it): {command}"
                    " — or add --multi-cycle warn to align the set as it is (docs/loop-repair.md section 4)")
         if report_path is not None:
@@ -673,7 +897,8 @@ def align_set(loop_dirs: list[Path], *, length: int | None = None, interpolate: 
                 "cycles_given": {str(loops[i][0]): k for i, k in given.items()}, "feet_given": {str(loops[i][0]): f for i, f in told.items()}})
         raise CycleSuspects(message, suspects, command)
     cycle_warnings += [f"{_suspect_line(e)}; aligned as it is (--multi-cycle warn) — at the set's length it plays "
-                       f"{max(row['cycles'] for row in e['candidates'])} times as fast as the rest if it does"
+                       + ("one step where the rest play two, if it is one" if "one_step" in e else
+                          f"{max(row['cycles'] for row in e['candidates'])} times as fast as the rest if it does")
                        for e in suspects if e["status"] == "warned"]
     lengths = [len(f) for f in sources]
     target = length if length is not None else round(statistics.median(lengths))
@@ -685,13 +910,19 @@ def align_set(loop_dirs: list[Path], *, length: int | None = None, interpolate: 
             found = rife_mod.Rife()
             located.append(found.describe())
             interpolate = found
-        return interpolate(a, b, t)
+        return cache.frame(interpolate, a, b, t) if cache is not None else interpolate(a, b, t)
 
-    # Every loop is resampled before any is rewritten: a loop that cannot be made leaves the set as it was.
+    # Every loop is resampled before any is rewritten: a loop that cannot be made leaves the set as it was. The cut
+    # each is aligned from is read first, while its strip is still the cut's.
+    origins = [origin_of(d, meta_path, meta) for d, meta_path, meta, _ in loops]
     aligned = []
     for i, ((d, *_), frames, view) in enumerate(zip(loops, sources, views or [None] * len(loops))):
+        # which frame of cycle.source/ each of `frames` is: all of them, or the one cycle `--cycles` took out
+        index = ([(taken[i]["start"] + k) % taken[i]["from"] for k in range(taken[i]["length"])] if i in taken
+                 else list(range(len(frames))))
+        provenance: list[dict[str, Any]] = []
         try:
-            out, facts = resample(frames, target, lazy, between=between)
+            out, facts = resample(frames, target, lazy, between=between, cells_from=provenance)
             strike = foot_strike(out, view=view, foot=start_foot, given=told.get(i))
         except rife_mod.RifeNotInstalled as exc:
             raise rife_mod.RifeNotInstalled(f"{d}: {exc}") from exc
@@ -699,7 +930,10 @@ def align_set(loop_dirs: list[Path], *, length: int | None = None, interpolate: 
             raise SystemExit(f"video-cycle-align: {d}: {exc}; frames between source frames are made by RIFE (docs/loop-repair.md)") from exc
         start = strike["start"]
         drawings = held_drawings(frames, fps=fps, clip=loops[i][2].get("drawings"), cut=loops[i][2].get("cycle_drawings"))
-        again = retake(drawings, facts, fps=fps)
+        # the ghosts passed over or kept as frames of cycle.source/, each cell where it now stands
+        ghost_at = sorted(({**g, "at": (g["at"] - start) % target, "source": index[g["source"]], "taken": index[g["taken"]]}
+                           for g in facts["ghost_at"]), key=lambda g: g["at"])
+        again = retake(drawings, facts, ghost_at, fps=fps)
         record = {**facts, "drawings": drawings, "retake": again, "turned_by": start, "turned_on": strike["by"], "view": view, "start_foot": strike["start_foot"],
                   "start_foot_source": strike["start_foot_source"],
                   # the two strikes as they stand in the rebuilt cycle/: the larger first
@@ -713,17 +947,31 @@ def align_set(loop_dirs: list[Path], *, length: int | None = None, interpolate: 
             record["nearest_at"] = sorted((k - start) % target for k in facts["nearest_at"])
         if "smear" in facts:
             record["smear"] = sorted(({**m, "at": (m["at"] - start) % target} for m in facts["smear"]), key=lambda m: m["at"])
-        aligned.append((out[start:] + out[:start], record))
+        # the screen's frames as frames of cycle.source/
+        record["ghost_screen"] = {**facts["ghost_screen"], "ghosts": [{**g, "frame": index[g["frame"]]} for g in facts["ghost_screen"]["ghosts"]]}
+        record["ghost_at"] = ghost_at
+        provenance = [{"source": index[p["source"]]} if "source" in p else {"between": [index[j] for j in p["between"]], "t": p["t"]}
+                      for p in provenance]
+        aligned.append((out[start:] + out[:start], record, provenance[start:] + provenance[:start]))
     rows = []
-    for (d, meta_path, meta, _), (out, record) in zip(loops, aligned):
-        merged = _rebuild(d, meta_path, meta, out, fps, record)
-        rows.append({"dir": str(d), "name": meta_path.name[: -len(".strip.json")], **{k: v for k, v in record.items() if k not in ("gif", "webp")},
+    for (d, meta_path, meta, _), (out, record, provenance), origin in zip(loops, aligned, origins):
+        merged = _rebuild(d, meta_path, meta, out, fps, record, cells_from=provenance, origin=origin)
+        # The report names where each cell is from; the cut's own record stays in the strip's meta.
+        rows.append({"dir": str(d), "name": meta_path.name[: -len(".strip.json")],
+                     **{k: v for k, v in record.items() if k not in ("gif", "webp", "origin")},
                      "strip": {k: merged[k] for k in ("frames", "w", "h", "body_h", "delay_ms")}})
-    warnings = [_fault_line(r["name"], m) for r in rows for m in r.get("smear", []) if m["faults"]]
+    warnings = [_fault_line(r["name"], m, next((g for g in r["ghost_at"] if g["at"] == m["at"]), None))
+                for r in rows for m in r.get("smear", []) if m["faults"]]
+    warnings += [_look_line(r["name"], m) for r in rows for m in r.get("smear", []) if m["method"] == "rife" and m["look"]]
     retakes = [{"dir": r["dir"], "name": r["name"], **r["retake"]} for r in rows if r["retake"]]
     # A loop to film again is named by its directory where two loops share a strip name (each `walk`).
     shared = len({r["name"] for r in rows}) < len(rows)
-    warnings = cycle_warnings + [_retake_line(r["dir"] if shared else r["name"], r["retake"]) for r in rows if r["retake"]] + warnings
+    warnings += [_ghost_line(r["dir"] if shared else r["name"], g) for r in rows for g in r["ghost_at"]]
+    warnings += [f"{r['dir'] if shared else r['name']}: the ghost screen does not read it — {r['ghost_screen']['why']}; no frame of it "
+                 "is named a ghost or given way for one, so look at cycle/ (docs/loop-repair.md section 4)"
+                 for r in rows if not r["ghost_screen"]["reads"]]
+    warnings = cycle_warnings + [_retake_line(r["dir"] if shared else r["name"], r["retake"], reason)
+                                 for r in rows if r["retake"] for reason in r["retake"]["reasons"]] + warnings
     unnamed = [_unnamed_foot(r) for r in rows if r["start_foot"] is None]
     if len(rows) > 1 and views is None and unnamed:
         warnings.append("no view given (--view): each loop " + ("not named by --foot " if told else "")
@@ -742,6 +990,7 @@ def align_set(loop_dirs: list[Path], *, length: int | None = None, interpolate: 
               "fps": round(fps, 4), "cycle_seconds": round(target / fps, 4),
               "interpolator": ({"kind": "rife-ncnn-vulkan", **located[0]} if located else
                                {"kind": "injected"} if any(r.get("smear") for r in rows) else None),
+              "between_cache": cache.record() if cache is not None else None,
               "made_by_rife": sum(r["made_by_rife"] for r in rows),
               "replaced": sum(1 for r in rows for m in r.get("smear", []) if m["method"] == "nearest"), "loops": rows}
     if report_path is not None:
@@ -766,16 +1015,26 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
                              "report lists under `unnamed_feet` (repeatable; LOOP is named as for --cycles): that loop starts as "
                              "--start-foot lands, recorded start_foot_source given")
     parser.add_argument("--multi-cycle", choices=MULTI_CYCLE, default="fail",
-                        help="a loop that may hold two or three cycles (a half or a third of it returns to a pose on the motion's path) "
-                             "and has no --cycles: fail (default) stops the set before anything is rewritten, the report naming it under "
-                             "`suspects`; warn aligns it as it is and names it in the warnings")
+                        help="a loop that may hold two or three cycles (a half or a third of it returns to a pose on the motion's path), "
+                             "or may be one step (its cut's report: `cycle.step_screen`), and has no --cycles: fail (default) stops the "
+                             "set before anything is rewritten, the report naming it under `suspects` (`one_step` for the latter: cut it "
+                             "again with video-loop --steps 1 once its steps are counted); warn aligns it as it is and names it in the warnings")
     parser.add_argument("--state", help="the set's motion state (walk, run), for loops cut before video-loop wrote it in the strip metadata: "
                                         "its gait floor is the shortest cycle the screen looks for")
     parser.add_argument("--between", choices=BETWEEN, default=DEFAULT_BETWEEN,
-                        help="a time between two source frames: auto (default) makes that frame with RIFE and keeps it unless it smeared "
-                             "or lost its outline (a melted limb), where the nearer source frame is taken and named in the warnings; rife "
-                             "keeps every made frame and warns on those; nearest takes the nearer source frame — nothing made, no RIFE "
-                             "needed, the motion up to half a frame off its time. Every made frame is measured in the report (`smear`)")
+                        help="a time between two source frames: auto (default) makes that frame with RIFE and keeps it unless it smeared, "
+                             "lost its outline (a melted limb) or carries a ghost (a part-covered band), where the nearer source frame is "
+                             "taken and named in the warnings; rife keeps every made frame and warns on those; nearest takes the nearer "
+                             "source frame — nothing made, no RIFE needed, the motion up to half a frame off its time. Every made frame is "
+                             "measured in the report (`smear`); under auto and nearest a filmed ghost frame gives way to a clean source "
+                             "frame beside it (`ghost_at`); a made frame kept that cross-fades two drawings inside its outline is kept "
+                             "and named to look at (`look`)")
+    parser.add_argument("--between-cache", type=Path, metavar="DIR",
+                        help="a directory every frame RIFE makes between two source frames is kept in, for aligning the same set "
+                             "again: a later alignment given the same DIR (the feet told, a retake in place of one loop) takes a "
+                             "kept frame instead of making it, only where both source frames, the fraction, and the RIFE binary, "
+                             "model, engine code and machine are byte for byte the same; the report counts `between_cache` hits "
+                             "and misses. Give each alignment its own DIR and remove it after; nothing is kept without it")
 
 
 def parse_cycles(values: list[str]) -> dict[str, int]:
@@ -810,7 +1069,8 @@ def run(**kwargs: object) -> int:
                            between=str(kwargs.get("between") or DEFAULT_BETWEEN), views=kwargs.get("view"),  # type: ignore[arg-type]
                            start_foot=str(kwargs.get("start_foot") or START_FOOT),
                            multi_cycle=str(kwargs.get("multi_cycle") or "fail"), cycles=parse_cycles(list(kwargs.get("cycles") or [])),  # type: ignore[arg-type]
-                           state=kwargs.get("state"), feet=parse_feet(list(kwargs.get("foot") or [])))  # type: ignore[arg-type]
+                           state=kwargs.get("state"), feet=parse_feet(list(kwargs.get("foot") or [])),  # type: ignore[arg-type]
+                           between_cache=kwargs.get("between_cache"))  # type: ignore[arg-type]
     except rife_mod.RifeNotInstalled as exc:
         # Asked for by name, so no RIFE is a failure, never a quiet skip (video-set skips with a warning).
         raise SystemExit(f"video-cycle-align: {exc}; frames between source frames are made by RIFE — "
@@ -818,7 +1078,7 @@ def run(**kwargs: object) -> int:
     for line in report["warnings"]:
         print(f"video-cycle-align: warning: {line}", file=sys.stderr)
     print(json.dumps({k: report[k] for k in ("length", "lengths", "cycles_given", "feet_given", "between", "made_by_rife", "replaced", "retake",
-                                             "unnamed_feet", "cycle_seconds")}
+                                             "unnamed_feet", "cycle_seconds", "between_cache")}
                      | {"loops": [{k: r[k] for k in ("name", "from", "to", "made_by_rife", "turned_by", "turned_on", "start_foot", "start_foot_source",
                                                      "seam_ratio")} for r in report["loops"]]},
                      ensure_ascii=False, indent=2))

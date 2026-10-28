@@ -24,11 +24,48 @@ import tempfile
 from PIL import Image, ImageSequence
 
 ENGINE_ROOT = Path(__file__).resolve().parents[2] / "engine" / "sprite-gen"
-VERSION = "video-processing-v4-sprite-gen-2.34"
+VERSION = "video-processing-v6-sprite-gen-2.45.3-m3"
 STATES = ("idle", "walk", "run", "jump", "attack", "dance", "wave", "cheer")
 DIRECTIONS = ("side", "front", "back", "front_diagonal", "back_diagonal")
 KEYS = ("auto", "green", "magenta", "cyan", "white")
 RIFE_ROOT = ENGINE_ROOT.parents[1] / ".data" / "tools" / "rife"
+
+
+def processing_policy():
+    """Identity of the code actually used, independent of the historical base pin."""
+    root = ENGINE_ROOT.parents[1]
+    paths = sorted((ENGINE_ROOT / "sprite_gen").rglob("*.py"))
+    paths += sorted((root / "adapters" / "spritegen").glob("*.py"))
+    paths += sorted((root / "alignment").glob("*.py"))
+    paths += [root / "services" / "worker" / "video_task.py"]
+    h = hashlib.sha256()
+    for path in paths:
+        h.update(path.relative_to(root).as_posix().encode() + b"\0" + path.read_bytes())
+    rife = _engine("video.rife")
+    token = rife.TTA_OVERRIDE.set(())
+    try:
+        binary = rife.installed_binary(RIFE_ROOT)
+        model = binary.parent / rife.MODEL
+        if not binary.is_file():
+            binary, model = rife.locate()
+        if not all((model / name).is_file() for name in ("flownet.param", "flownet.bin")):
+            raise rife.RifeNotInstalled("incomplete model")
+        installation = rife.Rife(binary=binary.resolve(), model=model.resolve()).identity()
+    except rife.RifeNotInstalled:
+        installation = "not-installed"
+    finally:
+        rife.TTA_OVERRIDE.reset(token)
+    return {"version": VERSION, "engineDigest": h.hexdigest(), "rifeInstallationDigest": hashlib.sha256(installation.encode()).hexdigest(),
+            "colorAlpha": "video-union-color-alpha-v2.19+video-finish-v1",
+            "interpolation": "rife-rgba-2.45.3+quality-gate-2.45.3"}
+
+
+def require_processing_policy(job):
+    from services.api.store import AppError
+    if job.get("processingPolicy") != processing_policy():
+        raise AppError("VIDEO_RECIPE_INCOMPATIBLE", "이전 처리 정책의 작업은 재개할 수 없습니다. 보존 영상에서 새 처리 작업을 만드세요.", 409)
+    from .video_provider import validate_params
+    validate_params(job["request"].get("params", {}), generation=job["operation"] == "generate_video")
 
 
 class VideoProcessingError(Exception):
@@ -374,6 +411,29 @@ def _cycle_diagnostics(files, source, selection, options):
     selection["footStrike"] = _finite(_foot_strike(images, options))
     selection["footStrike"]["indexSpace"] = "selected-source-cycle"
     selection["retake"] = {"suggested": False, "reasons": [], "automaticGeneration": False}
+    if options["state"] in ("walk", "run") and "stepCount" not in selection.get("metrics", {}):
+        whole = [Image.open(p).convert("RGBA") for p in files]
+        reading = _step_reading(whole, options)
+        selection.setdefault("metrics", {})["stepCount"] = {"reading": reading.record(), "cut": reading.judge(selection["startFrame"], len(images)), "measurement": "source-frames", "pixelSelectionRetained": True}
+    screen = _engine("video.interpolation_quality").ghost_screen(images)
+    selection["ghostScreen"] = {**screen, "measurement": "selected-source-frames"}
+    if screen["ghosts"]:
+        selection["retake"].update(suggested=True, reasons=["filmed-ghost"])
+    selection["equipmentCycle"] = {"measurement": "selected-source-frames", "period": selection["period"],
+                                    "meaning": "pixel periodicity; independent equipment motion is not anatomy"}
+
+
+def _step_reading(images, options):
+    from .video_prompt import parse_structured_params
+    bodies, _ = parse_structured_params({"bodyPlan": options.get("bodyPlan", "")})
+    crossings = _engine("video.crossings")
+    if not _engine("video.body_plan").biped(bodies) or options.get("bodyPlan") == "reference":
+        return crossings.Reading(len(images), "gap", [], why="body plan is not an observed biped; pixel selection retained")
+    try:
+        signals = _engine("video.loop").leg_signals(images)
+        return crossings.read(crossings.foot_signals(images, gap=signals["gap"] if signals else None))
+    except ValueError as exc:
+        return crossings.Reading(len(images), "gap", [], why=str(exc))
 
 
 def _gait_fallback(files, source, profile, directory, first_error):
@@ -421,6 +481,19 @@ def _gait_fallback(files, source, profile, directory, first_error):
 def _select(files: list[Path], source: dict, options: dict, directory: Path | None = None) -> dict:
     loop = _engine("video.loop")
     mode, n = options["loopMode"], len(files)
+    if mode == "auto" and options["state"] in ("walk", "run") and not options.get("_afterLeadIn"):
+        images = [Image.open(p).convert("RGBA") for p in files]
+        lo, hi = loop.profile_for(options["state"]).window(n, source["fps"])
+        lead = _engine("video.gait_fallback").lead_in(images, min_lag=lo, max_lag=hi)
+        skip = lead["frames"]
+        if skip:
+            result = _select(files[skip:], source, {**options, "_afterLeadIn": True}, directory)
+            result["startFrame"] += skip
+            result["endFrame"] += skip
+            if result.get("_processedKeyedPaths"):
+                result["_processedKeyedPaths"] = [str(p) for p in files[:skip]] + result["_processedKeyedPaths"]
+            result["leadIn"] = {**lead, "searchFrom": skip, "measurement": "source-frames"}
+            return result
     if mode == "auto":
         if not source["constantFrameRate"]:
             raise VideoProcessingError("VIDEO_VARIABLE_RATE_AUTO", "가변 프레임률 영상은 전체 또는 수동 구간을 선택하세요.")
@@ -477,7 +550,10 @@ def _select(files: list[Path], source: dict, options: dict, directory: Path | No
             # A pinned idle uses the actual last->first pin error rather than
             # magnifying re-render noise by a near-zero breathing playback step.
             if cycle["kind"] != "pinned" and (not math.isfinite(ratio) or ratio > loop.SEAM_RATIO_MAX):
-                raise ValueError("seam ratio exceeds threshold")
+                if profile.gait and options.get("overlapWrap") == "auto" and options.get("repairMode") != "off":
+                    cycle["seamPendingRepair"] = True
+                else:
+                    raise ValueError("seam ratio exceeds threshold")
         except (SystemExit, ValueError) as exc:
             if profile.gait and directory is not None:
                 try:
@@ -493,6 +569,28 @@ def _select(files: list[Path], source: dict, options: dict, directory: Path | No
                                             "periodicAttempt": _finite(periodic_attempt),
                                             "seamRatioMax": loop.SEAM_RATIO_MAX, "reason": str(exc)}) from exc
         start, end = cycle["start"], cycle["start"] + cycle["length"]
+        if profile.gait:
+            images = [Image.open(p).convert("RGBA") for p in files]
+            reading = _step_reading(images, options)
+            judged = reading.judge(start, end - start)
+            if judged["verdict"] == "refuted":
+                candidates = []
+                step_distances = loop.distance_matrix(files)
+                for row in reading.twos(lo, hi):
+                    at, length = row["cut"]
+                    candidate = loop.fixed_cycle(step_distances, start=at, length=length)
+                    if math.isfinite(candidate["ratio"]) and candidate["ratio"] <= loop.SEAM_RATIO_MAX:
+                        candidates.append(candidate)
+                if candidates:
+                    picked = min(candidates, key=lambda c: c["ratio"])
+                    picked["periodicity"] = cycle["periodicity"]
+                    picked["period_global"] = cycle["period_global"]
+                    cycle.update(picked, kind="periodic", stepSelection="observed-crossings", previousCut=[start, end])
+                    start, end = picked["start"], picked["start"] + picked["length"]
+                    judged = reading.judge(start, end - start)
+                else:
+                    judged = {**judged, "verdict": "uncertain", "pixelVerdict": "refuted", "why": "observed steps refute pixel cut; no seam-safe two-step cut in window"}
+            cycle["stepCount"] = {"reading": reading.record(), "cut": judged, "measurement": "source-frames", "pixelSelectionRetained": cycle.get("stepSelection") is None}
         metrics = {k: v for k, v in cycle.items() if k != "candidates"}
         if periodic_attempt is not None:
             metrics["periodicAttempt"] = {**periodic_attempt, "metrics": {
@@ -522,7 +620,7 @@ def _select(files: list[Path], source: dict, options: dict, directory: Path | No
     return result
 
 
-def _repair_selection(files, selection, options, directory):
+def _repair_selection(files, selection, options, directory, interpolation=None):
     """Repair only explicitly enabled gait loops; all sources stay immutable."""
     mode = options["repairMode"]
     if options["state"] not in ("walk", "run") or not selection["loop"]:
@@ -535,16 +633,39 @@ def _repair_selection(files, selection, options, directory):
         with Image.open(path) as image:
             images.append(image.convert("RGBA"))
     repair, rife = _engine("video.repair"), _engine("video.rife")
-    record = {"applied": False, "mode": mode, "reason": "disabled", "replaced": []}
+    screen = _engine("video.interpolation_quality").ghost_screen(images)
+    record = {"applied": False, "mode": mode, "reason": "disabled", "replaced": [],
+              "ghostScreen": screen, "measurement": "selected-source-frames",
+              "overlapWrap": {"applied": False, "reason": "disabled by local execution policy; performance not established"}}
     if mode != "off":
         located = None
         def interpolate(a, b, t):
             nonlocal located
             if located is None:
-                located = rife_interpolator()
+                located = interpolation or rife_interpolator()
             return located(a, b, t)
         try:
-            updated, facts = repair.repair_jumps(images, interpolate, facing=options["facing"])
+            if interpolation:
+                interpolation.start()
+            overlapped = []
+            if options.get("overlapWrap") == "auto":
+                loop = _engine("video.loop")
+                step = selection.get("metrics", {}).get("stepCount", {}).get("cut", {})
+                if loop.wrap_on_cells(images) <= loop.SEAM_RATIO_MAX:
+                    record["overlapWrap"] = {"applied": False, "reason": "source wrap already passes; no overlap needed"}
+                elif interpolation and step.get("verdict") == "two" and images[0].width * images[0].height <= 2_000_000:
+                    others = {side: {q: Image.open(files[start + q + sign * len(images)]).convert("RGBA")
+                                     for q in range(len(images)) if 0 <= start + q + sign * len(images) < len(files)}
+                              for side, sign in (("after", 1), ("before", -1))}
+                    images, overlap = repair.overlap_wrap(images, others, interpolation.read, seam=loop.wrap_on_cells,
+                            steps=loop.ring_steps, seam_max=loop.SEAM_RATIO_MAX, reads=screen["reads"], check=interpolation._check)
+                    record["overlapWrap"] = overlap
+                    overlapped = overlap["frames"]
+                else:
+                    record["overlapWrap"] = {"applied": False, "reason": "overlap requires confirmed two steps and the shared RIFE pixel budget", "pixelBudget": 2_000_000}
+            updated, facts = repair.repair_jumps(images, interpolate, facing=options["facing"], screen=screen,
+                      overlapped=overlapped, check=interpolation._check if interpolation else lambda: None)
+            facts["replaced"] = sorted(set(facts["replaced"]) | set(overlapped))
         except rife.RifeNotInstalled as exc:
             if mode == "on":
                 raise VideoProcessingError("VIDEO_RIFE_UNAVAILABLE", "RIFE 설치를 확인하세요. 원본 프레임은 보존했습니다.", {"reason": str(exc)}) from exc
@@ -553,6 +674,8 @@ def _repair_selection(files, selection, options, directory):
             raise VideoProcessingError("VIDEO_RIFE_FAILED", "RIFE 보간이 실패했습니다. 원본 프레임은 보존했습니다.", {"reason": str(exc)}) from exc
         else:
             record.update(facts, applied=bool(facts["replaced"]), reason="repaired" if facts["replaced"] else "no jump frames")
+            if interpolation:
+                interpolation._check()
             if located is not None:
                 record["interpolator"] = {"kind": "rife-ncnn-vulkan", **located.describe()}
             if record["applied"]:
@@ -570,10 +693,45 @@ def _repair_selection(files, selection, options, directory):
     jolt = repair.measure_jolt(images, facing=options["facing"])
     record["jolt"] = {**jolt, "warnings": repair.jolt_verdict(jolt), "gated": False}
     record["sourceFrameIndices"] = [start + i for i in record["replaced"]]
+    record["lineage"] = _repair_lineage(record, start, end - start)
     return files, _finite(record)
 
 
-def _align_selected_cycle(raw, keyed, original_keyed, source, selection, options, directory):
+def _repair_lineage(record, start, length):
+    lineage = {}
+    for attempt in record.get("overlapWrap", {}).get("tries", []):
+        if attempt.get("outcome") != "accepted":
+            continue
+        sign = 1 if attempt["side"] == "after" else -1
+        for made in attempt.get("made", []):
+            at = made["frame"]
+            sources = [start + at + length, start + at] if sign == 1 else [start + at, start + at - length]
+            lineage[str(start + at)] = {"method": "rife-overlap-wrap", "sourceFrameIndices": sources, "fraction": made["t"]}
+    for row in record.get("rounds", []):
+        if "replaced" not in row:
+            continue
+        why = row.get("why")
+        if why == "ghost":
+            at = row["replaced"]
+            taken = row.get("taken")
+            if isinstance(taken, dict):
+                lineage[str(start + at)] = {"method": "ghost-source-replacement", "sourceFrameIndices": [start + taken["source"]], "fraction": 0.0}
+            else:
+                lineage[str(start + at)] = {"method": "rife-ghost-repair", "sourceFrameIndices": [start + (at - 1) % length, start + (at + 1) % length], "fraction": .5}
+        for made in row.get("made", []):
+            sources = made.get("from", row.get("neighbours"))
+            if sources is None:
+                continue
+            for at in made["frames"]:
+                if at in row["replaced"]:
+                    lineage[str(start + at)] = {"method": "rife-" + str(why) + "-repair", "sourceFrameIndices": [start + s for s in sources], "fraction": made["t"]}
+    for item in lineage.values():
+        if item['fraction'] >= 1:
+            item.update(method='repair-source-replacement', sourceFrameIndices=[item['sourceFrameIndices'][-1]], fraction=0.0)
+    return lineage
+
+
+def _align_selected_cycle(raw, keyed, original_keyed, source, selection, options, directory, interpolation=None):
     """Resample an explicitly matched cycle, preserving exact original samples."""
     align, rife = _engine("video.align"), _engine("video.rife")
     if not selection["loop"]:
@@ -588,10 +746,11 @@ def _align_selected_cycle(raw, keyed, original_keyed, source, selection, options
     def interpolate(a, b, t):
         nonlocal located
         if located is None:
-            located = rife_interpolator()
+            located = interpolation or rife_interpolator()
         return located(a, b, t)
     try:
-        aligned, facts = align.resample(images, count, interpolate, between={"auto": "auto", "on": "rife", "off": "nearest"}[options["between"]])
+        sampled_from = []
+        aligned, facts = align.resample(images, count, interpolate, between={"auto": "auto", "on": "rife", "off": "nearest"}[options["between"]], cells_from=sampled_from)
         strike = _foot_strike(aligned, options)
         turned = options.get("startIndex", strike["start"])
         if turned >= count:
@@ -622,20 +781,21 @@ def _align_selected_cycle(raw, keyed, original_keyed, source, selection, options
         nearest = sample_index in facts.get("nearest_at", [])
         if nearest:
             primary, fraction = start + (i + (fraction >= 0.5)) % length, 0.0
+        if "source" in sampled_from[sample_index]:
+            primary = start + sampled_from[sample_index]["source"]
+            fraction = 0.0
         path = target / f"frame-{output_index:04d}.png"
         aligned[sample_index].save(path)
         existing_repair = primary in repaired
         interpolation = ({"method": "rife-cycle-align", "sourceFrameIndices": [primary, second],
                           "fraction": fraction, "sourceTimeMs": [times[primary], times[second]],
                           "inputJumpRepairSourceFrameIndices": [v for v in (primary, second) if v in repaired]}
-                         if made else {"method": "rife-jump-repair", "sourceFrameIndices":
-                                       [start + (primary - start - 1) % length, start + (primary - start + 1) % length],
-                                       "fraction": 0.5} if existing_repair else None)
+                         if made else selection.get("repair", {}).get("lineage", {}).get(str(primary)) if existing_repair else None)
         frame = {"rawPath": str(raw[primary]), "keyedPath": str(path), "originalKeyedPath": str(original_keyed[primary]),
                  "outputFrameIndex": output_index, "sourceFrameIndex": primary,
                  "sourceTimeMs": times[primary] + fraction * (times[primary + 1] - times[primary]),
                  "durationMs": boundaries[output_index + 1] - boundaries[output_index],
-                 "interpolated": made or existing_repair, "processing": {"kind": "cycle-alignment", "sampleIndex": sample_index,
+                 "interpolated": made or bool(interpolation and interpolation["fraction"] > 0), "processing": {"kind": "cycle-alignment", "sampleIndex": sample_index,
                      "samplingMethod": "rife" if made else "nearest-source" if nearest else "exact-source"}}
         if interpolation:
             frame["interpolation"] = interpolation
@@ -648,8 +808,9 @@ def _align_selected_cycle(raw, keyed, original_keyed, source, selection, options
               "outputMadeAt": [(k - turned) % count for k in facts["made_at"]],
               "outputNearestAt": [(k - turned) % count for k in facts.get("nearest_at", [])]}
     if selection.get("held"):
-        reason = align.retake(selection["held"], facts, fps=count * 1000 / duration)
-        selection["retake"] = {"suggested": reason is not None, "reasons": [reason] if reason else [], "automaticGeneration": False}
+        reason = align.retake(selection["held"], facts, facts.get("ghost_at", []), fps=count * 1000 / duration)
+        previous = selection.get("retake", {}).get("reasons", [])
+        selection["retake"] = {"suggested": bool(previous) or reason is not None, "reasons": previous + ([reason] if reason else []), "automaticGeneration": False}
     if located:
         record["interpolator"] = {"kind": "rife-ncnn-vulkan", **located.describe()}
     return frames, record
@@ -663,13 +824,16 @@ def _describe_source_processing(frame, selection):
     processing["coordinateSpace"] = "processed-video-canvas" if correction or frame["interpolated"] else "decoded-video-canvas"
     if frame["interpolated"]:
         processing["rawToProcessedMapping"] = "non-affine-interpolation"
+    elif processing.get("interpolation"):
+        processing["rawToProcessedMapping"] = "source-replacement"
     if correction:
         processing["scaleCorrection"] = {k: v for k, v in correction.items() if k != "frames"}
         if frame["interpolated"]:
             indices = frame["interpolation"]["sourceFrameIndices"]
             processing["preInterpolationSourceTransforms"] = [correction["frames"][i] for i in indices]
         else:
-            measured = correction["frames"][frame["sourceFrameIndex"]]
+            source_index = processing.get("interpolation", {}).get("sourceFrameIndices", [frame["sourceFrameIndex"]])[0]
+            measured = correction["frames"][source_index]
             processing["sourceTransform"] = measured["sourceTransform"]
             processing["scaleCorrection"].update(fittedHeightPx=measured["fittedHeightPx"], footAnchor=measured["footAnchor"])
             processing["rawToProcessedMapping"] = "affine-before-normalization"
@@ -714,7 +878,7 @@ def _preview(frames: list[dict], directory: Path, loop: bool) -> dict:
             "kind": "full-canvas-thumbnail", "resampler": "nearest"}
 
 
-def process_clip(clip: Path, work: Path, params: dict, on_progress=None) -> dict:
+def process_clip(clip: Path, work: Path, params: dict, on_progress=None, *, project_root=None) -> dict:
     """Extract/key once and select a range, retaining evidence even on refusal.
 
     params: contract state/key/loopMode/startFrame/endFrame/maxFrames, plus optional
@@ -732,6 +896,8 @@ def process_clip(clip: Path, work: Path, params: dict, on_progress=None) -> dict
     limit = _integer(params.get("maxFrames", 8 if state == "walk" else 32), "maxFrames", 4, 64)
     options = {"state": state, "key": key, "loopMode": mode, "maxFrames": limit,
                "repairMode": _choice(params, "repairMode", ("off", "auto", "on"), "off"),
+               "rifeTta": _choice(params, "rifeTta", ("off", "on"), "off"),
+               "overlapWrap": _choice(params, "overlapWrap", ("off", "auto"), "off"),
                "facing": _choice(params, "facing", ("right", "left"), "right"),
                "direction": _choice(params, "direction", DIRECTIONS, "side"),
                "bodyPlan": params.get("bodyPlan", ""),
@@ -770,9 +936,12 @@ def process_clip(clip: Path, work: Path, params: dict, on_progress=None) -> dict
     def progress(name, message):
         if on_progress:
             on_progress(name, message)
+    from .video_interpolation import Session
+    interpolation = Session(project_root or work, lambda: progress("interpolate", "로컬 보간을 확인합니다."), tta=("-x", "-z") if options["rifeTta"] == "on" else ())
+    policy = processing_policy()
     try:
         digest = _sha(clip)
-        extraction_options = {"version": VERSION, "sourceSha256": digest, "key": key, "decontam": "auto",
+        extraction_options = {"version": VERSION, "policy": policy, "sourceSha256": digest, "key": key, "decontam": "auto",
                               "referencePath": str(reference) if reference else None,
                               "referenceSha256": _sha(reference) if reference else None}
         extraction_id = hashlib.sha256(_encoded(extraction_options)).hexdigest()[:24]
@@ -835,7 +1004,7 @@ def process_clip(clip: Path, work: Path, params: dict, on_progress=None) -> dict
         if selection.get("_processedKeyedPaths"):
             keyed = [Path(p) for p in selection.pop("_processedKeyedPaths")]
         _cycle_diagnostics(keyed, source, selection, options)
-        keyed, repair = _repair_selection(keyed, selection, options, artifact_dir)
+        keyed, repair = _repair_selection(keyed, selection, options, artifact_dir, interpolation)
         selection["repair"] = repair
         loop_engine = _engine("video.loop")
         with Image.open(original_keyed[0]) as im:
@@ -877,15 +1046,13 @@ def process_clip(clip: Path, work: Path, params: dict, on_progress=None) -> dict
         repaired = repair.get("sourceFrameIndices", [])
 
         def frame_for(i, k):
+            provenance = repair.get("lineage", {}).get(str(i))
             return {"rawPath": str(raw[i]), "keyedPath": str(keyed[i]), "sourceFrameIndex": i, "outputFrameIndex": k,
                     "sourceTimeMs": times[i], "durationMs": boundaries[k + 1] - boundaries[k] if k is not None else None,
-                    "originalKeyedPath": str(original_keyed[i]), "interpolated": i in repaired,
-                    "processing": {"kind": "rife-jump-repair" if i in repaired else
+                    "originalKeyedPath": str(original_keyed[i]), "interpolated": bool(provenance and provenance["fraction"] > 0),
+                    "processing": {"kind": provenance["method"] if provenance else
                                    "scale-drift-correction" if selection.get("scaleCorrection") else "chroma-key",
-                                   **({"interpolation": {"method": "rife-ncnn-vulkan", "fraction": 0.5,
-                                                         "sourceFrameIndices": [start + (i - start - 1) % (end - start),
-                                                                                start + (i - start + 1) % (end - start)]}}
-                                      if i in repaired else {})}}
+                                   **({"interpolation": provenance} if provenance else {})}}
         frames = [frame_for(i, k) for k, i in enumerate(indices)]
         alternates = []
         chosen = selection.get("frameSelection", {})
@@ -905,10 +1072,10 @@ def process_clip(clip: Path, work: Path, params: dict, on_progress=None) -> dict
                                                    "source": u["source"], "role": "uniform-alternative"}
                     alternates.append(alternate)
         for frame in frames + alternates:
-            if frame["interpolated"]:
+            if frame["processing"].get("interpolation"):
                 frame["interpolation"] = frame["processing"]["interpolation"]
         if "targetFrameCount" in options:
-            frames, alignment = _align_selected_cycle(raw, keyed, original_keyed, source, selection, options, artifact_dir)
+            frames, alignment = _align_selected_cycle(raw, keyed, original_keyed, source, selection, options, artifact_dir, interpolation)
             selection["cycleAlignment"] = alignment
             count = len(frames)
             boundaries = [0, alignment["durationMs"]]
@@ -933,13 +1100,16 @@ def process_clip(clip: Path, work: Path, params: dict, on_progress=None) -> dict
         files = [extraction["reportPath"], str(marker), str(artifact_dir / "processing.report.json"), str(checkpoint)]
         files += [preview[k] for k in ("path", "sheetPath") if k in preview]
         files += [str(p) for p in (artifact_dir / "frame-selection").glob("candidates.sheet.png")]
-        result = {"version": VERSION, "options": options, "frames": frames, "source": dict(source),
+        result = {"version": VERSION, "policy": policy, "interpolation": interpolation.describe(), "options": options, "frames": frames, "source": dict(source),
                   "selection": selection, "standingHeight": standing, "anchor": anchor,
                   "boundsPaths": [str(f["keyedPath"]) for f in frames] if "targetFrameCount" in options else
                                  [str(p) for p in keyed[start:end]],
                   "anchorSourceFrameIndex": 0, "sourceSha256": digest, "preview": preview,
                   **({"alternateFrames": alternates} if alternates else {}),
-                  "extraction": {k: v for k, v in extraction.items() if k not in ("source", "manifest", "options")},
+                  "extraction": {**{k: v for k, v in extraction.items() if k not in ("source", "manifest", "options")},
+                                 "sourceReceipt": {"options": {k: v for k, v in extraction["options"].items() if k != "referencePath"},
+                                                   "manifest": extraction["manifest"],
+                                                   "reportSha256": _sha(Path(extraction["reportPath"])) }},
                   "files": [Path(p).relative_to(work).as_posix() for p in files]}
         if keyed != original_keyed:
             result["extraction"]["processedKeyedDir"] = str(keyed[0].parent)

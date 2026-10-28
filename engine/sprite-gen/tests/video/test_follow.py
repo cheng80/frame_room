@@ -189,8 +189,10 @@ def test_the_smallest_region_sets_the_one_gain(loop_dir):
     cx, cy, rx, ry = chest_region(loop_dir)
     alone = follow.follow_loop(loop_dir, [small], on_fold='lower')
     both = follow.follow_loop(loop_dir, [(cx, cy+30, rx, ry), small], on_fold='lower')
-    assert both['gain'] == alone['gain']
+    # v2.45 keeps a separate safe gain per region; the smaller part cannot flatten the larger one.
+    assert both['gain'] == follow.GAIN_DEFAULT
     large, little = both['fold']['regions']
+    assert large['gain'] == follow.GAIN_DEFAULT and little['gain'] == alone['gain']
     assert large['gain_limit'] > follow.GAIN_DEFAULT > little['gain_limit']
     assert large['ratio'] < little['ratio'] < 1
 

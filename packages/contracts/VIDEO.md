@@ -75,3 +75,27 @@
 - 기록: 작업 `processing.selection.frameSelection`에 후보 풀, 프레임별 측정·관찰·규칙 판정·이유 코드, 슬롯별 선택, 시퀀스 검사, 관찰 receipt(모델, 사용량, 시간, 캐시 hit), `observer`(id·model·effort·선택 근거), `judge: {requested, backend: "rules"}`를 남긴다. 새 프레임의 `selectionDecision`은 자동 추천이며 `review`·`reviewReason`·`hidden`·기존 clip을 바꾸지 않는다. 교체된 균등 프레임은 슬롯 없이 후보(`role: uniform-alternative`)로 함께 등록해 사용자가 되돌릴 수 있다.
 - 과거 기록 호환: 2026-10-12~13에 저장된 기록의 `judge.backend: "laya-mlx"|"jev"`, `decision.source: "laya-mlx"|"jev"`, `laya`/`jev` 필드, `LAYA_*`/`JEV_*`/`CONFLICT_LAYA_VS_RULES`/`CONFLICT_JEV_VS_RULES` 이유 코드와 `.data/cache/frame-selection/jev/`는 지우거나 다시 쓰지 않으며 UI는 이 값을 계속 읽어 표시한다.
 - `GET /v1/providers`의 `grok-video.capabilities.frameSelection`은 `{modes: ["uniform","vision"], judges: ["rules"], defaultMode: "vision", defaultJudge: "rules", observer}`이며 `observer`는 위 CLI 사전 확인과 catalog 선택 결과(`model`, `effort`, `available`, `reason`)다. 감지는 설치·다운로드·추론·네트워크 호출을 하지 않는다.
+
+## M1 제출·회수·저장 복구 (2026-10-22)
+
+- 한 job의 외부 생성 POST는 최대 1회다. 거절·전송 실패·응답 유실·유효한 ID가 없는 접수 불명 상태에서는 재전송하지 않는다. 새로운 생성은 사용자가 별도 요청으로 명시한다.
+- ID가 있으면 같은 `/videos/{id}` GET만 사용한다. 429/5xx·연결/잘린 body·비JSON·read timeout은 연속 최대 4회(최대 3회 재시도, 1/2/4초 backoff) 조회하며 각 수동 재개의 네트워크 예산은 600초다. 각 HTTP timeout·socket 수신·대기는 남은 예산으로 제한하며 느리게 분할된 header/body도 예산을 연장하지 않는다. GET 401/403은 즉시 중단하며 로그인 복구 후 같은 ID로 수동 재개한다.
+- 완료 URL 누락·다운로드 오류·MP4 검사 실패는 원본/완료 등록을 만들지 않는다. `/jobs/{jid}/retry`는 같은 ID로 조회·회수를 재개한다. 다운로드의 429/5xx·연결/잘린 body/read timeout은 최대 4회(1/2/4초 backoff) 시도하며 MP4 검사 실패는 수동 회수로 남긴다. 기존 동일 Grok credential을 붙이는 다운로드 재요청은 같은 잔여 예산을 공유하고 실제 HTTP마다 downloadCount를 증가시킨다. token/provider/authSource 자동 전환은 없다.
+- 다운로드 바이트는 앱 MP4 검사와 SHA-256 확인을 거쳐 엔진의 독점 임시 `.part` 파일·fsync·원자 replace로 확정한다. 고정 `.part` symlink는 따라가지 않고 최종 출력/부모 symlink를 거절해 원본을 보존하며 게시 실패 시 새 임시 파일만 정리한다. 원자 게시 직후 중단도 로컬 파일부터 검사하므로 인증·조회·다운로드 없이 재사용한다.
+- 완성 `result.json`이 있으면 별도 출력과 파일 해시를 재사용하여 저장만 재시도한다. DB 게시 후 프로젝트 폴더 flush 실패는 `interrupted`로 표시하고 outbox·동작·프레임·개별 시간을 보존한다. 이 경우 재시도는 같은 attemptId를 유지하고 폴더 동기화/상태 저장만 한다. 재시도 키는 기존 멱등성 계약을 따른다.
+- 공개 `Job.recovery`는 선택 필드 `requestId`, `postCount`, `pollCount`, `downloadCount`, `stopReason`만 제공한다. 최종 `receipt`에도 안전한 시도 정보만 포함한다. provider 응답 원문·서명 URL·token·인증 경로는 포함하지 않는다. ID는 현재 credential token을 포함하지 않는 제한 ASCII 식별자를 신규 응답 수용 시 검증한 경우만 공개하고, 검증 표식 없는 과거 ID는 내부에 보존하되 공개 영수증에서 생략한다. 재사용 receipt의 임의 키·서명 URL은 필드 allowlist와 타입 검사로 제거하고, model은 요청 허용 목록 또는 unknown만 공개한다. 과거 checkpoint의 원래 receipt와 ID는 유지한다. `completedResult`/`published`가 있으면 JobCard는 완성 결과 저장 재시도로 표시한다.
+- 출력 검증·job/export 등록과 삭제는 기존 SQLite writer transaction으로 직렬화한다. 존재 검사 뒤 실제 읽기 전에 삭제가 끼어드는 강제 실행 순서 회귀를 둔다. M0 최초 통합 실패 원인이 이 경합이었다고 확정하지 않는다.
+
+검증 fixture는 localhost HTTP 서버와 ffmpeg 합성 MP4다. 실제 provider 장애·로그인·유료 생성 실측은 아니다. Postman CLI 1.69.0은 1.70+ simulation을 지원하지 않아 로컬 transport 회귀를 사용하며 CLI 전역 갱신·workspace 생성·외부 게시는 하지 않는다.
+
+## M2 루프·보간 정책 (2026-10-22)
+
+새 영상 작업은 `processingPolicy`에 `video-processing-v6-sprite-gen-2.45.3-m3`, 실제 엔진·앱 의존 소스 `engineDigest`, 색/알파·보간 정책을 고정합니다. 같은 identity는 extraction key와 `result.processing.policy`에도 저장합니다. VERSION/digest가 없거나 다른 작업은 API retry와 worker 실행에서 `VIDEO_RECIPE_INCOMPATIBLE`(409)로 거절합니다. 모르는 설정도 거절합니다. 보존 영상을 선택한 새 처리 요청은 허용합니다. 이미 완성된 결과의 저장만 재시도는 구 recipe도 허용하며 생성·다운로드·재처리를 실행하지 않습니다.
+
+추가 설정은 `rifeTta: off|on`(기본 off, on은 `-x -z`)과 `overlapWrap: off|auto`(기본 off)입니다. 이전 저장 설정을 덮어쓰지 않습니다. overlap은 명시 보정이 켜져 있고 두 걸음이 관측된 구간에서만 검토하며 공유 시간·픽셀 예산을 넘기면 적용 성공으로 기록하지 않습니다. 기본 8장·선택 12장·4–64장 축소는 보간하지 않습니다. 명시 수동 구간은 그대로 유지합니다.
+
+원본의 `stepCount`, `ghostScreen`, `leadIn`, 장비 픽셀 주기와 최종 `renderedSeam`의 측정 대상을 구분합니다. 숨은 발·비이족/기준 구조 불명은 두 걸음을 확정하지 않습니다. `repairMode=off`는 보정 픽셀을 만들지 않으며 `filmed-ghost`는 재촬영 권고만 남깁니다. ghost 원본 대체·flow·급가속 보정은 실제 입력 프레임과 비율을 기록합니다.
+
+RIFE 캐시는 서버가 정한 프로젝트 폴더의 `.cache/rife-m2`입니다. 요청으로 경로를 받지 않습니다. RGBA·순서·비율·전처리 코드·binary/model 내용·TTA·host identity가 다르면 miss입니다. hit도 현재 손상/ghost/outline gate를 통과해야 채택하며 완성 셀과 계보는 캐시 밖의 출력/라이브러리에 저장합니다. 삭제·손상·쓰기 실패는 로컬 재계산 또는 캐시 없이 계속할 수 있고, symlink 이탈은 거절합니다. 같은 키의 게시에는 독점 임시 PNG와 원자 replace를 씁니다.
+
+로컬 보간은 작업 전체 60초, 프레임당 2,000,000픽셀 예산입니다. 캐시 재사용·flow/overlap 검색·binary pass는 취소/잔여 예산을 확인합니다. 실행 불능·예산 중단은 원본을 보존하고 실패 이유를 남깁니다. TTA/overlap의 합성 실측을 실제 영상 품질 향상이나 다른 장치의 성능으로 해석하지 않습니다.

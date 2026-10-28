@@ -254,7 +254,7 @@ def providers():
     return {'providers':result}
 
 class JobRequest(Strict):
-    operation:Literal['generate','generate_video','process_video','cutout','extract','align','inspect','bake','preview_follow','apply_follow','check_handed']; inputRevision:int; assetIds:list[str]=[]; params:dict={}; idempotencyKey:str=Field(min_length=1,max_length=200)
+    operation:Literal['generate','generate_video','process_video','cutout','extract','align','inspect','bake','preview_follow','apply_follow','check_handed','preview_restore','compare_clips']; inputRevision:int; assetIds:list[str]=[]; params:dict={}; idempotencyKey:str=Field(min_length=1,max_length=200)
 def enqueue(pid,operation,request,idem,expected=None,connection=None):
     try:
         # A job stored before the fresh selection default hashed the raw request: an exact replay of
@@ -277,7 +277,7 @@ def enqueue(pid,operation,request,idem,expected=None,connection=None):
             raise s.AppError('provider.invalid_asset_settings','자료 이미지 생성에는 별도 참조를 지정할 수 없습니다.')
         if p:
             for aid in request.get('assetIds',[]): find(p['assets'],'assetId',aid)
-        if operation in ('preview_follow','apply_follow','check_handed'):
+        if operation in ('preview_follow','apply_follow','check_handed','preview_restore','compare_clips'):
             if request.get('assetIds'): raise s.AppError('CLIP_TOOLS_INPUT','선택 동작 도구에는 별도 이미지 목록을 전달할 수 없습니다.')
             if operation=='apply_follow':
                 from services.worker.clip_tools_task import validate_apply
@@ -319,6 +319,9 @@ def enqueue(pid,operation,request,idem,expected=None,connection=None):
                 if settings.get('spillReferenceAssetId'): find(p['assets'],'assetId',settings['spillReferenceAssetId'])
                 if settings['loopMode']=='manual' and settings['endFrame']>video['frameCount']: raise s.AppError('VIDEO_RANGE','선택 구간이 영상 끝을 넘습니다.')
         jid=s.uid(); j=dict(jobId=jid,projectId=pid,operation=operation,status='queued',attemptId=s.uid(),attempts=[],inputRevision=expected,request=request,snapshot=p,requestHash=rh,idempotencyKey=idem,eventSeq=0,step='queued',progress={},artifacts=[],errors=[],createdAt=s.now(),updatedAt=s.now(),engineCommit=s.COMMIT)
+        if operation in ('generate_video','process_video'):
+            from adapters.spritegen.video_processing import processing_policy
+            j['processingPolicy']=processing_policy()
         if operation=='process_video': j['resumable']=True
         c.execute('INSERT INTO jobs VALUES (?,?,?,?,?,?,?,?,?)',(jid,pid,operation,'queued',rh,idem,s.dumps(j),j['createdAt'],j['updatedAt']))
         s.write_job(c,j)
@@ -404,15 +407,27 @@ def cancel(jid:str,body:Cancel):
         j['status']='canceled' if j['status']=='queued' else 'cancel_requested'; s.write_job(c,j)
     return JSONResponse(s.public_job(j),202)
 class Retry(Strict): failedStep:str=''; reuseCheckpoint:bool=True; idempotencyKey:str
-@app.post('/v1/jobs/{jid}/retry')
+@app.post('/v1/jobs/{jid}/retry',description='영상 생성 POST는 다시 전송하지 않습니다. 접수 ID 조회·원본 회수 또는 검증된 완성 결과 저장만 재개합니다. 이미 게시된 결과의 폴더 저장 재시도는 같은 attemptId를 유지하며 중복 등록하지 않습니다. 미완성 영상 작업은 VERSION·engine digest가 현재 처리 정책과 다르면 재개하지 않습니다.')
 def retry(jid:str,body:Retry):
+    existing=s.get_job(jid)
+    if existing.get('published') and existing.get('projectId'):
+        from .project_folders import flush
+        flush({existing['projectId']})
     with s.transaction() as c:
         j=s.get_job(jid,c)
         if body.idempotencyKey in j.get('retryKeys',[]): return s.public_job(j)
         if j['status']=='provider_outcome_unknown': raise s.AppError('PROVIDER_OUTCOME_UNKNOWN','외부 결과가 불명확합니다. 자동 재전송할 수 없습니다. 제공자 결과를 확인하세요.',409)
         if j['status'] not in ('failed','interrupted','canceled'): raise s.AppError('RETRY_STATE','이 상태의 작업은 재시도할 수 없습니다.',409)
+        if j.get('published'):
+            j.setdefault('retryKeys',[]).append(body.idempotencyKey)
+            j.update(status=j.get('result',{}).get('status','succeeded'),step='complete',errors=[])
+            s.write_job(c,j)
+            return s.public_job(j)
         result_path=s.resolve_work_path(jid,s.job_directory(jid)/j['attemptId']/'result.json')
         completed_result=json.loads(result_path.read_text()) if result_path.exists() else {}
+        if j['operation'] in ('generate_video','process_video') and not completed_result.get('ok'):
+            from adapters.spritegen.video_processing import require_processing_policy
+            require_processing_policy(j)
         if j['operation']=='generate_video' and not completed_result.get('ok'):
             from adapters.spritegen.video_provider import checkpoint_state,read_checkpoint
             state=checkpoint_state(j)
@@ -431,26 +446,26 @@ class ExportRequest(Strict):
     savedRevision:int; clipRevisionIds:list[str]; formats:list[str]=['atlas','pngs','runtime','aseprite']; outlineMode:Literal['bake','preview-only']='bake'; idempotencyKey:str
 @app.post('/v1/projects/{pid}/exports',status_code=202)
 def export_create(pid:str,body:ExportRequest):
-    p=s.get_project(pid); s.check_revision(p,body.savedRevision)
-    if not body.clipRevisionIds: raise s.AppError('EMPTY_TIMELINE','출력할 동작을 선택하세요.')
-    if len(set(body.clipRevisionIds))!=len(body.clipRevisionIds): raise s.AppError('INVALID_CLIP_SELECTION','같은 동작이 중복 선택되었습니다.')
-    for rid in body.clipRevisionIds:
-        cl=find(p['clips'],'clipRevisionId',rid)
-        if not cl['occurrences']: raise s.AppError('EMPTY_TIMELINE','빈 동작은 출력할 수 없습니다.',422,{'affectedIds':[cl['clipId']]})
-        from alignment.pipeline import _clip_gates
-        gates=_clip_gates(p,cl)
-        if gates: raise s.AppError(gates[0]['code'],gates[0]['message'],422,{'errors':gates})
-        for occurrence in cl['occurrences']:
-            frame=find(p['frames'],'frameVersionId',occurrence['frameVersionId'])
-            if frame.get('review')=='rejected': raise s.AppError('FRAME_REJECTED','제외한 프레임을 타임라인에서 제거하거나 다시 선택하세요.',422,{'affectedIds':[frame['frameVersionId']]})
-            anchor=p['alignments'].get(frame['frameVersionId'],{})
-            group=find(p['alignmentGroups'],'alignmentGroupId',frame['nativeScaleGroupId'])
-            if not anchor: raise s.AppError('ALIGNMENT_MISSING','프레임 앵커가 없습니다.',422,{'affectedIds':[frame['frameVersionId']]})
-            if anchor.get('groupRevisionId')!=group['groupRevisionId'] or anchor.get('frameVersionId')!=frame['frameVersionId']:
-                raise s.AppError('STALE_ALIGNMENT','현재 프레임/그룹에 대한 앵커가 아닙니다.',422,{'affectedIds':[frame['frameVersionId']]})
-            s.asset_path(frame['imageAssetId'])
-    request=body.model_dump(exclude={'idempotencyKey'})
     with s.transaction() as c:
+        p=s.get_project(pid,c); s.check_revision(p,body.savedRevision)
+        if not body.clipRevisionIds: raise s.AppError('EMPTY_TIMELINE','출력할 동작을 선택하세요.')
+        if len(set(body.clipRevisionIds))!=len(body.clipRevisionIds): raise s.AppError('INVALID_CLIP_SELECTION','같은 동작이 중복 선택되었습니다.')
+        for rid in body.clipRevisionIds:
+            cl=find(p['clips'],'clipRevisionId',rid)
+            if not cl['occurrences']: raise s.AppError('EMPTY_TIMELINE','빈 동작은 출력할 수 없습니다.',422,{'affectedIds':[cl['clipId']]})
+            from alignment.pipeline import _clip_gates
+            gates=_clip_gates(p,cl)
+            if gates: raise s.AppError(gates[0]['code'],gates[0]['message'],422,{'errors':gates})
+            for occurrence in cl['occurrences']:
+                frame=find(p['frames'],'frameVersionId',occurrence['frameVersionId'])
+                if frame.get('review')=='rejected': raise s.AppError('FRAME_REJECTED','제외한 프레임을 타임라인에서 제거하거나 다시 선택하세요.',422,{'affectedIds':[frame['frameVersionId']]})
+                anchor=p['alignments'].get(frame['frameVersionId'],{})
+                group=find(p['alignmentGroups'],'alignmentGroupId',frame['nativeScaleGroupId'])
+                if not anchor: raise s.AppError('ALIGNMENT_MISSING','프레임 앵커가 없습니다.',422,{'affectedIds':[frame['frameVersionId']]})
+                if anchor.get('groupRevisionId')!=group['groupRevisionId'] or anchor.get('frameVersionId')!=frame['frameVersionId']:
+                    raise s.AppError('STALE_ALIGNMENT','현재 프레임/그룹에 대한 앵커가 아닙니다.',422,{'affectedIds':[frame['frameVersionId']]})
+                s.asset_path(frame['imageAssetId'])
+        request=body.model_dump(exclude={'idempotencyKey'})
         # Queue visibility and export registration share the same commit.
         s.check_revision(s.get_project(pid,c),body.savedRevision)
         j=enqueue(pid,'export',request,body.idempotencyKey,body.savedRevision,connection=c)

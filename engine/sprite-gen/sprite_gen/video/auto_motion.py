@@ -9,10 +9,14 @@ from __future__ import annotations
 
 from PIL import Image
 from sprite_gen._deps import np
+from sprite_gen.util import lsq
 from sprite_gen.video import motion_anchor
 
 ANALYSIS_EDGE = 184
 SAMPLE_COUNT = 9
+# Two offsets' match costs closer than this are a tie: FFT rounding differs between machines by
+# ~1e-14, two different pictures by far more than this.
+MATCH_TIE = 1e-9
 
 
 def correct_cycle(frames, regions, *, coarse_dx):
@@ -71,7 +75,36 @@ def _correlate(region, kernel, rows, cols):
 
 
 def _match(reference, moving, center, radius):
-    """Bounded masked NCC at every translation, never wrap pixels.
+    """Bounded masked NCC at every translation, never wrap pixels (`_match_costs`), the best taken
+    (`_best`): the shift (dx, dy) that lays `moving` over the reference, and its cost."""
+    (x, y, right, bottom), mask, feature, norm = reference
+    cx, cy = center
+    costs, xs, ys = _match_costs(reference, moving, center, radius)
+    iy, ix = _best(costs, xs, ys, reference, center)
+    dx, dy = x-(xs+ix), y-(ys+iy)
+    if abs(dx-cx) == radius or abs(dy-cy) == radius:
+        raise ValueError("automatic motion anchor match reached search boundary")
+    return np.array([dx, dy]), float(costs[iy, ix])
+
+
+def _best(costs, xs, ys, reference, center):
+    """The offset of the least cost in `costs` (`_match_costs`), as (row, column).
+
+    A patch on a flat fill matches equally at several offsets, and FFT rounding — not the same on
+    every machine — would pick among them. Costs within MATCH_TIE are one match; the evidence does
+    not decide between them, so the prior does: the offset nearest the centre the search was put on.
+    """
+    (x, y, right, bottom) = reference[0]
+    cx, cy = center
+    tied = np.argwhere(costs <= costs.min()+MATCH_TIE)
+    return min(((int(iy), int(ix)) for iy, ix in tied),
+               key=lambda at: ((x-(xs+at[1])-cx)**2+(y-(ys+at[0])-cy)**2, at))
+
+
+def _match_costs(reference, moving, center, radius):
+    """The masked NCC cost of every translation within `radius` (px, or px across and down) of
+    `center`, never wrap pixels: costs[iy, ix] with the reference's box laid at (xs + ix, ys + iy)
+    in `moving`; returns (costs, xs, ys).
 
     Per channel, the masked patch sum, squared sum and product with the centered reference
     are window correlations, so all offsets come out of a few FFTs instead of one gathered
@@ -79,9 +112,10 @@ def _match(reference, moving, center, radius):
     """
     (x, y, right, bottom), mask, feature, norm = reference
     cx, cy = center
+    rx, ry = (radius, radius) if isinstance(radius, int) else radius
     height, width = mask.shape
-    xs, xe = max(0, x-cx-radius), min(moving.shape[1]-width, x-cx+radius)
-    ys, ye = max(0, y-cy-radius), min(moving.shape[0]-height, y-cy+radius)
+    xs, xe = max(0, x-cx-rx), min(moving.shape[1]-width, x-cx+rx)
+    ys, ye = max(0, y-cy-ry), min(moving.shape[0]-height, y-cy+ry)
     if xs > xe or ys > ye:
         raise ValueError("automatic motion anchor has no search overlap")
     region = moving[ys:ye+height, xs:xe+width].astype(np.float64)
@@ -100,12 +134,7 @@ def _match(reference, moving, center, radius):
         product += _correlate(values, kernel[:, :, channel], rows, cols) - total * kernel[:, :, channel].sum() / count
         energy += _correlate(values * values, weights, rows, cols) - total * total / count
     denominator = np.sqrt(np.maximum(energy, 0.0)) * norm
-    costs = 1 - product / np.maximum(1e-10, denominator)
-    iy, ix = np.unravel_index(costs.argmin(), costs.shape)
-    dx, dy = x-(xs+int(ix)), y-(ys+int(iy))
-    if abs(dx-cx) == radius or abs(dy-cy) == radius:
-        raise ValueError("automatic motion anchor match reached search boundary")
-    return np.array([dx, dy]), float(costs[iy, ix])
+    return 1 - product / np.maximum(1e-10, denominator), xs, ys
 
 
 def discover(frames: list[Image.Image], *, reference_index: int) -> tuple[list, dict]:
@@ -149,7 +178,9 @@ def discover(frames: list[Image.Image], *, reference_index: int) -> tuple[list, 
             smoothness = float(np.abs(np.diff(positions, n=2, axis=0)).mean()/body_h)
             quality = float(np.mean(errors)+.25*np.quantile(errors, .9)+.05*smoothness)
             candidates.append({'box': box, 'quality': quality, 'sample_costs': errors})
-    candidates.sort(key=lambda row: (row['quality'], row['box']))
+    # Qualities are sums of match costs, so two regions that both track exactly tie but for FFT
+    # rounding; read on MATCH_TIE's grain, such a tie is ordered by the box, the same on every machine.
+    candidates.sort(key=lambda row: (round(row['quality']/MATCH_TIE), row['box']))
     if not candidates or candidates[0]['quality'] > .8:
         raise ValueError("automatic motion anchor found no stable textured region")
     chosen = []
@@ -206,10 +237,10 @@ def analyse(frames: list[Image.Image], *, fps: float) -> tuple[np.ndarray, np.nd
     trajectory = []
     for k in range(n):
         js = np.arange(max(0, k-radius), min(n, k+radius+1))
-        trajectory.append(float(np.polyfit(js-k, positions[js, 0], 1)[1]))
+        trajectory.append(lsq.line(js-k, positions[js, 0])[1])
     trajectory = np.asarray(trajectory)
     trajectory -= trajectory[n//2]
-    dy_slope = float(np.polyfit(np.arange(n), positions[:, 1], 1)[0])
+    dy_slope = lsq.line(range(n), positions[:, 1])[0]
     shifts = np.column_stack((trajectory, dy_slope*(np.arange(n)-n//2)))
     pad = int(np.ceil(np.abs(shifts).max()))+4
     normalized = []

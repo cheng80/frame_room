@@ -58,3 +58,4 @@ def test_the_figure_shades_its_far_leg_by_the_levels_asked():
     """The fixture itself: the margins the tests above rest on."""
     margins = {d: align.strike_foot(_cycle(view="side", far_darker=d), (0, 6), "side", "right")["margin"] for d in (FAINT, CLEAR)}
     assert math.isclose(margins[FAINT], 0.0235, abs_tol=0.0005) and math.isclose(margins[CLEAR], 0.0314, abs_tol=0.0005)
+

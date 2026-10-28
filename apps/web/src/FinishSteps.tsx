@@ -30,7 +30,7 @@ export function JobCard({job,s,onSelectClip}:{job:Job;s:Studio;onSelectClip?:(cl
   {job.error?<p className="error">{job.error.message}</p>:null}
   {job.status==='provider_outcome_unknown'?<p className="warning">외부 생성이 접수되었을 수 있습니다. 접수 결과가 확인되지 않아 요청을 다시 보내지 않습니다.</p>:null}
   {videoJob?<VideoDiagnostics processing={job.result?.processing}/>:null}
-  {videoJob&&retryLabel?<p className="caption">저장된 영상 또는 접수한 요청을 이어서 처리합니다. 새 영상 생성 요청은 보내지 않습니다.</p>:null}
+  {videoJob&&retryLabel?<p className="caption">{job.completedResult||job.published?'완성 결과를 다시 저장합니다. 생성·다운로드·프레임 처리는 반복하지 않습니다.':'저장된 영상 또는 접수한 요청을 이어서 처리합니다. 새 영상 생성 요청은 보내지 않습니다.'}</p>:null}
   <div className="row">
    {['queued','running'].includes(job.status)?<button disabled={s.busy} onClick={()=>s.run(async()=>{await api(`/jobs/${job.jobId}/cancel`,'POST',{expectedStatus:job.status});if(s.base)await s.refreshDetails(s.base.projectId);})}>작업 취소 요청</button>:null}
    {retryLabel?<button disabled={s.busy||!!s.commands.length||!!s.conflict} onClick={()=>s.run(async()=>{await api(`/jobs/${job.jobId}/retry`,'POST',{failedStep:job.failedStep||job.step||'',reuseCheckpoint:true,idempotencyKey:uid()});if(s.base)await s.refreshDetails(s.base.projectId);})}>{retryLabel}</button>:null}
@@ -39,7 +39,7 @@ export function JobCard({job,s,onSelectClip}:{job:Job;s:Studio;onSelectClip?:(cl
    {downloads?.map(a=><a className="button" key={a.artifactId} href={a.url} download={a.name}>{outputNames[a.name]||a.name} 다운로드</a>)}
   </div>
   {retryLabel&&(s.commands.length||s.conflict)?<p className="caption">{s.conflict?'저장 충돌을 해결한 뒤':'편집 초안을 저장한 뒤'} 재시도할 수 있습니다.</p>:null}
-  <details><summary>진단 정보</summary><p className="mono">작업 {job.jobId} · 단계 {job.step||'대기'}</p>{diagnostics?.map(a=><p key={a.artifactId}><a href={a.url} download={a.name}>{a.name}</a></p>)}{job.result?.qa?<pre>{JSON.stringify(job.result.qa,null,2)}</pre>:null}{job.result?.processing?<pre>{JSON.stringify(job.result.processing,null,2)}</pre>:null}</details>
+  <details><summary>진단 정보</summary><p className="mono">작업 {job.jobId} · 단계 {job.step||'대기'}</p>{diagnostics?.map(a=><p key={a.artifactId}><a href={a.url} download={a.name}>{a.name}</a></p>)}{videoJob&&job.recovery?<pre>{JSON.stringify(job.recovery,null,2)}</pre>:null}{job.result?.qa?<pre>{JSON.stringify(job.result.qa,null,2)}</pre>:null}{job.result?.processing?<pre>{JSON.stringify(job.result.processing,null,2)}</pre>:null}</details>
  </article>;
 }
 export function JobsStep({s,onSelectClip}:{s:Studio;onSelectClip?:(clipId:string)=>void}){return <Panel title="작업 센터" eyebrow="BACKGROUND JOBS"><p className="muted">탭을 닫아도 작업은 처리됩니다. 원본과 성공한 다른 결과는 보존됩니다.</p>{s.jobs.slice().reverse().map(j=><JobCard key={j.jobId} job={j} s={s} onSelectClip={onSelectClip}/>)}{!s.jobs.length&&<Empty title="진행한 작업이 없습니다"><p>생성하거나 이미지를 추출하면 진행 상태를 여기서 확인할 수 있습니다.</p></Empty>}</Panel>}

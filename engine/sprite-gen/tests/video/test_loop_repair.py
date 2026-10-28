@@ -1,10 +1,11 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Jump-frame repair (docs/loop-repair.md section 2): only the frame after a jump is replaced,
-by the interpolator's frame between its two neighbours; at most three, never two side by side;
-the hair watched is behind the body whichever way it faces; and `video-loop` records what it
-replaced and gates the cells as they now play. When a frame needs making and no RIFE is
-installed, `--repair auto` cuts the loop as filmed with a warning and the install line, and
-`--repair on` refuses.
+"""Jump-frame repair (docs/loop-repair.md section 2): the frames off the loop's flow are taken out
+and made again by the interpolator between the frames either side, each at its own time; at most
+three calls, never made from or beside a frame made; and `video-loop` records what it replaced and
+gates the cells as they now play. The size reading (`jump_scores`, the hair behind the body
+whichever way it faces) is what the jump guard of `video-loop-compare` reads. When a frame needs
+making and no RIFE is installed, `--repair auto` cuts the loop as filmed with a warning and the
+install line, and `--repair on` refuses.
 
 The interpolator is a stand-in that returns the true in-between of the synthetic loop, so the
 tests need no binary and can say exactly which frame should come back."""
@@ -18,12 +19,13 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from PIL import Image
+from PIL import Image, ImageDraw
 
 from sprite_gen.video import loop as loop_mod
 from sprite_gen.video import repair
 
 W, H, N = 120, 140, 24
+SIZE_JUMP = 1.4  # a step this many times the loop's median: the size reading's jump, which picked frames before the flow reading
 
 
 def _frame(phase: float, *, tail_dx: int = 0, tail_side: str = "left", tail_jump: int = 0) -> Image.Image:
@@ -54,8 +56,9 @@ def _loop(jumps: dict[int, int] | None = None, *, side: str = "left") -> tuple[l
     return filmed, truth
 
 
-class TrueMiddle:
-    """Stand-in interpolator: the true frame between two frames of the synthetic loop."""
+class TrueBetween:
+    """Stand-in interpolator: the true frame of the synthetic loop at the time t of the way from one
+    frame to another (a time the loop has a frame for)."""
 
     def __init__(self, filmed: list[Image.Image], truth: list[Image.Image]):
         self.index = {id(f): k for k, f in enumerate(filmed)}
@@ -64,21 +67,34 @@ class TrueMiddle:
 
     def __call__(self, a: Image.Image, b: Image.Image, t: float) -> Image.Image:
         ka, kb = self.index[id(a)], self.index[id(b)]
-        self.calls.append((ka, kb, t))
-        assert (kb - ka) % N == 2 and t == 0.5  # always the two neighbours, half way
-        return self.truth[(ka + 1) % N]
+        self.calls.append((ka, kb, round(t, 4)))
+        at = t * ((kb - ka) % N)
+        assert abs(at - round(at)) < 1e-9  # always a frame's own time
+        return self.truth[(ka + round(at)) % N]
 
 
-def test_only_the_frame_after_a_jump_is_replaced_by_its_neighbours_middle():
+def forced_flow_group(monkeypatch, frames: list[int], neighbours: tuple[int, int], t: list[float]) -> None:
+    """Isolate adoption from target detection: the flow reading names this one group (a drawing a frame),
+    until a round has made it or refused it."""
+    group = {"frames": frames, "drawings": [[k] for k in frames], "neighbours": list(neighbours), "t": t, "off": 9.0}
+
+    def read(loop, *, fixed=(), skip=(), **kw):
+        groups = [] if set(frames) & (set(fixed) | set(skip)) else [group]
+        return {"groups": groups, "unfixed": [], "hold": 1, "drawings": len(loop), "off_max_before": 9.0 if groups else 0.0}
+
+    monkeypatch.setattr(repair, "flow_targets", read)
+
+
+def test_only_the_frame_off_the_flow_is_made_again_between_its_neighbours():
     filmed, truth = _loop({10: 12})
-    fake = TrueMiddle(filmed, truth)
+    fake = TrueBetween(filmed, truth)
     out, record = repair.repair_jumps(filmed, fake)
     assert record["replaced"] == [10]
     assert fake.calls == [(9, 11, 0.5)]
     assert out[10] is truth[10]
     assert all(out[k] is filmed[k] for k in range(N) if k != 10)  # every other frame stays the video's own
-    assert record["score_max_before"] >= repair.JUMP_RATIO > record["score_max_after"]
-    assert record["stopped"].startswith("no step at or above")
+    assert record["off_max_before"] >= repair.FLOW_LIMIT > record["off_max_after"]
+    assert record["stopped"] == "no frame off the flow"
 
 
 def test_a_smooth_loop_is_left_alone_and_needs_no_interpolator():
@@ -87,26 +103,97 @@ def test_a_smooth_loop_is_left_alone_and_needs_no_interpolator():
     assert record["replaced"] == [] and all(a is b for a, b in zip(out, filmed))
 
 
-def test_at_most_three_and_never_next_to_a_made_frame():
-    filmed, truth = _loop({3: 14, 9: 13, 15: 12, 20: 11})
-    out, record = repair.repair_jumps(filmed, TrueMiddle(filmed, truth))
-    assert len(record["replaced"]) == 3 and record["stopped"] == "3 frames replaced"
-    assert record["replaced"][0] == 3 and set(record["replaced"]) < {3, 9, 15, 20}  # worst first, only stray frames
+def test_at_most_three_calls_worst_first():
+    filmed, truth = _loop({3: 14, 10: 13, 15: 12, 21: 11})
+    fake = TrueBetween(filmed, truth)
+    out, record = repair.repair_jumps(filmed, fake)
+    assert len(record["replaced"]) == 3 and record["stopped"] == "3 interpolation calls used"
+    assert set(record["replaced"]) < {3, 10, 15, 21} and all(out[k] is truth[k] for k in record["replaced"])
+    offs = [r["off"] for r in record["rounds"]]
+    assert offs == sorted(offs, reverse=True)  # worst first, by the flow reading
+    assert [g["frames"] for g in record["left"]] == [[k] for k in {3, 10, 15, 21} - set(record["replaced"])]
 
-    filmed, truth = _loop({8: 14, 9: 14})  # two jump frames side by side
-    out, record = repair.repair_jumps(filmed, TrueMiddle(filmed, truth))
-    assert len(record["replaced"]) == 1
-    assert "next to a frame already made" in record["stopped"]
+
+def test_jumps_a_few_frames_apart_are_not_read_as_a_loop_on_threes():
+    # Its only large steps are the ones into and out of the jumps, every few frames: to `held.measure` the ordinary
+    # steps are repeats and the jumps drawings. Its runs are not a hold (five and six frames, and one), so it is read
+    # a drawing a frame: each jump a frame of its own, and a frame made stands for itself alone.
+    filmed, truth = _loop({3: 14, 9: 13, 15: 12, 20: 11})
+    record = repair.flow_targets(filmed)
+    assert record["hold"] == 1 and sorted(g["frames"] for g in record["groups"]) == [[3], [9], [15], [20]]
+    out, record = repair.repair_jumps(filmed, TrueBetween(filmed, truth))
+    assert len(record["replaced"]) == 3 and all(len(r["frames"]) == 1 for r in record["rounds"])
+
+
+def test_two_jump_frames_side_by_side_are_made_again_as_two():
+    filmed, truth = _loop({8: 14, 9: 14})
+    fake = TrueBetween(filmed, truth)
+    out, record = repair.repair_jumps(filmed, fake)
+    assert record["replaced"] == [8, 9] and fake.calls == [(7, 10, 0.3333), (7, 10, 0.6667)]
+    assert out[8] is truth[8] and out[9] is truth[9]
 
 
 def test_the_hair_watched_is_behind_the_body_whichever_way_it_faces():
     # A small ponytail jump: the whole frame barely notices, the hair box does.
     right_filmed, right_truth = _loop({12: 6}, side="left")  # tail on the left = behind a right-facing body
-    assert repair.jump_scores(right_filmed, facing="right")["hair"].max() >= repair.JUMP_RATIO
-    assert repair.jump_scores(right_filmed, facing="left")["hair"].max() < repair.JUMP_RATIO
+    assert repair.jump_scores(right_filmed, facing="right")["hair"].max() >= SIZE_JUMP
+    assert repair.jump_scores(right_filmed, facing="left")["hair"].max() < SIZE_JUMP
     left_filmed, _ = _loop({12: 6}, side="right")  # tail on the right = behind a left-facing body
-    assert repair.jump_scores(left_filmed, facing="left")["hair"].max() >= repair.JUMP_RATIO
+    assert repair.jump_scores(left_filmed, facing="left")["hair"].max() >= SIZE_JUMP
     assert repair.hair_box("left") == (0.55, 0.30, 1.0, 0.80)
+    # The flow reading needs no facing: the jump is taken out on either side.
+    for filmed, truth in (_loop({12: 6}, side="left"), _loop({12: 6}, side="right")):
+        out, record = repair.repair_jumps(filmed, TrueBetween(filmed, truth))
+        assert record["replaced"] == [12]
+
+
+def test_each_group_is_made_from_frames_as_filmed_never_beside_a_frame_made():
+    filmed, truth = _loop({8: 14, 9: 14, 18: 10})
+    fake = TrueBetween(filmed, truth)
+    out, record = repair.repair_jumps(filmed, fake)
+    assert sorted(record["replaced"]) == [8, 9, 18] and len(fake.calls) == repair.MAX_REPAIRS
+    for r in record["rounds"]:
+        assert not set(r["neighbours"]) & set(record["replaced"])
+        assert all(filmed[k] is out[k] for k in r["neighbours"])
+
+
+def test_bad_outline_proposals_preserve_originals_and_consume_the_call_budget():
+    filmed, truth = _loop({3: 14, 10: 13, 15: 12, 21: 11})
+    for frame in filmed + truth:
+        d = ImageDraw.Draw(frame)
+        d.rectangle((50, 30, 69, 99), outline=(10, 10, 10, 255), width=2)
+        d.rectangle((48, 10, 71, 29), outline=(10, 10, 10, 255), width=2)
+    before = [f.tobytes() for f in filmed]
+    fake = TrueBetween(filmed, truth)
+
+    def melted(a, b, t):
+        pixels = np.asarray(fake(a, b, t)).copy()
+        dark = (pixels[..., :3].max(axis=2) < 70) & (pixels[..., 3] > 0)
+        pixels[dark, :3] = (200, 180, 150)
+        return Image.fromarray(pixels, "RGBA")
+
+    out, record = repair.repair_jumps(filmed, melted)
+    assert record["replaced"] == []
+    assert record["attempts"] == len(fake.calls) == repair.MAX_REPAIRS
+    assert len({tuple(r["frames"]) for r in record["rounds"]}) == repair.MAX_REPAIRS
+    assert all(r["outcome"] == "rejected" and "outline" in r["faults"] for r in record["rounds"])
+    assert [f.tobytes() for f in out] == before == [f.tobytes() for f in filmed]
+
+
+def test_a_pair_flung_at_the_wrap_is_taken_out_whole_not_smoothed_at_its_edges():
+    # Frames N-1 and 0 flung together: the frames either side of them read as far off the line as they do, and
+    # an in-between there brings the reading under the limit too, leaving the pair. The pair is what the
+    # in-between moves furthest: it is taken out, made again from frames N-2 and 1.
+    filmed, truth = _loop({0: 16, N - 1: 15, 12: 10})
+    fake = TrueBetween(filmed, truth)
+    out, record = repair.repair_jumps(filmed, fake)
+    assert sorted(record["replaced"]) == [0, 12, N - 1]
+    assert sorted(fake.calls) == [(11, 13, 0.5), (N - 2, 1, 0.3333), (N - 2, 1, 0.6667)]
+    assert all(out[k] is truth[k] for k in (0, 12, N - 1))
+    no_calls = TrueBetween(filmed, truth)
+    out, record = repair.repair_jumps(filmed, no_calls, max_frames=0)
+    assert not no_calls.calls and record["attempts"] == 0
+    assert all(a is b for a, b in zip(out, filmed))
 
 
 def _keyed(tmp_path: Path, frames: list[Image.Image]) -> Path:
@@ -142,6 +229,32 @@ def test_video_loop_records_the_repair_and_plays_the_made_frame(tmp_path):
     assert np.array_equal(np.asarray(Image.open(tmp_path / "out" / "cycle" / "frame-009.png")), np.asarray(reopened[9]))
     assert json.loads((tmp_path / "w.json").read_text())["jump_repair"]["replaced"] == [10]
     assert made == [0.5]
+    # the jolt of the loop as it plays after the repair (docs/loop-repair.md section 3)
+    jolt = rep["jolt"]
+    assert jolt["measured"] == "after the jump repair" and jolt["warnings"] == [] and jolt["passed"]
+    assert jolt["gated"] is False and jolt["gate"] is None
+    assert jolt["reference"] == {"jolt_max": repair.JOLT_REFERENCE, "head_step_max": repair.HEAD_STEP_REFERENCE}
+    assert set(jolt["head"]["x"]) >= {"step_max_pct", "step_median_pct", "max_over_median", "range_pct"}
+    assert set(jolt["head"]["y"]) >= {"step_max_pct", "step_median_pct", "max_over_median", "range_pct"}
+
+
+def test_video_loop_plays_two_frames_made_again_at_their_own_times_in_a_loop_as_long(tmp_path):
+    filmed, truth = _loop({8: 14, 9: 14})
+    keyed = _keyed(tmp_path, filmed)
+    made = []
+
+    def between(a, b, t):
+        made.append(round(t, 4))
+        return truth[8] if t < 0.5 else truth[9]
+
+    rep = _run(tmp_path, keyed, interpolate=between)
+    assert rep["jump_repair"]["replaced"] == [8, 9] and made == [0.3333, 0.6667]
+    (round_,) = [r for r in rep["jump_repair"]["rounds"] if r["why"] == "flow"]
+    assert round_["neighbours"] == [7, 10] and round_["t"] == [0.3333, 0.6667]
+    cells = sorted((tmp_path / "out" / "cycle").glob("frame-*.png"))
+    assert len(cells) == N  # the loop keeps its length: each frame its own time
+    for k in (8, 9):
+        assert np.array_equal(np.asarray(Image.open(cells[k])), np.asarray(truth[k]))
 
 
 def _no_rife(monkeypatch, tmp_path: Path) -> None:
@@ -163,7 +276,8 @@ def test_a_jump_without_rife_is_cut_as_filmed_with_a_warning(tmp_path, monkeypat
     jr = rep["jump_repair"]
     assert jr["applied"] is False and jr["replaced"] == [] and jr["why"] == "RIFE not installed — cut as filmed"
     assert jr["install"] == "sprite-gen rife install" and "rife-ncnn-vulkan not found" in jr["rife"]
-    assert jr["score_max_before"] >= repair.JUMP_RATIO and jr["score_max_after"] == jr["score_max_before"]
+    assert jr["off_max_before"] >= repair.FLOW_LIMIT and jr["off_max_after"] == jr["off_max_before"]
+    assert jr["unmade"]["frames"] == [10]
     assert rep["seam_measurement"] == "source-frames" and rep["jolt"]["measured"] == "as filmed"
     on_disk = np.asarray(Image.open(tmp_path / "out" / "cycle" / "frame-010.png"))
     assert np.array_equal(on_disk, np.asarray(reopened[10]))  # the jump frame stays as filmed
@@ -187,12 +301,6 @@ def test_repair_on_without_rife_is_refused_with_the_install_line(tmp_path, monke
         _run(tmp_path, _keyed(tmp_path, filmed), repair="on")
     report = json.loads((tmp_path / "w.json").read_text())
     assert report["status"] == "failed" and "rife-ncnn-vulkan not found" in report["error"]
-
-
-def test_repair_on_with_rife_repairs_as_auto_does(tmp_path):
-    filmed, truth = _loop({10: 12})
-    rep = _run(tmp_path, _keyed(tmp_path, filmed), repair="on", interpolate=lambda a, b, t: truth[10])
-    assert rep["jump_repair"]["replaced"] == [10] and rep["jump_repair"]["applied"] is True
 
 
 def test_a_rife_that_is_found_and_fails_still_fails_the_loop(tmp_path):
@@ -260,17 +368,6 @@ def test_a_loop_with_no_head_to_track_says_so_instead_of_passing():
     assert any("could not be tracked" in o for o in repair.jolt_verdict(measured))
 
 
-def test_video_loop_reports_the_jolt_of_the_loop_as_it_plays_after_the_repair(tmp_path):
-    filmed, truth = _loop({10: 12})
-    rep = _run(tmp_path, _keyed(tmp_path, filmed), interpolate=lambda a, b, t: truth[10])
-    jolt = rep["jolt"]
-    assert jolt["measured"] == "after the jump repair" and jolt["warnings"] == [] and jolt["passed"]
-    assert jolt["gated"] is False and jolt["gate"] is None
-    assert jolt["reference"] == {"jolt_max": repair.JOLT_REFERENCE, "head_step_max": repair.HEAD_STEP_REFERENCE}
-    assert set(jolt["head"]["x"]) >= {"step_max_pct", "step_median_pct", "max_over_median", "range_pct"}
-    assert set(jolt["head"]["y"]) >= {"step_max_pct", "step_median_pct", "max_over_median", "range_pct"}
-
-
 def test_by_default_a_jolting_loop_is_kept_with_a_warning_line(tmp_path, capsys):
     filmed, _ = _loop()
     popped = _head_pop(filmed, 7, 4)
@@ -301,3 +398,51 @@ def test_repair_off_measures_the_jolt_and_does_not_gate_it(tmp_path):
     filmed, _ = _loop()
     rep = _run(tmp_path, _keyed(tmp_path, _head_pop(filmed, 7, 4)), repair="off", head_step_max=0.1)
     assert rep["jolt"]["gated"] is False and rep["jolt"]["warnings"] and rep["status"] == "passed"
+
+
+def test_at_most_three_and_never_next_to_a_made_frame():
+    filmed, truth = _loop({3: 14, 9: 13, 15: 12, 20: 11})
+    fake = TrueBetween(filmed, truth)
+    out, record = repair.repair_jumps(filmed, fake)
+    assert len(record["replaced"]) == 3 and record["stopped"] == "3 interpolation calls used"
+    assert record["replaced"][0] == int(repair.flow_scores(filmed)["off"].argmax())
+    assert set(record["replaced"]) < {3, 9, 15, 20}
+    assert all(a not in record['replaced'] and b not in record['replaced'] for a, b, _ in fake.calls)
+
+    filmed, truth = _loop({8: 14, 9: 14})  # two jump frames side by side
+    fake = TrueBetween(filmed, truth)
+    out, record = repair.repair_jumps(filmed, fake)
+    # v2.45 repairs a two-frame flow group from the same untouched outer neighbours.
+    assert record['replaced'] == [8, 9]
+    assert fake.calls == [(7, 10, .3333), (7, 10, .6667)]
+    assert out[8] is truth[8] and out[9] is truth[9]
+
+
+def test_only_the_frame_after_a_jump_is_replaced_by_its_neighbours_middle():
+    filmed, truth = _loop({10: 12})
+    fake = TrueBetween(filmed, truth)
+    out, record = repair.repair_jumps(filmed, fake)
+    assert record["replaced"] == [10]
+    assert fake.calls == [(9, 11, 0.5)]
+    assert out[10] is truth[10]
+    assert all(out[k] is filmed[k] for k in range(N) if k != 10)  # every other frame stays the video's own
+    assert record["off_max_before"] >= repair.FLOW_LIMIT > record["off_max_after"]
+    assert record["stopped"].startswith("no frame off the flow")
+
+
+def test_repair_on_with_rife_repairs_as_auto_does(tmp_path):
+    filmed, truth = _loop({10: 12})
+    rep = _run(tmp_path, _keyed(tmp_path, filmed), repair="on", interpolate=lambda a, b, t: truth[10])
+    assert rep["jump_repair"]["replaced"] == [10] and rep["jump_repair"]["applied"] is True
+
+
+def test_video_loop_reports_the_jolt_of_the_loop_as_it_plays_after_the_repair(tmp_path):
+    filmed, truth = _loop({10: 12})
+    rep = _run(tmp_path, _keyed(tmp_path, filmed), interpolate=lambda a, b, t: truth[10])
+    jolt = rep["jolt"]
+    assert jolt["measured"] == "after the jump repair" and jolt["warnings"] == [] and jolt["passed"]
+    assert jolt["gated"] is False and jolt["gate"] is None
+    assert jolt["reference"] == {"jolt_max": repair.JOLT_REFERENCE, "head_step_max": repair.HEAD_STEP_REFERENCE}
+    assert set(jolt["head"]["x"]) >= {"step_max_pct", "step_median_pct", "max_over_median", "range_pct"}
+    assert set(jolt["head"]["y"]) >= {"step_max_pct", "step_median_pct", "max_over_median", "range_pct"}
+

@@ -39,7 +39,7 @@ def reap_job(j):
         command=subprocess.run(['ps','-p',str(pid),'-o','command='],capture_output=True,text=True).stdout
         if not command.strip() or ('services.worker.task' in command and j['jobId'] in command): terminate_group(pid)
 
-def interrupt_project(project_id,error):
+def interrupt_project(project_id,error,job_id=None):
     # The shared index and outbox are committed before portable-folder flushing.
     # Keep that outbox when an unavailable folder cannot receive this event.
     with s.connect() as c:
@@ -47,9 +47,10 @@ def interrupt_project(project_id,error):
     for row in rows: reap_job(json.loads(row[0]))
     try:
         with s.transaction() as c:
-            rows=c.execute("SELECT body FROM jobs WHERE project_id=? AND status IN ('queued','running','cancel_requested')",(project_id,)).fetchall()
+            rows=c.execute("SELECT body FROM jobs WHERE project_id=? AND (status IN ('queued','running','cancel_requested') OR id=?)",(project_id,job_id)).fetchall()
             for row in rows:
                 current=json.loads(row[0])
+                if current.get('published'): current['completedResult']=True
                 current.update(status='interrupted',step='stopped',errors=[dict(
                     code=error.code,message='프로젝트 폴더에 접근할 수 없어 작업을 중단했습니다. 폴더를 복구한 뒤 저장된 결과를 확인하세요.',
                     stage=current.get('step'),details=error.details)])
@@ -66,7 +67,7 @@ def handle_folder_failure(j,error):
             if not folder_failure(exc): return False
             error=exc
         else: return False
-    interrupt_project(j['projectId'],error)
+    interrupt_project(j['projectId'],error,j['jobId'])
     return True
 
 def validate_animation_publication(result,project):
@@ -123,6 +124,7 @@ def recover_job(j):
             from adapters.spritegen.video_provider import checkpoint_state
             state=checkpoint_state(j);current.update({k:v for k,v in state.items() if k!='outcomeUnknown'})
             current['status']='provider_outcome_unknown' if state['outcomeUnknown'] else 'interrupted'
+        current['completedResult']=bool(payload and payload.get('ok'))
         current['errors']=[dict(code='WORKER_INTERRUPTED',message='작업 처리기가 중단되었습니다. 저장된 원본과 이전 결과는 보존됩니다.',stage=j.get('step'))]
         s.write_job(c,current)
 
@@ -149,7 +151,12 @@ def claim():
 def publish(j,payload):
     out=s.job_directory(j['jobId'])/j['attemptId']/'staging'
     result=payload['result']; files=result.get('files',[])
-    if s.get_job(j['jobId']).get('published'): return
+    if s.get_job(j['jobId']).get('published'):
+        with s.transaction() as c:
+            current=s.get_job(j['jobId'],c)
+            current.update(status=current.get('result',{}).get('status','succeeded'),step='complete',errors=[])
+            s.write_job(c,current)
+        return
     if j['operation'] in ('generate_video','process_video'):
         validate_animation_publication(result,j['snapshot'])
     published=s.artifact_directory(j['jobId'])/j['attemptId']
@@ -260,6 +267,7 @@ def run_job(j):
             current['result']={'receipt':payload['providerCheckpoint']['providerResult']['receipt']}
             current['providerCheckpoint']=True
             current['checkpoints']=[{'step':'generate','inputHash':j['requestHash'],'confirmed':True}]
+        current['completedResult']=bool(payload_path.exists() and json.loads(payload_path.read_text()).get('ok'))
         current.update(status=status,errors=[payload['error']],step='stopped'); s.write_job(c,current)
 
 def main():

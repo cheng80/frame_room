@@ -206,7 +206,9 @@ def asset_path(aid):
     if not row: raise AppError('ASSET_MISSING','원본 자료가 없습니다.',424,{'assetId':aid})
     from .project_folders import resource_path
     path=resource_path('assets',aid,row)
-    if digest(path.read_bytes())!=json.loads(row['metadata'])['sha256']: raise AppError('ASSET_HASH','원본 파일의 해시가 변경되었습니다.',424,{'assetId':aid})
+    try: data=path.read_bytes()
+    except FileNotFoundError as exc: raise AppError('ASSET_MISSING','프로젝트 원본 파일을 찾을 수 없습니다.',424,{'id':aid}) from exc
+    if digest(data)!=json.loads(row['metadata'])['sha256']: raise AppError('ASSET_HASH','원본 파일의 해시가 변경되었습니다.',424,{'assetId':aid})
     return path
 
 def get_job(jid,c=None):

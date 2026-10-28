@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import copy
 import io
+import json
 from pathlib import Path
 
 from PIL import Image
@@ -22,18 +23,70 @@ def validate_apply(snapshot, params, connection=None):
     preview = s.get_job(params['previewJobId'], connection)
     if preview.get('projectId') != snapshot['projectId']:
         raise s.AppError('FOLLOW_PREVIEW_PROJECT', '같은 프로젝트의 미리보기만 저장할 수 있습니다.', 404)
-    if preview['operation'] != 'preview_follow' or preview['status'] != 'succeeded' or not preview.get('published'):
+    if preview['operation'] not in ('preview_follow', 'preview_restore', 'compare_clips') or preview['status'] != 'succeeded' or not preview.get('published'):
         raise s.AppError('FOLLOW_PREVIEW_INCOMPLETE', '성공한 흔들림 미리보기만 저장할 수 있습니다.', 409)
     result = preview.get('result', {})
     source = result.get('source', {})
-    if result.get('version') != VERSION or result.get('tool') != 'follow' or source.get('projectId') != snapshot['projectId']:
+    if result.get('version') != VERSION or result.get('tool') not in ('follow', 'restore', 'compare') or source.get('projectId') != snapshot['projectId']:
         raise s.AppError('FOLLOW_PREVIEW_INVALID', '미리보기 출처가 유효하지 않습니다.', 424)
+    if result.get('report', {}).get('canApply') is False:
+        raise s.AppError('CLIP_TOOL_UNCERTAIN', '대응 또는 복원을 증명하지 못한 결과는 저장할 수 없습니다.', 409)
+    if result.get('policy'):
+        from adapters.spritegen.clip_comparison import policy
+        if result['policy'] != policy():
+            raise s.AppError('CLIP_TOOL_POLICY', '처리 정책이 바뀌었습니다. 다시 미리보기하세요.', 409)
     s.check_revision(snapshot, source.get('projectRevision'))
     if result.get('sourceProjectRevision') != snapshot['revision'] or preview['inputRevision'] != snapshot['revision']:
         raise s.AppError('REVISION_CONFLICT', '프로젝트가 바뀌었습니다. 흔들림 미리보기를 다시 만드세요.', 409)
     clip = next((cl for cl in snapshot['clips'] if cl['clipId'] == source.get('clipId')), None)
     if not clip or clip['clipRevisionId'] != source.get('clipRevisionId'):
         raise s.AppError('FOLLOW_PREVIEW_INVALID', '미리보기 동작 버전이 다릅니다.', 409)
+    from adapters.spritegen import clip_comparison as comparison, clip_tools
+    report = result.get('report', {})
+    if result['tool'] in ('restore', 'compare'):
+        restoration = result['tool'] == 'restore'
+        if (result.get('policy') != comparison.policy() or report.get('bridge_policy') != comparison.policy()
+                or report.get('schema_version') != (4 if restoration else 1)
+                or report.get('metric_version') != ('source-restoration-v5' if restoration else 'same-sample-defects-v1')
+                or report.get('canApply') is not True or report.get('verdict') not in ('improved', 'non_regressing')
+                or restoration and (report.get('comparison_schema') != 6 or report.get('policy_version') != comparison.policy()['policy_version']
+                    or report.get('comparison', {}).get('schema_version') != 6
+                    or any(report.get('comparison', {}).get(k) != report.get(k) for k in ('metric_version', 'policy_version', 'verdict', 'source', 'origin', 'baseline', 'candidate')))):
+            raise s.AppError('CLIP_TOOL_POLICY', '증거 형식·정책·판정이 유효하지 않습니다.', 424)
+    cells, durations, actual_source = clip_tools.render_clip(snapshot, {'clipId': clip['clipId'], 'clipRevisionId': clip['clipRevisionId']}, s.asset_path)
+    if any(source.get(k) != value for k, value in actual_source.items() if k != 'pixelHashes'):
+        raise s.AppError('FOLLOW_PREVIEW_INVALID', '미리보기의 원본 좌표·슬롯 출처가 현재 동작과 다릅니다.', 424)
+    if source.get('pixelHashes') and source['pixelHashes'] != comparison.pixels(cells):
+        raise s.AppError('FOLLOW_PREVIEW_HASH', '미리보기 입력 픽셀이 변경되었습니다.', 424)
+    if result['settings'].get('readOnClipId'):
+        origin_clip = next(c for c in snapshot['clips'] if c['clipId'] == result['settings']['readOnClipId'])
+        origin_cells, _, _ = clip_tools.render_clip(snapshot, {'clipId': origin_clip['clipId'], 'clipRevisionId': origin_clip['clipRevisionId']}, s.asset_path)
+        if comparison.pixels(origin_cells) != source.get('readOnSource', {}).get('pixelHashes'):
+            raise s.AppError('FOLLOW_PREVIEW_HASH', '영역을 읽은 동작이 변경되었습니다.', 424)
+    if result['tool'] in ('restore', 'compare'):
+        try:
+            read = comparison.read_evidence if result['tool'] == 'restore' else comparison.read_comparison_evidence
+            evidence, _, _, _ = read(snapshot, clip, cells, durations)
+            after = _decode_cells(result, _preview_contents(preview, result, snapshot))
+            actual = dict(source=evidence['source'], origin=evidence['origin'],
+                          baseline=comparison.identity(cells, durations, evidence['basis']),
+                          candidate=comparison.identity(after, durations, evidence['basis']))
+            if result['tool'] == 'restore' and (actual['baseline'] == actual['candidate'] or report['verdict'] != 'improved'):
+                raise ValueError('unchanged-restoration-is-not-an-accepted-proposal')
+            if result['tool'] == 'compare':
+                candidate = next(c for c in snapshot['clips'] if c['clipId'] == result['settings']['candidateClipId'])
+                selected, times, _ = clip_tools.render_clip(snapshot, {'clipId': candidate['clipId'], 'clipRevisionId': candidate['clipRevisionId']}, s.asset_path)
+                chosen, _, _, _ = comparison.read_comparison_evidence(snapshot, candidate, selected, times)
+                if (chosen['source'] != evidence['source'] or chosen['origin'] != evidence['origin']
+                        or comparison.identity(selected, times, chosen['basis']) != actual['candidate']):
+                    raise ValueError('candidate-source-or-pixels-changed')
+            reports = [report, report['comparison']] if result['tool'] == 'restore' else [report]
+            if any(row.get(key) != value for row in reports for key, value in actual.items()):
+                raise ValueError('comparison-identity-does-not-match-actual-cells')
+        except (ValueError, KeyError, TypeError, OSError) as exc:
+            raise s.AppError('CLIP_TOOL_SOURCE', '원본·최초 결과 증거가 변경되었습니다. 다시 미리보기하세요.', 424) from exc
+    else:
+        _preview_contents(preview, result, snapshot)
     return {'previewJobId': preview['jobId']}
 
 
@@ -75,17 +128,64 @@ def execute_clip_tools(j, out):
         return _prepare_apply(j, out)
     snapshot = j['snapshot']
     params = clip_tools.validate_params(snapshot, j['operation'], j['request']['params'])
-    cells, durations, source = clip_tools.render_clip(snapshot, params, s.asset_path)
+    cells, durations, source = clip_tools.render_clip(snapshot, params, s.asset_path,
+        allow_render_errors=j['operation'] in ('preview_restore', 'compare_clips'))
     _check_cells(cells, durations)
     clip = next(cl for cl in snapshot['clips'] if cl['clipId'] == source['clipId'])
     files, before, animation, strip = _write_cells(cells, durations, clip['loop'], out, 'before', source)
     preview = {'width': cells[0].width, 'height': cells[0].height, 'frameCount': len(cells),
                'durationsMs': durations, 'before': animation, 'beforeStrip': strip, 'firstFrame': before[0]['name']}
-    result = {'tool': 'follow' if j['operation'] == 'preview_follow' else 'handed', 'version': VERSION,
+    from adapters.spritegen import clip_comparison as comparison
+    result = {'tool': {'preview_follow': 'follow', 'preview_restore': 'restore', 'compare_clips': 'compare'}.get(j['operation'], 'handed'), 'version': VERSION,
               'source': source, 'sourceProjectRevision': snapshot['revision'], 'settings': params,
-              'preview': preview, 'cellFiles': {'before': before}, 'files': files}
-    if j['operation'] == 'preview_follow':
-        after, report = clip_tools.follow_frames(cells, durations, params)
+              'policy': comparison.policy(), 'preview': preview, 'cellFiles': {'before': before}, 'files': files}
+    source['stripSha256'] = s.digest((out / strip).read_bytes())
+    if j['operation'] in ('preview_follow', 'preview_restore', 'compare_clips'):
+        if j['operation'] == 'preview_restore':
+            after, report = comparison.restore(snapshot, clip, cells, durations)
+            report['sourceStatus'] = comparison.source_status(snapshot, clip)
+            if source.get('renderErrors'):
+                report.update(verdict='unknown', canApply=False, reasons=['canonical-render-errors'])
+                report['comparison'].update(verdict='unknown', reasons=['canonical-render-errors'])
+        elif j['operation'] == 'compare_clips':
+            candidate_params = {'clipId': params['candidateClipId'], 'clipRevisionId': params['candidateClipRevisionId']}
+            candidate_cells, candidate_durations, candidate_source = clip_tools.render_clip(snapshot, candidate_params, s.asset_path, allow_render_errors=True)
+            candidate_clip = next(c for c in snapshot['clips'] if c['clipId'] == params['candidateClipId'])
+            try:
+                e, _, _, _ = comparison.read_comparison_evidence(snapshot, clip, cells, durations)
+                ce, _, _, _ = comparison.read_comparison_evidence(snapshot, candidate_clip, candidate_cells, candidate_durations)
+                basis, candidate_basis = e['basis'], ce['basis']
+                comparable = e['source'] == ce['source'] and e['origin'] == ce['origin'] and not source.get('renderErrors') and not candidate_source.get('renderErrors')
+            except (ValueError, KeyError, TypeError, OSError):
+                basis = candidate_basis = {}; comparable = False
+            report = comparison.compare_cells(cells, candidate_cells, durations, candidate_durations, basis, candidate_basis, comparable=comparable)
+            if comparable: report.update(source=e['source'], origin=e['origin'])
+            report['canApply'] = comparable and report['verdict'] in ('improved', 'non_regressing')
+            after = candidate_cells if len(candidate_cells) == len(cells) and candidate_cells[0].size == cells[0].size and candidate_durations == durations else [c.copy() for c in cells]
+            report['candidateClipId'] = candidate_clip['clipId']
+        elif params.get('readOnClipId'):
+            origin_clip = next(c for c in snapshot['clips'] if c['clipId'] == params['readOnClipId'])
+            origin_cells, origin_durations, origin_source = clip_tools.render_clip(snapshot,
+                {'clipId': origin_clip['clipId'], 'clipRevisionId': origin_clip['clipRevisionId']}, s.asset_path)
+            source['readOnSource'] = origin_source
+            origin_files, _, _, origin_strip = _write_cells(origin_cells, origin_durations, origin_clip['loop'], out, 'read-on', origin_source)
+            files.extend(origin_files)
+            strip_bytes = (out / origin_strip).read_bytes(); sha = s.digest(strip_bytes)
+            try:
+                if params.get('readOn') and params['readOn'] != sha: raise ValueError('read-on-strip-hash-mismatch')
+                motion = clip_tools.transported_reading(snapshot, clip, cells, durations, origin_clip, origin_cells, origin_durations, strip_bytes)
+                after, report = clip_tools.follow_frames(cells, durations, params, motion=motion)
+                report['readOn'] = {'relation': 'transported', 'sha256': sha, 'sourceCells': motion[4]}
+            except (ValueError, KeyError, TypeError, OSError, SystemExit) as exc:
+                after = [c.copy() for c in cells]
+                report = dict(canApply=False, gainRequested=params['gain'], gainApplied=0, foldLimited=False,
+                    unchanged=True, readOn={'relation': 'uncertain', 'reason': str(exc)})
+        elif params.get('readOn') and params['readOn'] != source['stripSha256']:
+            after = [c.copy() for c in cells]
+            report = dict(canApply=False, gainRequested=params['gain'], gainApplied=0, foldLimited=False,
+                          unchanged=True, readOn={'relation': 'uncertain', 'reason': 'strip-hash-or-sample-mapping-unverified'})
+        else:
+            after, report = clip_tools.follow_frames(cells, durations, params)
         _check_cells(after, durations)
         if after[0].size != cells[0].size:
             raise s.AppError('CLIP_TOOLS_SIZE', '흔들림 결과의 셀 크기가 변경되었습니다.', 424)
@@ -156,10 +256,21 @@ def _prepare_apply(j, out):
     s.check_revision(s.get_project(j['projectId']), j['inputRevision'])
     job = s.get_job(settings['previewJobId'])
     result = copy.deepcopy(job['result'])
-    _, records = _after_cells(result, j['snapshot'])
+    contents = _preview_contents(job, result, j['snapshot'])
+    for name, data in contents.items():
+        s.atomic_bytes(out / name, data)
+    result.update(previewJobId=job['jobId'], files=list(contents), status='needs_review')
+    result.pop('publicationHashes', None)
+    return result
+
+
+def _preview_contents(job, result, snapshot):
+    """Bind DB metadata to verified bytes at API admission, execution and publication."""
+    _, records = _after_cells(result, snapshot)
     expected = {r['name']: r['sha256'] for r in result['fileHashes']}
     artifacts = {a['name']: a for a in job['artifacts']}
-    if set(expected) != set(artifacts) or any(expected.get(r['name']) != r['sha256'] for r in records):
+    if (len(expected) != len(result['fileHashes']) or set(expected) != set(artifacts)
+            or any(expected.get(r['name']) != r['sha256'] for r in records)):
         raise s.AppError('FOLLOW_PREVIEW_INVALID', '미리보기 산출물 목록이 다릅니다.', 424)
     root = s.artifact_directory(job['jobId']) / job['attemptId']
     # Verify every artifact before copying, and every cell before registration.
@@ -170,11 +281,13 @@ def _prepare_apply(j, out):
             raise s.AppError('FOLLOW_PREVIEW_HASH', '미리보기 파일이 변경되었습니다. 다시 미리보기를 만드세요.', 424)
         contents[name] = data
     _decode_cells(result, contents)
-    for name, data in contents.items():
-        s.atomic_bytes(out / name, data)
-    result.update(previewJobId=job['jobId'], files=list(contents), status='needs_review')
-    result.pop('publicationHashes', None)
-    return result
+    try:
+        metadata = json.loads(contents['report.json'])
+        recorded = {k: v for k, v in result.items() if k not in ('fileHashes', 'publicationHashes', 'files')}
+        if metadata != recorded: raise ValueError('preview-metadata-does-not-match-report-artifact')
+    except (ValueError, KeyError, TypeError) as exc:
+        raise s.AppError('FOLLOW_PREVIEW_INVALID', '미리보기 보고서와 보존 산출물의 내용이 다릅니다.', 424) from exc
+    return contents
 
 
 def _decode_cells(result, contents):
@@ -210,12 +323,12 @@ def publish_follow(j, result, directory, snapshot, connection):
     """Called inside the revision-checked publication transaction, never by preview."""
     validate_apply(snapshot, {'previewJobId': result['previewJobId']}, connection)
     approved_preview = s.get_job(result['previewJobId'], connection)['result']
-    for key in ('version', 'tool', 'source', 'sourceProjectRevision', 'settings', 'report', 'preview', 'cellFiles', 'fileHashes'):
+    for key in ('version', 'tool', 'source', 'sourceProjectRevision', 'settings', 'report', 'preview', 'cellFiles', 'fileHashes', 'policy'):
         if result.get(key) != approved_preview.get(key):
             raise s.AppError('FOLLOW_PREVIEW_INVALID', '저장 결과가 성공한 미리보기와 다릅니다.', 424)
     original, records = _after_cells(result, snapshot)
     contents = {r['name']: _safe_file(directory, r['name']).read_bytes() for r in records}
-    _decode_cells(result, contents)
+    after_cells = _decode_cells(result, contents)
     source = result['source']
     width, height = result['preview']['width'], result['preview']['height']
     group_id, group_revision = s.uid(), s.uid()
@@ -225,7 +338,7 @@ def publish_follow(j, result, directory, snapshot, connection):
                  targetAnchor=target, bodyMeasurement=None, resampler='nearest', roundingVersion='js-round-v1')
     assets, frames, alignments, occurrences = [], [], {}, []
     by_frame = {f['frameVersionId']: f for f in snapshot['frames']}
-    lineage = {'kind': 'clip-follow', 'version': VERSION, 'source': copy.deepcopy(source),
+    lineage = {'kind': 'clip-' + result['tool'], 'version': VERSION, 'source': copy.deepcopy(source),
                'settings': copy.deepcopy(result['settings']), 'report': copy.deepcopy(result['report']),
                'previewJobId': result['previewJobId'], 'preview': copy.deepcopy(result['preview']),
                'previewFiles': copy.deepcopy(result['fileHashes'])}
@@ -236,7 +349,7 @@ def publish_follow(j, result, directory, snapshot, connection):
         provenance = {**lineage, 'parentAssetId': previous['imageAssetId'], 'sourceFrame': copy.deepcopy(previous),
                       'sourceOccurrence': copy.deepcopy(slot), 'sourceAlignment': copy.deepcopy(old_alignment),
                       'sourceGroup': copy.deepcopy(old_group), 'previewCell': copy.deepcopy(record)}
-        asset = s.register_asset(contents[record['name']], f'흔들림-{index + 1}.png', 'derived', provenance,
+        asset = s.register_asset(contents[record['name']], f"{result['tool']}-{index + 1}.png", 'derived', provenance,
                                  c=connection, project_id=j['projectId'])
         assets.append(asset)
         fid = s.uid()
@@ -262,5 +375,35 @@ def publish_follow(j, result, directory, snapshot, connection):
     clip = {**_candidate(original), 'clipId': s.uid(), 'clipRevisionId': s.uid(),
             'name': original['name'] + ' · 부위 흔들림 · 검수 대기', 'review': 'pending', 'occurrences': occurrences,
             'sourceProcessing': {**lineage, 'sourceClip': copy.deepcopy(original)}}
+    if original.get('comparisonEvidence'):
+        from adapters.spritegen import clip_comparison as comparison, clip_tools
+        evidence = copy.deepcopy(original['comparisonEvidence'])
+        if result['tool'] == 'compare':
+            selected = next(c for c in snapshot['clips'] if c['clipId'] == result['report']['candidateClipId'])
+            evidence = copy.deepcopy(selected['comparisonEvidence'])
+        if result['tool'] == 'restore':
+            evidence['applied'] = result['report']['applied']
+        elif result['tool'] == 'follow':
+            try:
+                before, durations, _ = clip_tools.render_clip(snapshot, original, s.asset_path)
+                comparison.read_comparison_evidence(snapshot, original, before, durations)
+                if comparison.pixels(after_cells) != comparison.pixels(before):
+                    evidence['unsupported'] = 'follow-source-warp-unverified'
+                    evidence['followProof'] = dict(schemaVersion=1, parent=comparison.saved_render(snapshot, original),
+                                                  settings=copy.deepcopy(result['settings']))
+                    if result['settings'].get('readOnClipId'):
+                        reading = next(c for c in snapshot['clips'] if c['clipId'] == result['settings']['readOnClipId'])
+                        evidence['followProof']['reading'] = comparison.saved_render(snapshot, reading)
+            except (ValueError, KeyError, TypeError, OSError, s.AppError):
+                evidence['unsupported'] = evidence.get('unsupported') or 'parent-source-evidence-unverified'
+                evidence.pop('followProof', None)
+        evidence['currentPixels'] = comparison.pixels(after_cells)
+        evidence['slotIds'] = [o['occurrenceId'] for o in occurrences]
+        evidence['geometry'] = comparison.geometry({**snapshot, 'frames': snapshot['frames'] + frames,
+            'alignmentGroups': snapshot['alignmentGroups'] + [group], 'alignments': {**snapshot['alignments'], **alignments}}, clip)
+        clip['comparisonEvidence'] = evidence
+    label = {'follow': '부위 흔들림', 'restore': '원본 복원', 'compare': '비교 선택'}[result['tool']]
+    clip['name'] = original['name'] + ' · ' + label + ' · 검수 대기'
+    clip['sourceProcessing']['kind'] = 'clip-' + result['tool']
     result.update(assets=assets, frames=frames, alignmentGroups=[group], alignments=alignments, clips=[clip],
                   clipId=clip['clipId'], frameVersionIds=group['frameVersionIds'], status='needs_review')

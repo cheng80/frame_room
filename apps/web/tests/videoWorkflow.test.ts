@@ -48,7 +48,7 @@ describe('video request boundaries', () => {
     expect(videoAssetSettings(p, 'approved')).toMatchObject({direction: 'side', facing: 'left'});
   });
   it('defaults to game eight while preserving twelve and explicit legacy frame counts', () => {
-    expect(defaultVideoProcessing()).toMatchObject({maxFrames: '8', finishMode: 'gif', repairMode: 'off', between: 'auto', startFoot: 'auto', startIndex: ''});
+    expect(defaultVideoProcessing()).toMatchObject({maxFrames: '8', finishMode: 'gif', repairMode: 'off', rifeTta: 'off', overlapWrap: 'off', between: 'auto', startFoot: 'auto', startIndex: ''});
     for (const n of [4, 8, 12, 32, 64]) expect(videoProcessingParams({...defaultVideoProcessing(), maxFrames: String(n)}).maxFrames).toBe(n);
   });
   it('sends phase and interpolation controls independently of jump repair', () => {
@@ -80,7 +80,7 @@ describe('video request boundaries', () => {
   it('builds exactly one generation operation with a saved reference and low default settings', () => {
     expect(videoGenerationRequest(snapshot, generation(), defaultVideoProcessing())).toEqual({
       operation: 'generate_video', assetIds: ['approved'], params: {
-        state: 'walk', key: 'auto', loopMode: 'auto', maxFrames: 8, bodyHeight: 94, cellWidth: 64, cellHeight: 128, finishMode: 'gif', repairMode: 'off', between: 'auto', startFoot: 'auto',
+        state: 'walk', key: 'auto', loopMode: 'auto', maxFrames: 8, bodyHeight: 94, cellWidth: 64, cellHeight: 128, finishMode: 'gif', repairMode: 'off', rifeTta: 'off', overlapWrap: 'off', between: 'auto', startFoot: 'auto',
         frameSelection: 'vision', frameJudge: 'rules', model: 'grok-imagine-video-1.5', durationSeconds: 3, resolution: '480p', direction: 'side', facing: 'right',
         motionPrompt: '', bodyPlan: '', equipment: '', referenceRevisionId: 'ref',
       },
@@ -241,6 +241,8 @@ describe('safe resume and source provenance', () => {
     expect(videoRetryLabel(j)).toBeNull();
     expect(videoRetryLabel({...j, resumable: false})).toBeNull();
     expect(videoRetryLabel({...j, resumable: true})).toBe('접수한 요청 조회 재개');
+    expect(videoRetryLabel({...j, resumable: true, completedResult: true})).toBe('완성 결과 저장 재시도');
+    expect(videoRetryLabel({...j, resumable: true, published: true})).toBe('완성 결과 저장 재시도');
     expect(videoRetryLabel({...j, resumable: true, result: {videoId: 'v'}})).toBe('기존 영상 처리 재개');
     expect(videoRetryLabel({...j, resumable: true, status: 'provider_outcome_unknown'})).toBeNull();
   });

@@ -9,6 +9,20 @@ export function videoDiagnostics(processing: unknown): VideoDiagnostic[] {
   if (!selection) return [];
   const rows: VideoDiagnostic[] = [];
   const add = (id: string, level: VideoDiagnostic['level'], message: string) => rows.push({id, level, message});
+  const step = record(record(record(selection.metrics)?.stepCount)?.cut);
+  if (step) add('steps', step.verdict === 'two' ? 'info' : 'warning', step.verdict === 'two' ? '원본 발 교차에서 두 걸음을 확인했습니다.' : '원본에서 두 걸음을 확정하지 못했습니다. 픽셀 선택 근거와 수동 구간을 확인하세요.');
+  const ghost = record(selection.ghostScreen);
+  if (Array.isArray(ghost?.ghosts) && ghost.ghosts.length) add('ghost', 'warning', `선택한 원본에서 잔상 의심 ${ghost.ghosts.length}장입니다. 새 영상은 자동 생성하지 않습니다.`);
+  const repair = record(selection.repair), overlap = record(repair?.overlapWrap);
+  if (overlap) add('overlap', 'info', Array.isArray(overlap.frames) && overlap.frames.length ? `루프 겹침 보정 ${overlap.frames.length}장 적용` : '루프 겹침 보정은 적용하지 않았습니다. 세부 사유는 진단 정보에서 확인하세요.');
+  if (record(selection.renderedSeam)) add('rendered', 'info', '이음새는 크기·색상 마무리 후 실제 출력 셀에서 검사했습니다. 원본 수치와 측정 대상이 다릅니다.');
+  const bounds = record(selection.renderedBounds), frames = Array.isArray(bounds?.frames) ? bounds.frames.map(record) : [];
+  const clipped = frames.filter(frame => frame?.canvasClipping === true).length;
+  const unsafe = frames.filter(frame => Object.values(record(frame?.safeOverflowPx) ?? {}).some(value => typeof value === 'number' && value > 0)).length;
+  if (clipped) add('clipping', 'warning', `실제 출력 셀에서 그림이 잘리는 프레임 ${clipped}장입니다. 셀 크기를 늘리거나 몸 높이를 줄이세요.`);
+  else if (unsafe) add('margin', 'warning', `셀 경계 안에 있지만 안전 여백이 부족한 프레임 ${unsafe}장입니다.`);
+  const interpolation = record(record(processing)?.interpolation), cache = record(interpolation?.cache);
+  if (cache && count(cache.hits) !== null) add('cache', 'info', `로컬 보간 캐시 재사용 ${cache.hits}장 · 새 계산 ${count(cache.misses) ?? 0}장. 재사용한 프레임도 현재 품질 검사를 거칩니다.`);
   const period = record(selection.period);
   if (period?.suspect === true || Array.isArray(period?.suspects) && period.suspects.length > 0) {
     add('period', 'warning', '선택 구간에 여러 주기가 들어 있을 수 있습니다. 왼발·오른발이 한 번씩 돌아오는지 원본을 보고 수동 구간을 확인하세요.');

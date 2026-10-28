@@ -1079,6 +1079,7 @@
     "/v1/jobs/{jid}/retry": {
       "post": {
         "summary": "Retry",
+        "description": "영상 생성 POST는 다시 전송하지 않습니다. 접수 ID 조회·원본 회수 또는 검증된 완성 결과 저장만 재개합니다. 이미 게시된 결과의 폴더 저장 재시도는 같은 attemptId를 유지하며 중복 등록하지 않습니다. 미완성 영상 작업은 VERSION·engine digest가 현재 처리 정책과 다르면 재개하지 않습니다.",
         "operationId": "retry_v1_jobs__jid__retry_post",
         "parameters": [
           {
@@ -1932,7 +1933,9 @@
               "bake",
               "preview_follow",
               "apply_follow",
-              "check_handed"
+              "check_handed",
+              "preview_restore",
+              "compare_clips"
             ],
             "title": "Operation"
           },

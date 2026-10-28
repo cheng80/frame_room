@@ -1,13 +1,16 @@
 """Single Grok login submission with durable receipt and GET-only resume."""
 from __future__ import annotations
-import json, shutil
+import http.client, json, re, shutil, time
 from pathlib import Path
+from urllib.parse import urlsplit
 from services.api import store as s
 from services.api.edits import number
 from .provider import _engine, ProviderError
 
+HTTP_TIMEOUT_SECONDS=60
+
 MODELS=('grok-imagine-video-1.5','grok-imagine-video-1.5-lite')
-DEFAULTS=dict(state='walk',direction='side',facing='right',motionPrompt='',model=MODELS[0],durationSeconds=3,resolution='480p',key='auto',loopMode='auto',maxFrames=8,bodyHeight=94,cellWidth=64,cellHeight=128,finishMode='gif',repairMode='off',between='auto',startFoot='auto',bodyPlan='',equipment='')
+DEFAULTS=dict(state='walk',direction='side',facing='right',motionPrompt='',model=MODELS[0],durationSeconds=3,resolution='480p',key='auto',loopMode='auto',maxFrames=8,bodyHeight=94,cellWidth=64,cellHeight=128,finishMode='gif',repairMode='off',rifeTta='off',overlapWrap='off',between='auto',startFoot='auto',bodyPlan='',equipment='')
 
 def validate_params(params,*,generation):
     allowed=set(DEFAULTS)|{'referenceRevisionId','videoId','startFrame','endFrame','spillReferenceAssetId','matchClipId','startIndex','frameSelection','frameJudge','frameObserver','observationCacheOnly'}
@@ -16,7 +19,7 @@ def validate_params(params,*,generation):
     # Only new walks adopt the game-sized cycle; explicit saved requests keep
     # their count, and other motions keep their previous extraction default.
     if 'maxFrames' not in params and value['state']!='walk': value['maxFrames']=32
-    enums={'state':('idle','walk','run','jump','attack','dance','wave','cheer'),'direction':('side','front','back','front_diagonal','back_diagonal'),'facing':('right','left'),'model':MODELS,'resolution':('480p','720p'),'key':('auto','green','magenta','cyan','white'),'loopMode':('auto','full','manual'),'finishMode':('gif','rgba'),'repairMode':('off','auto','on'),'between':('auto','on','off'),'startFoot':('auto','left','right')}
+    enums={'state':('idle','walk','run','jump','attack','dance','wave','cheer'),'direction':('side','front','back','front_diagonal','back_diagonal'),'facing':('right','left'),'model':MODELS,'resolution':('480p','720p'),'key':('auto','green','magenta','cyan','white'),'loopMode':('auto','full','manual'),'finishMode':('gif','rgba'),'repairMode':('off','auto','on'),'rifeTta':('off','on'),'overlapWrap':('off','auto'),'between':('auto','on','off'),'startFoot':('auto','left','right')}
     for k,values in enums.items():
         if value[k] not in values: raise s.AppError('VIDEO_SETTING',f'영상 {k} 설정을 확인하세요.')
     for k,lo,hi in [('durationSeconds',2,6),('maxFrames',4,64),('bodyHeight',16,512),('cellWidth',32,1024),('cellHeight',32,1024)]:
@@ -83,6 +86,27 @@ def capability():
 def read_checkpoint(path):
     return json.loads(path.read_text()) if path.is_file() else None
 
+def recovery_receipt(saved):
+    result={k:saved[k] for k in ('postCount','pollCount','downloadCount') if type(saved.get(k)) is int and saved[k]>=0}
+    reasons=('PROVIDER_OUTCOME_UNKNOWN','VIDEO_PROVIDER_FAILED','VIDEO_POLL_RETRY_LIMIT','VIDEO_RECOVERY_TIMEOUT','VIDEO_URL_MISSING','GROK_AUTH_REJECTED','GROK_USAGE_LIMIT','VIDEO_DOWNLOAD_FAILED','VIDEO_DOWNLOAD_RETRY_LIMIT','VIDEO_FORMAT','VIDEO_DECODE','VIDEO_DIMENSIONS','VIDEO_LIMIT','VIDEO_DEPENDENCY')
+    if saved.get('stopReason') in reasons: result['stopReason']=saved['stopReason']
+    rid=saved.get('requestId')
+    if saved.get('requestIdVerified') is True and isinstance(rid,str) and re.fullmatch(r'[A-Za-z0-9_-]{1,200}',rid): result['requestId']=rid
+    return result
+
+def checkpoint_receipt(saved):
+    receipt=saved.get('receipt')
+    if not isinstance(receipt,dict) or not receipt: return {}
+    result={'providerId':'grok-video','authSource':'grok-login','model':receipt.get('model') if receipt.get('model') in MODELS else 'unknown'}
+    if receipt.get('modelSource') in ('request','provider'): result['modelSource']=receipt['modelSource']
+    if isinstance(receipt.get('sha256'),str) and re.fullmatch(r'[a-f0-9]{64}',receipt['sha256']): result['sha256']=receipt['sha256']
+    if type(receipt.get('durationRequested')) is int and 1<=receipt['durationRequested']<=15: result['durationRequested']=receipt['durationRequested']
+    if receipt.get('resolutionRequested') in ('480p','720p'): result['resolutionRequested']=receipt['resolutionRequested']
+    if type(receipt.get('elapsedSeconds')) in (int,float) and 0<=receipt['elapsedSeconds']<=86400: result['elapsedSeconds']=receipt['elapsedSeconds']
+    if receipt.get('downloadRecovered') is True: result['downloadRecovered']=True
+    result.update(recovery_receipt({**receipt,**{k:v for k,v in saved.items() if k!='receipt'}}))
+    return result
+
 def checkpoint_state(job):
     path=s.job_directory(job['jobId'])/'video-checkpoint.json'
     try: saved=read_checkpoint(path)
@@ -90,13 +114,21 @@ def checkpoint_state(job):
     if not saved: return {'outcomeUnknown':bool(job.get('externalStarted')),'resumable':False}
     if not isinstance(saved,dict): return {'outcomeUnknown':True,'resumable':False}
     return {'outcomeUnknown':saved.get('phase')=='submitting' and not saved.get('requestId'),
-            'resumable':bool(saved.get('requestId') or saved.get('videoId')),'videoId':saved.get('videoId')}
+            'resumable':bool(saved.get('requestId') or saved.get('videoId')),'videoId':saved.get('videoId'),'recovery':recovery_receipt(saved)}
 
-def generate(source,work,params,checkpoint,request_hash,on_progress=lambda *_:None,*,credential=None,call=None,download=None,sleep=None,job_id=None,save_checkpoint=None):
+def generate(source,work,params,checkpoint,request_hash,on_progress=lambda *_:None,*,credential=None,call=None,download=None,sleep=None,job_id=None,save_checkpoint=None,timeout=600):
     write_checkpoint=save_checkpoint or (lambda path,value:s.atomic_bytes(path,s.dumps(value).encode()))
     _engine()
     from sprite_gen.gen import video
     from .video_processing import prepare_still,build_motion_prompt
+    root=s.job_directory(job_id).resolve() if job_id else checkpoint.parent.resolve()
+    if not work.resolve().is_relative_to(root):
+        raise ProviderError('VIDEO_CHECKPOINT_PATH','영상 출력 폴더가 작업 범위를 벗어났습니다.')
+    parent=work
+    while True:
+        if parent.is_symlink(): raise ProviderError('VIDEO_CHECKPOINT_PATH','영상 출력 폴더의 심볼릭 링크는 지원하지 않습니다.')
+        if parent.resolve()==root: break
+        parent=parent.parent
     saved=read_checkpoint(checkpoint)
     if saved and saved.get('requestHash')!=request_hash: raise ProviderError('VIDEO_CHECKPOINT_HASH','영상 요청과 저장된 작업이 다릅니다.')
     if saved and saved.get('requestId') and saved.get('localPath'):
@@ -109,16 +141,23 @@ def generate(source,work,params,checkpoint,request_hash,on_progress=lambda *_:No
             from services.api.videos import validate
             data=local.read_bytes();meta=validate(data,local.name)
             if saved.get('receipt',{}).get('sha256') not in (None,meta['sha256']): raise ProviderError('VIDEO_CHECKPOINT_HASH','받은 영상의 해시가 다릅니다.')
-            receipt=saved.get('receipt') or dict(providerId='grok-video',model=params['model'],modelSource='request',authSource='grok-login',requestId=saved['requestId'],sha256=meta['sha256'],durationRequested=params['durationSeconds'],resolutionRequested=params['resolution'],downloadRecovered=True)
-            saved.update(phase='downloaded',receipt=receipt)
+            receipt=checkpoint_receipt(saved) or dict(providerId='grok-video',model=params['model'],modelSource='request',authSource='grok-login',sha256=meta['sha256'],durationRequested=params['durationSeconds'],resolutionRequested=params['resolution'],downloadRecovered=True,**recovery_receipt(saved))
+            saved.update(phase='downloaded')
+            if not saved.get('receipt'): saved['receipt']=receipt
             write_checkpoint(checkpoint,saved)
             return {'path':local,'receipt':receipt,'preparation':saved.get('preparation'),'prompt':saved.get('prompt')}
     if saved and not saved.get('requestId'):
         if saved.get('phase')=='submitting': raise ProviderError('PROVIDER_OUTCOME_UNKNOWN','영상 접수 여부가 불명확합니다. 자동 재전송하지 않습니다.',outcome_unknown=True)
         if saved.get('phase')=='rejected': raise ProviderError('VIDEO_RETRY_BLOCKED','거절된 생성 요청을 재전송하지 않습니다. 설정을 확인한 뒤 새 요청을 만드세요.')
+    if (work/'original.mp4').is_symlink():
+        raise ProviderError('VIDEO_CHECKPOINT_PATH','영상 출력이 심볼릭 링크여서 기록을 변경하지 않았습니다.')
     credential=credential or login_credential()
     from sprite_gen.gen.xai import AUTH_SOURCE_GROK_LOGIN,http_json
     if credential.source!=AUTH_SOURCE_GROK_LOGIN: raise ProviderError('GROK_LOGIN_REQUIRED','Grok 로그인 인증만 사용할 수 있습니다.')
+    if saved and saved.get('requestId'):
+        rid=saved['requestId']
+        if not isinstance(rid,str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,200}',rid) or credential.token in rid:
+            raise ProviderError('VIDEO_CHECKPOINT_ID','기존 접수 ID의 안전성을 확인하지 못했습니다. 원본 기록은 보존하며 조회·재전송하지 않습니다.')
     transport=call or http_json
     work.mkdir(parents=True,exist_ok=True)
     on_progress('prepare','기준 그림과 동작을 준비합니다.')
@@ -126,32 +165,90 @@ def generate(source,work,params,checkpoint,request_hash,on_progress=lambda *_:No
     prompt=build_motion_prompt(params)
     state=saved or {'requestHash':request_hash,'phase':'prepared','postCount':0,'authSource':'grok-login','createdAt':s.now()}
     state.update(localPath=str((work/'original.mp4').resolve()),preparation=preparation,prompt=prompt)
+    state.pop('stopReason',None)
+    deadline=time.monotonic()+timeout
     def save(): write_checkpoint(checkpoint,state)
     save()
+    def remaining():
+        left=deadline-time.monotonic()
+        if left<=0: raise ProviderError('VIDEO_RECOVERY_TIMEOUT','기존 영상 조회·회수 시간 한도에 도달했습니다. 같은 요청을 수동 재개할 수 있습니다.')
+        return min(HTTP_TIMEOUT_SECONDS,left)
+    def pause(seconds):
+        (sleep or time.sleep)(min(seconds,remaining()))
+        remaining()
+    def request(method,url,token,body):
+        left=remaining()
+        return transport(method,url,token,body) if call else transport(method,url,token,body,timeout=left,deadline=deadline)
     def guarded(method,url,token,body=None):
         if method=='POST':
             if state.get('requestId'): return 200,{'request_id':state['requestId']}
             if state['postCount']!=0: raise ProviderError('VIDEO_RETRY_BLOCKED','추가 영상 생성 요청을 차단했습니다.')
             state.update(phase='submitting',postCount=1);save();on_progress('submit','Grok에 영상 1건을 요청합니다.')
-            status,reply=transport(method,url,token,body)
-            rid=reply.get('request_id') if isinstance(reply,dict) else None
-            state.update(phase='submitted' if rid else 'rejected',requestId=rid,submitHttpStatus=status);save()
+            status,reply=request(method,url,token,body)
+            rid=reply.get('request_id') if isinstance(reply,dict) and status in (200,202) else None
+            if not isinstance(rid,str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,200}',rid) or credential.token in rid: rid=None
+            state.update(phase='submitted' if rid else 'submitting' if status in (200,202) else 'rejected',requestId=rid,requestIdVerified=bool(rid),submitHttpStatus=status);save()
+            if not rid and status in (200,202): raise ProviderError('PROVIDER_OUTCOME_UNKNOWN','유효한 영상 접수 ID를 받지 못했습니다. 자동 재전송하지 않습니다.',outcome_unknown=True)
         else:
             on_progress('poll','접수된 영상의 완료 상태를 확인합니다.')
-            status,reply=transport(method,url,token,body)
+            for retry in range(4):
+                remaining()
+                state['pollCount']=state.get('pollCount',0)+1;save()
+                try:
+                    status,reply=request(method,url,token,body)
+                except (SystemExit,OSError,http.client.HTTPException,ValueError):
+                    status,reply=0,None
+                if status in (401,403): break
+                transient=status==0 or status==429 or 500<=status<=599 or status in (200,202) and not isinstance(reply,dict)
+                if not transient: break
+                if retry==3: raise ProviderError('VIDEO_POLL_RETRY_LIMIT','기존 영상 조회의 일시 오류가 반복되어 중단했습니다. 같은 요청을 수동 재개할 수 있습니다.')
+                pause(2**retry)
+            if status in (200,202) and isinstance(reply,dict) and reply.get('status') in ('done','complete','completed'):
+                video_reply=reply.get('video')
+                url=video_reply.get('url') if isinstance(video_reply,dict) else None
+                try:
+                    parsed=urlsplit(url) if isinstance(url,str) else None
+                    valid=parsed and parsed.scheme in ('http','https') and parsed.hostname and not parsed.username and not parsed.password
+                except ValueError: valid=False
+                if (not isinstance(video_reply,dict) or video_reply.get('respect_moderation') is not False) and not valid:
+                    raise ProviderError('VIDEO_URL_MISSING','완료 영상의 다운로드 주소가 없습니다. 같은 요청을 수동 재개할 수 있습니다.')
         if status in (401,403): raise ProviderError('GROK_AUTH_REJECTED','Grok이 인증을 거부했습니다. 로그인 상태를 확인한 뒤 기존 요청 조회를 재개하세요.')
-        if status==429: raise ProviderError('GROK_USAGE_LIMIT','Grok 사용량 제한에 도달했습니다. 자동 재생성하지 않습니다.')
+        if status==429 and method=='POST': raise ProviderError('GROK_USAGE_LIMIT','Grok 사용량 제한에 도달했습니다. 자동 재생성하지 않습니다.')
         return status,reply
     def fetch(url,token):
         on_progress('download','완성된 원본 영상을 보존합니다.')
-        return (download or video.http_download)(url,token)
+        def attempt():
+            state['downloadCount']=state.get('downloadCount',0)+1;save()
+        for retry in range(4):
+            left=remaining()
+            try:
+                if download: attempt();data=download(url,token)
+                else: data=video.http_download(url,token,timeout=left,deadline=deadline,on_attempt=attempt)
+                break
+            except (SystemExit,OSError,http.client.HTTPException) as exc:
+                status=getattr(exc.__cause__,'code',None)
+                if status in (401,403):
+                    raise ProviderError('GROK_AUTH_REJECTED','Grok이 다운로드 인증을 거부했습니다. 로그인 상태를 확인한 뒤 같은 요청을 수동 재개하세요.') from exc
+                transient=status is None or status==429 or 500<=status<=599
+                if not transient or retry==3:
+                    raise ProviderError('VIDEO_DOWNLOAD_RETRY_LIMIT' if transient else 'VIDEO_DOWNLOAD_FAILED','완료 영상 다운로드가 중단되었습니다. 같은 요청을 수동 재개할 수 있습니다.') from exc
+                pause(2**retry)
+        from services.api.videos import validate
+        try: validate(data,'original.mp4')
+        except s.AppError as exc:
+            raise ProviderError(exc.code,exc.message) from exc
+        remaining()
+        return data
     try:
         from sprite_gen.video.batch import pins_last_frame
-        result=video.generate_video(video.VideoRequest(image=canvas,prompt=prompt,out=work/'original.mp4',duration=params['durationSeconds'],resolution=params['resolution'],model=params['model'],generate_audio=False,direction=None if params['direction']=='side' else params['direction'].replace('-','_'),facing=params['facing'],last_frame=canvas if pins_last_frame(params['state'],params['direction'].replace('-','_')) else None),credential=credential,call=guarded,download=fetch,sleep=sleep,poll_timeout=600)
-    except ProviderError: raise
-    except (SystemExit,OSError,ValueError) as exc:
+        result=video.generate_video(video.VideoRequest(image=canvas,prompt=prompt,out=work/'original.mp4',duration=params['durationSeconds'],resolution=params['resolution'],model=params['model'],generate_audio=False,direction=None if params['direction']=='side' else params['direction'].replace('-','_'),facing=params['facing'],last_frame=canvas if pins_last_frame(params['state'],params['direction'].replace('-','_')) else None),credential=credential,call=guarded,download=fetch,sleep=pause,poll_timeout=timeout)
+    except ProviderError as exc:
+        state['stopReason']=exc.code;save()
+        raise
+    except (SystemExit,OSError,ValueError,http.client.HTTPException) as exc:
         unknown=state.get('phase')=='submitting' and not state.get('requestId')
+        state['stopReason']='PROVIDER_OUTCOME_UNKNOWN' if unknown else 'VIDEO_PROVIDER_FAILED';save()
         raise ProviderError('PROVIDER_OUTCOME_UNKNOWN' if unknown else 'VIDEO_PROVIDER_FAILED','영상 결과를 받지 못했습니다. 접수 ID가 있으면 기존 요청 조회를 재개할 수 있습니다.',outcome_unknown=unknown) from exc
-    receipt={'providerId':'grok-video','model':result.model,'authSource':'grok-login','requestId':result.request_id,'durationRequested':params['durationSeconds'],'resolutionRequested':params['resolution'],'sha256':s.digest(result.out.read_bytes()),'elapsedSeconds':round(result.elapsed_seconds,3)}
+    receipt={'providerId':'grok-video','model':result.model if result.model in MODELS else params['model'],'modelSource':'provider' if result.model in MODELS else 'request','authSource':'grok-login','durationRequested':params['durationSeconds'],'resolutionRequested':params['resolution'],'sha256':s.digest(result.out.read_bytes()),'elapsedSeconds':round(result.elapsed_seconds,3),**recovery_receipt(state)}
     state.update(phase='downloaded',localPath=str(result.out),receipt=receipt,preparation=preparation,prompt=prompt);save()
     return {'path':result.out,'receipt':receipt,'prompt':prompt,'preparation':preparation}

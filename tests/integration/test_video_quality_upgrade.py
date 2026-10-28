@@ -40,7 +40,7 @@ def test_rejected_resample_uses_actual_nearest_parent_after_rotation_and_repair(
             out = a.copy();out.paste((0, 0, 0, 255), (8, 5, 23, 38));return out
         def describe(self): return {'kind': 'synthetic-dark-test-double'}
     monkeypatch.setattr(vp, 'rife_interpolator', DarkInterpolator)
-    selection = {'loop': True, 'startFrame': 0, 'endFrame': 4, 'repair': {'sourceFrameIndices': [1]}}
+    selection = {'loop': True, 'startFrame': 0, 'endFrame': 4, 'repair': {'sourceFrameIndices': [1], 'lineage': {'1': {'method': 'rife-flow-repair', 'sourceFrameIndices': [0, 2], 'fraction': 0.5}}}}
     options = {'targetFrameCount': 8, 'between': between, 'direction': 'side', 'facing': 'right',
                'startFoot': 'auto', 'startIndex': 1}
     frames, report = vp._align_selected_cycle(paths, paths, paths, {'timesMs': [0, 100, 200, 300, 400]}, selection, options, tmp_path)
@@ -52,7 +52,7 @@ def test_rejected_resample_uses_actual_nearest_parent_after_rotation_and_repair(
         assert frames[0]['sourceFrameIndex'] == 1
         assert frames[0]['sourceTimeMs'] == 100
         assert frames[0]['interpolated'] is True  # prior jump repair remains identified
-        assert frames[0]['interpolation']['method'] == 'rife-jump-repair'
+        assert frames[0]['interpolation']['method'] == 'rife-flow-repair'
         assert frames[6]['sourceFrameIndex'] == 0  # wrap nearest
         assert frames[6]['sourceTimeMs'] == 0
         assert frames[6]['interpolated'] is False

@@ -60,7 +60,7 @@ def test_zero_gain_or_rigid_motion_is_exact_rgba_identity(rigid):
 
 def test_uniform_timing_reuses_engine_response_and_uneven_timing_changes_response():
     from sprite_gen.video.follow import body_motion, follow_offsets
-    before = cells(); rows, cols, _ = body_motion(before)
+    before = cells(); rows, cols, _, _ = body_motion(before)
     _, report = ct.follow_frames(before, [125] * 8, params())
     expected = follow_offsets(cols, 8., freq=2.4, zeta=.6, gain=1.)
     np.testing.assert_allclose([o["x"] for o in report["offsets"]], expected, atol=1e-6)

@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import math
 import os
+import re
 from pathlib import Path
 
 import numpy as np
@@ -48,8 +49,8 @@ def test_resample_keeps_every_frame_that_lands_on_a_source_frame():
     frames = [_walker(2 * math.pi * k / 6) for k in range(6)]
     rec = Recorder()
     out, facts = align.resample(frames, 12, rec, between="rife")
-    assert {k: v for k, v in facts.items() if k != "smear"} == {"from": 6, "to": 12, "between": "rife", "taken": 6, "made_by_rife": 6,
-                                                                "made_at": [1, 3, 5, 7, 9, 11]}
+    assert {k: v for k, v in facts.items() if k not in ("smear", "ghost_screen")} == {
+        "from": 6, "to": 12, "between": "rife", "taken": 6, "made_by_rife": 6, "made_at": [1, 3, 5, 7, 9, 11], "ghost_at": []}
     assert [m["at"] for m in facts["smear"]] == [1, 3, 5, 7, 9, 11]
     assert all(out[2 * k] is frames[k] for k in range(6)) and rec.calls == [0.5] * 6
     same, facts = align.resample(frames, 6, None)  # already that long: untouched, nothing made
@@ -278,6 +279,34 @@ def test_a_loop_cut_before_the_cell_cap_was_recorded_is_refused_by_name(tmp_path
         align.align_set([d], interpolate=Recorder())
 
 
+def _files(d: Path) -> dict[str, bytes | None]:
+    """Every path under a loop directory, a file by its bytes and a directory as None."""
+    return {p.relative_to(d).as_posix(): p.read_bytes() if p.is_file() else None for p in sorted(d.rglob("*"))}
+
+
+def test_a_loop_whose_strip_as_cut_is_missing_is_refused_by_name_and_the_set_left_as_it_was(tmp_path):
+    """A first alignment reads the strip as cut (`cycle_align.origin`): a loop directory without it is refused, its strip
+    named, before any loop of the set is touched — no traceback, no `cycle.source/` left behind in it or the loop before it."""
+    dirs = [_cut(tmp_path, n, L) for n, L in (("S", 20), ("E", 24))]
+    (dirs[1] / "walk.strip.png").unlink()
+    before = [_files(d) for d in dirs]
+    with pytest.raises(SystemExit, match=rf"^video-cycle-align: {re.escape(str(dirs[1].resolve()))}: no walk\.strip\.png — .*cycle_align\.origin"):
+        align.main([*(a for d in dirs for a in ("--loop-dir", str(d))), "--report", str(tmp_path / "align.json")])
+    assert [_files(d) for d in dirs] == before
+    assert not (tmp_path / "align.json").exists()
+
+
+def test_a_loop_aligned_before_is_aligned_again_without_its_strip(tmp_path):
+    """Only a first alignment reads the strip as cut; a later one keeps the origin the first recorded."""
+    dirs = [_cut(tmp_path, n, L) for n, L in (("S", 20), ("E", 24))]
+    align.align_set(dirs, interpolate=Recorder())
+    origin = json.loads((dirs[0] / "walk.strip.json").read_text())["cycle_align"]["origin"]
+    (dirs[0] / "walk.strip.png").unlink()
+    assert align.align_set(dirs, interpolate=Recorder(), length=22)["length"] == 22
+    meta = json.loads((dirs[0] / "walk.strip.json").read_text())
+    assert meta["cycle_align"]["origin"] == origin and (dirs[0] / "walk.strip.png").is_file()
+
+
 def test_video_set_aligns_each_gait_filmed_in_two_or_more_directions(tmp_path):
     from sprite_gen.video import batch
 
@@ -376,18 +405,6 @@ def test_a_made_frame_that_lost_its_outline_is_replaced_by_the_nearer_source_fra
     assert len([w for w in kept["warnings"] if "lost its outline" in w and "--between auto" in w]) == kept["made_by_rife"]
 
 
-def test_a_made_frame_that_keeps_its_outline_is_kept_under_auto(tmp_path):
-    def drawn(a: Image.Image, b: Image.Image, t: float) -> Image.Image:
-        return a.copy()  # a frame RIFE followed: whole, outlined as its neighbours
-
-    dirs = [_cut(tmp_path, n, L) for n, L in (("S", 20), ("E", 24))]
-    report = align.align_set(dirs, interpolate=drawn)
-    row = next(r for r in report["loops"] if Path(r["dir"]).name == "S")
-    assert report["replaced"] == 0 and row["nearest_at"] == [] and len(row["made_at"]) == len(row["smear"]) > 0
-    assert all(m["method"] == "rife" and m["faults"] == [] for m in row["smear"])
-    assert not any("lost its outline" in w for w in report["warnings"])
-
-
 def test_video_set_without_rife_skips_the_alignment_with_a_warning(tmp_path, monkeypatch, capsys):
     from sprite_gen.video import batch
 
@@ -418,3 +435,16 @@ def test_cutting_a_loop_again_drops_the_kept_source(tmp_path):
                       name="walk", report_path=None, cycle_mode="fixed", start=0, length=22, anchor="none", repair="off")
     assert not (dirs[0] / align.SOURCE_DIR).exists()
     assert align.align_set(dirs, interpolate=Recorder())["lengths"] == [22, 24]
+
+
+def test_a_made_frame_that_keeps_its_outline_is_kept_under_auto(tmp_path):
+    def drawn(a: Image.Image, b: Image.Image, t: float) -> Image.Image:
+        return a.copy()  # a frame RIFE followed: whole, outlined as its neighbours
+
+    dirs = [_cut(tmp_path, n, L) for n, L in (("S", 20), ("E", 24))]
+    report = align.align_set(dirs, interpolate=drawn)
+    row = next(r for r in report["loops"] if Path(r["dir"]).name == "S")
+    assert report["replaced"] == 0 and row["nearest_at"] == [] and len(row["made_at"]) == len(row["smear"]) > 0
+    assert all(m["method"] == "rife" and m["faults"] == [] for m in row["smear"])
+    assert not any("lost its outline" in w for w in report["warnings"])
+

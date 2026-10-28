@@ -227,7 +227,7 @@ def test_submission_checkpoint_resume_and_unknown_guard(client,media,monkeypatch
             return 200,{'request_id':'saved-request'}
         raise SystemExit('test interrupted poll')
     with pytest.raises(vp.ProviderError): vp.generate(source,work,params,checkpoint,'hash',credential=credential,call=interrupted,sleep=lambda _:None)
-    assert calls==['POST','GET'] and vp.read_checkpoint(checkpoint)['requestId']=='saved-request'
+    assert calls==['POST']+['GET']*4 and vp.read_checkpoint(checkpoint)['requestId']=='saved-request'
     assert submitted==[vp.read_checkpoint(checkpoint)['prompt']]
     if structured.get('bodyPlan')=='quadruped':
         assert 'all four legs' in submitted[0] and "character's own left side" in submitted[0]
@@ -238,7 +238,7 @@ def test_submission_checkpoint_resume_and_unknown_guard(client,media,monkeypatch
         assert method=='GET';calls.append(method)
         return 200,{'status':'done','model':vp.MODELS[0],'video':{'url':'https://example.invalid/fixture.mp4','duration':1}}
     result=vp.generate(source,work,params,checkpoint,'hash',credential=credential,call=resume,download=lambda *_:media,sleep=lambda _:None)
-    assert calls==['POST','GET','GET'] and Path(result['path']).read_bytes()==media
+    assert calls==['POST']+['GET']*5 and Path(result['path']).read_bytes()==media
     assert vp.read_checkpoint(checkpoint)['postCount']==1 and submitted==[result['prompt']]
     unknown=s.DATA/'unknown.json';s.atomic_bytes(unknown,s.dumps({'requestHash':'hash','phase':'submitting','postCount':1}).encode())
     with pytest.raises(vp.ProviderError) as e: vp.generate(source,work,params,unknown,'hash',credential=credential,call=lambda *_:pytest.fail('No replay'))
@@ -266,12 +266,12 @@ def test_generated_video_full_pipeline_preserves_prepared_reference(client,media
     from sprite_gen.gen import video as engine_video
     monkeypatch.setattr(vp,'login_credential',lambda:Credential('synthetic-token','grok-login'))
     calls=[]
-    def transport(method,url,token,body=None):
+    def transport(method,url,token,body=None,**kwargs):
         calls.append(method)
         if method=='POST': return 200,{'request_id':'synthetic-full-pipeline'}
         return 200,{'status':'done','model':vp.MODELS[0],'video':{'url':'https://example.invalid/video.mp4','duration':1}}
     monkeypatch.setattr(xai,'http_json',transport)
-    monkeypatch.setattr(engine_video,'http_download',lambda *_:media)
+    monkeypatch.setattr(engine_video,'http_download',lambda *_a,**_k:media)
     p,a=base(client,new(client));r=queue(client,p,'generate_video',{'loopMode':'full','bodyHeight':32,'cellWidth':64,'cellHeight':64},[a['assetId']])
     assert r.status_code==202
     j=run(r.json());assert j['status']=='needs_review' and calls==['POST','GET']
@@ -381,7 +381,7 @@ def test_fast_explicit_vfr_range_keeps_timing_and_valid_default_fps(client,media
     from alignment.pipeline import _clip_gates
     c=client;p,v=upload(c,new(c),media)
     image=Image.new('RGBA',(64,64));ImageDraw.Draw(image).rectangle((25,15,40,55),fill=(170,80,30,255));frame=tmp_path/'vfr-keyed.png';image.save(frame)
-    result={'version':video_processing.VERSION,'options':{},'source':{'width':64,'height':64,'fps':24,'frameCount':4,'durationMs':40,'timesMs':[0,10,20,30,40]},'selection':{'loop':True},'standingHeight':40,'anchor':{'x':32,'y':55},'files':[],
+    result={'version':video_processing.VERSION,'policy':video_processing.processing_policy(),'interpolation':{},'options':{},'source':{'width':64,'height':64,'fps':24,'frameCount':4,'durationMs':40,'timesMs':[0,10,20,30,40]},'selection':{'loop':True},'standingHeight':40,'anchor':{'x':32,'y':55},'files':[],
             'frames':[{'rawPath':str(frame),'keyedPath':str(frame),'sourceFrameIndex':i,'sourceTimeMs':i*10,'durationMs':10} for i in range(4)]}
     monkeypatch.setattr(video_processing,'process_clip',lambda *_a,**_kw:result)
     j=run(queue(c,p,params={'videoId':v['videoId'],'loopMode':'full','bodyHeight':32,'cellWidth':64,'cellHeight':64}).json())

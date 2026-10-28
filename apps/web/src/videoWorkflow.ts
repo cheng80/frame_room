@@ -30,6 +30,8 @@ export interface VideoProcessingSettings {
   spillReferenceAssetId: string;
   finishMode: 'gif' | 'rgba';
   repairMode: 'off' | 'auto' | 'on';
+  rifeTta?: 'off' | 'on';
+  overlapWrap?: 'off' | 'auto';
   between: 'auto' | 'on' | 'off';
   startFoot: 'auto' | 'left' | 'right';
   startIndex: string;
@@ -51,7 +53,7 @@ export interface VideoGenerationSettings {
 export const defaultVideoProcessing = (): VideoProcessingSettings => ({
   state: 'walk', key: 'auto', loopMode: 'auto', startFrame: '0', endFrame: '',
   maxFrames: '8', bodyHeight: '94', cellWidth: '64', cellHeight: '128',
-  spillReferenceAssetId: '', finishMode: 'gif', repairMode: 'off', matchClipId: '',
+  spillReferenceAssetId: '', finishMode: 'gif', repairMode: 'off', rifeTta: 'off', overlapWrap: 'off', matchClipId: '',
   between: 'auto', startFoot: 'auto', startIndex: '', frameSelection: 'vision',
 });
 export const imageProviders = (providers: Provider[]) => providers.filter(p => p.mediaKind !== 'video');
@@ -108,6 +110,8 @@ export function videoProcessingParams(settings: VideoProcessingSettings, video?:
     cellHeight: integer(settings.cellHeight, 32, 1024, '셀 높이'),
     finishMode: oneOf(settings.finishMode, ['gif', 'rgba'], '색상 마무리'),
     repairMode: oneOf(settings.repairMode, ['off', 'auto', 'on'], '동작 흔들림 보정'),
+    rifeTta: oneOf(settings.rifeTta ?? 'off', ['off', 'on'], 'RIFE TTA'),
+    overlapWrap: oneOf(settings.overlapWrap ?? 'off', ['off', 'auto'], '루프 겹침 보정'),
     between: oneOf(settings.between ?? 'auto', ['auto', 'on', 'off'], '주기 보간'),
     startFoot: oneOf(settings.startFoot ?? 'auto', ['auto', 'left', 'right'], '시작 발'),
   };
@@ -218,6 +222,7 @@ export function videoJobStep(job: Job) {
 }
 export function videoRetryLabel(job: Job): string | null {
   if (!isVideoJob(job) || job.resumable !== true || !['failed', 'interrupted', 'canceled'].includes(job.status)) return null;
+  if (job.completedResult || job.published) return '완성 결과 저장 재시도';
   return job.result?.videoId || job.operation === 'process_video' ? '기존 영상 처리 재개' : '접수한 요청 조회 재개';
 }
 export function videoProvenanceLabel(video: Video) {

@@ -88,7 +88,7 @@ def _execute(j,out):
     out.mkdir(parents=True,exist_ok=True)
     if op=='backup': return backup(p,out)
     if op=='restore': return restore(request,out)
-    if op in ('preview_follow','apply_follow','check_handed'):
+    if op in ('preview_follow','apply_follow','check_handed','preview_restore','compare_clips'):
         from services.worker.clip_tools_task import execute_clip_tools
         return execute_clip_tools(j,out)
     if op in ('generate_video','process_video'):

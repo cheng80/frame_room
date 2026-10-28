@@ -47,6 +47,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.error
 import urllib.request
@@ -62,7 +63,7 @@ from sprite_gen.video import facing as facing_mod
 from .xai import (
     API_BASE, AUTH_ENV, AUTH_SOURCE_API_KEY, AUTH_SOURCE_GROK_LOGIN,
     HTTP_TIMEOUT_SECONDS, GROK_REFRESH_COMMAND, GROK_REFRESH_WHERE, GROK_LOGIN_COMMAND,
-    Credential, HttpCall, grok_home, resolve_credential, http_json,
+    Credential, HttpCall, grok_home, resolve_credential, http_json, http_open,
 )
 
 DEFAULT_MODEL = "grok-imagine-video-1.5"
@@ -100,17 +101,25 @@ MP4_FTYP = b"ftyp"
 _DONE_STATUSES = ("done", "complete", "completed")
 _FAILED_STATUSES = ("failed", "error", "expired")
 
-def http_download(url: str, token: str) -> bytes:
+def http_download(url: str, token: str, *, timeout: float = HTTP_TIMEOUT_SECONDS, deadline: float | None = None, on_attempt: Callable[[], None] | None = None) -> bytes:
     request = urllib.request.Request(url)
+    budget_end = min(deadline, time.monotonic() + timeout) if deadline is not None else time.monotonic() + timeout
     try:
-        with urllib.request.urlopen(request, timeout=HTTP_TIMEOUT_SECONDS) as response:
+        if on_attempt is not None:
+            on_attempt()
+        with (urllib.request.urlopen(request, timeout=timeout) if deadline is None else http_open(request, timeout=timeout, deadline=budget_end)) as response:
             return response.read()
     except urllib.error.HTTPError as first:
         if first.code not in (401, 403):
             raise SystemExit(f"video: download failed with HTTP {first.code}") from first
+        left = budget_end - time.monotonic()
+        if left <= 0:
+            raise SystemExit("video: download time budget exhausted") from first
         request.add_header("Authorization", f"Bearer {token}")
         try:
-            with urllib.request.urlopen(request, timeout=HTTP_TIMEOUT_SECONDS) as response:
+            if on_attempt is not None:
+                on_attempt()
+            with (urllib.request.urlopen(request, timeout=left) if deadline is None else http_open(request, timeout=left, deadline=budget_end)) as response:
                 return response.read()
         except urllib.error.HTTPError as second:
             raise SystemExit(f"video: download failed with HTTP {second.code} even with the bearer token") from second
@@ -151,6 +160,13 @@ def verify_mp4(data: bytes) -> None:
 
 def _resolved(path: Path | None) -> Path | None:
     return None if path is None else path.expanduser().resolve()
+
+
+def _output_path(path: Path) -> Path:
+    path = path.expanduser()
+    if any(item.is_symlink() for item in (path, *path.parents)):
+        raise SystemExit("video: output path contains a symbolic link; refusing to replace it")
+    return path.parent.resolve() / path.name
 
 
 def _require_still(path: Path, flag: str) -> None:
@@ -467,15 +483,18 @@ def _submit_poll_publish(
     elapsed = time.monotonic() - started
 
     out.parent.mkdir(parents=True, exist_ok=True)
-    tmp = out.with_name(out.name + ".part")
-    tmp.write_bytes(data)
-    if accept is not None:
-        try:
+    fd, name = tempfile.mkstemp(dir=out.parent, prefix=f".{out.name}.", suffix=".part")
+    tmp = Path(name)
+    try:
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(data)
+            handle.flush()
+            os.fsync(handle.fileno())
+        if accept is not None:
             accept(tmp, final)
-        except BaseException:
-            tmp.unlink(missing_ok=True)
-            raise
-    os.replace(tmp, out)
+        os.replace(tmp, out)
+    finally:
+        tmp.unlink(missing_ok=True)
     return _Published(
         data=data, request_id=str(request_id), model=model_reported, duration_reported=duration_reported,
         host=_redact_host(video_url), polls=polls, elapsed_seconds=elapsed,
@@ -507,7 +526,7 @@ def generate_video(
     sleep = sleep or time.sleep
     _validate(request)
     credential = credential or resolve_credential()
-    out = request.out.expanduser().resolve()
+    out = _output_path(request.out)
     image = _resolved(request.image)
     last_frame = _resolved(request.last_frame)
     references = [path.expanduser().resolve() for path in request.reference_images]
@@ -593,7 +612,7 @@ def extend_video(
     probe = probe or (lambda clip: probe_duration_seconds(clip, verb="video-extend"))
     input_seconds = _validate_extend(request, probe=probe)
     credential = credential or resolve_credential()
-    out = request.out.expanduser().resolve()
+    out = _output_path(request.out)
     clip = request.video.expanduser().resolve()
     body: dict[str, Any] = {
         "model": request.model,
@@ -661,7 +680,7 @@ def edit_video(
     probe = probe or (lambda clip: probe_duration_seconds(clip, verb="video-edit"))
     input_seconds = _validate_edit(request, probe=probe)
     credential = credential or resolve_credential()
-    out = request.out.expanduser().resolve()
+    out = _output_path(request.out)
     clip = request.video.expanduser().resolve()
     body: dict[str, Any] = {
         "model": request.model,

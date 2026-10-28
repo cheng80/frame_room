@@ -1,6 +1,7 @@
 """Frame selection around uniform slots. Synthetic fixtures, fixture Codex catalogs and fake
 observers only (conftest blocks real observer calls): no Luna call, no generation."""
 import json
+from pathlib import Path
 import subprocess
 
 import pytest
@@ -216,15 +217,23 @@ def test_cycle_alignment_path_skips_observation(clip, tmp_path, monkeypatch):
 def test_repaired_lineage_follows_the_chosen_index(clip, tmp_path, monkeypatch):
     real = vp._repair_selection
 
-    def fake_repair(files, selection, options, directory):
-        files, record = real(files, selection, options, directory)
-        return files, {**record, "sourceFrameIndices": [4]}
+    def fake_repair(files, selection, options, directory, interpolation=None):
+        files, record = real(files, selection, options, directory, interpolation)
+        paths = list(files)
+        target = directory / 'synthetic-repaired-4.png'
+        with Image.open(files[3]) as a, Image.open(files[5]) as b:
+            Image.blend(a.convert('RGBA'), b.convert('RGBA'), .5).save(target)
+        paths[4] = target
+        return paths, {**record, "sourceFrameIndices": [4], "lineage": {"4": {"method": "rife-flow-repair", "sourceFrameIndices": [3, 5], "fraction": .5}}}
     monkeypatch.setattr(vp, "_repair_selection", fake_repair)
     monkeypatch.setattr(fs, "codex_observe", observer({4: {"blur_or_smear": "yes"}}))
     r = vp.process_clip(clip, tmp_path / "w", {"loopMode": "full", "frameSelection": "vision", "frameJudge": "rules"})
     chosen = r["frames"][1]
     assert chosen["sourceFrameIndex"] == 3 and chosen["interpolated"] is False and "interpolation" not in chosen
     assert r["alternateFrames"][0]["sourceFrameIndex"] == 4 and r["alternateFrames"][0]["interpolated"] is True
+    alternate = r['alternateFrames'][0]
+    assert alternate['interpolation']['sourceFrameIndices'] == [3, 5]
+    assert Path(alternate['keyedPath']).read_bytes() != Path(alternate['originalKeyedPath']).read_bytes()
 
 
 def test_sequence_gap_reverts_to_uniform_with_reason(tmp_path):

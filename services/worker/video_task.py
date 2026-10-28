@@ -2,12 +2,13 @@
 from __future__ import annotations
 from pathlib import Path
 from services.api import store as s, videos
-from adapters.spritegen.video_provider import validate_params,read_checkpoint,checkpoint_state,generate
+from adapters.spritegen.video_provider import validate_params,read_checkpoint,checkpoint_state,checkpoint_receipt,generate
 
 STAGES={'prepare':5,'submit':10,'poll':20,'download':45,'extract':55,'select_cycle':75,'finish_frames':85,'import_candidates':90}
 
 def execute_video(j,out):
-    from adapters.spritegen.video_processing import process_clip
+    from adapters.spritegen.video_processing import process_clip,require_processing_policy
+    require_processing_policy(j)
     params=validate_params(j['request'].get('params',{}),generation=j['operation']=='generate_video')
     checkpoint=s.job_directory(j['jobId'])/'video-checkpoint.json'
     def progress(stage,message):
@@ -29,7 +30,7 @@ def execute_video(j,out):
         if video is None and saved and saved.get('videoId'):
             video=videos.metadata_for(saved['videoId'])
         if video:
-            receipt=video['provenance'].get('receipt');preparation=video['provenance'].get('preparation');video_path=videos.path_for(video['videoId'])
+            receipt=checkpoint_receipt({**(saved or {}),'receipt':video['provenance'].get('receipt')}) or None;preparation=video['provenance'].get('preparation');video_path=videos.path_for(video['videoId'])
             if not any(v['videoId']==video['videoId'] for v in current.get('videos',[])):
                 with s.transaction() as c:
                     current=s.get_project(j['projectId'],c)
@@ -41,7 +42,7 @@ def execute_video(j,out):
                 old=s.resolve_work_path(j['jobId'],saved.get('localPath',''))
                 if not old.is_relative_to(s.job_directory(j['jobId']).resolve()) or not old.is_file(): raise s.AppError('VIDEO_CHECKPOINT_MISSING','받은 영상 파일이 없습니다. 추가 생성은 실행하지 않았습니다.',424)
                 if s.digest(old.read_bytes())!=saved['receipt']['sha256']: raise s.AppError('VIDEO_CHECKPOINT_HASH','받은 영상의 해시가 다릅니다.',424)
-                received={'path':old,'receipt':saved['receipt'],'preparation':saved.get('preparation'),'prompt':saved.get('prompt')}
+                received={'path':old,'receipt':checkpoint_receipt(saved),'preparation':saved.get('preparation'),'prompt':saved.get('prompt')}
             if received is None:
                 source=s.asset_path(j['request']['assetIds'][0])
                 received=generate(source,out/'generation',params,checkpoint,j['requestHash'],progress,job_id=j['jobId'])
@@ -63,7 +64,8 @@ def execute_video(j,out):
                 s.write_project(c,current,'Grok 원본 영상 보존')
             video_path=videos.path_for(video['videoId'])
         saved=read_checkpoint(checkpoint) or {'requestHash':j['requestHash']}
-        saved.update(phase='preserved',videoId=video['videoId'],receipt=receipt)
+        saved.update(phase='preserved',videoId=video['videoId'])
+        if not saved.get('receipt'): saved['receipt']=receipt
         s.atomic_bytes(checkpoint,s.dumps(saved).encode())
     else:
         video=next(v for v in j['snapshot'].get('videos',[]) if v['videoId']==params['videoId'])
@@ -89,7 +91,7 @@ def execute_video(j,out):
     if processing_params.get('frameSelection')=='vision':
         # Content-keyed observation cache shared by jobs, so a judge change does not re-observe.
         processing_params['observationCacheDir']=str(s.DATA/'cache'/'frame-selection')
-    result=process_clip(video_path,out/'processing',processing_params,on_progress=progress)
+    result=process_clip(video_path,out/'processing',processing_params,on_progress=progress,project_root=s.project_folder(j['projectId']))
     if match_clip and result['selection'].get('cycleAlignment'):
         result['selection']['cycleAlignment'].update(matchClipId=match_clip['clipId'],matchClipRevisionId=match_clip['clipRevisionId'])
     # Public lineage records IDs and decisions, not machine-local file paths.
@@ -132,7 +134,7 @@ def execute_video(j,out):
         candidate=videos_frame_asset(finished_path,f"영상편집-{item['sourceFrameIndex']}.png",{**provenance,'parentAssetId':normalized_asset['assetId'],'processing':'video-finish','normalization':normalization,'finish':finish})
         assets.extend([normalized_asset,candidate]);fid=s.uid();group['frameVersionIds'].append(fid)
         frame=dict(frameId=s.uid(),frameVersionId=fid,rawAssetId=raw['assetId'],imageAssetId=candidate['assetId'],sourceRect=normalization['sourceRect'],
-                   sourceToFrameTransform=normalization['sourceToFrameTransform'],extractionVersion='video-v4-2.34-finished',nativeScaleGroupId=gid,review='pending',hidden=False,
+                   sourceToFrameTransform=normalization['sourceToFrameTransform'],extractionVersion=result['version']+'-finished',nativeScaleGroupId=gid,review='pending',hidden=False,
                    sourceVideoId=video['videoId'],sourceFrameIndex=item['sourceFrameIndex'],sourceTimeMs=item['sourceTimeMs'],interpolated=bool(item.get('interpolated')),
                    **({'interpolation':item['processing']['interpolation']} if item.get('processing',{}).get('interpolation') else {}))
         frame['sourceProcessing']=item.get('processing',{'kind':'chroma-key'})
@@ -159,15 +161,28 @@ def execute_video(j,out):
                       'frames':j['snapshot']['frames']+frames,
                       'alignmentGroups':j['snapshot']['alignmentGroups']+[group],
                       'alignments':{**j['snapshot']['alignments'],**alignments}}
-    cells=[render_occurrence(preview_snapshot,clip,o,s.asset_path,include_outline=False)[0] for o in occurrences]
+    rendered=[render_occurrence(preview_snapshot,clip,o,s.asset_path,include_outline=False) for o in occurrences]
+    cells=[image for image,_ in rendered]
+    from adapters.spritegen.clip_comparison import capture_video
+    capture_video(preview_snapshot,clip,cells,rendered,result['frames'],assets,video,normalization,finish,
+                  result.get('extraction',{}),out,selection=result['selection'])
+    result['selection']['renderedBounds']={'measurement':'final-rendered-cells','frames':[
+        {'outputFrameIndex':i,'supportBounds':qa['supportBounds'],'safeOverflowPx':qa['overflowPx'],
+         'canvasClipping':bool(qa['supportBounds'] and (qa['supportBounds'][0]<0 or qa['supportBounds'][1]<0 or qa['supportBounds'][2]>grid[0] or qa['supportBounds'][3]>grid[1]))}
+        for i,(_,qa) in enumerate(rendered)]}
+    result['selection']['sourceEdgeContacts']={'measurement':'decoded-source-frames','contacts':result.get('extraction',{}).get('edgeContacts',[])}
+    from adapters.spritegen.video_processing import _engine,_finite
+    loop_engine=_engine('video.loop');seam=loop_engine.seam_on_cells(cells);wrap=loop_engine.wrap_on_cells(cells)
+    result['selection']['renderedSeam']=_finite({'measurement':'final-rendered-cells','seam':seam,'wrap':wrap,'limit':loop_engine.SEAM_RATIO_MAX,'verdict':'not-loop' if not clip['loop'] else 'pass' if seam<=loop_engine.SEAM_RATIO_MAX and wrap<=loop_engine.SEAM_RATIO_MAX else 'review','loop':clip['loop']})
     preview=write_animation_formats(cells,[o['durationMs'] for o in occurrences],clip['loop'],out/'final-preview')
     s.atomic_bytes(out/'final-preview'/'preview.json',s.dumps(preview).encode())
     intermediate_files=[name for name in result.get('files',[]) if not name.endswith(('preview.gif','preview.sheet.png'))]
     files=['processing/'+name for name in intermediate_files]+['normalized/normalization.json','finished/finish.json']
     files+=['final-preview/'+name for name in preview['files']]+['final-preview/preview.json']
+    files += [path.relative_to(out).as_posix() for path in sorted((out/'source-projection').rglob('*')) if path.is_file()]
     return dict(assets=assets,frames=frames,alignmentGroups=[group],alignments=alignments,clips=[clip],generations=generations,
                 files=files,status='needs_review',videoId=video['videoId'],clipId=clip['clipId'],frameVersionIds=group['frameVersionIds'],
-                processing={'version':result['version'],'options':result['options'],'source':source,'selection':result['selection'],'outputFrames':len(occurrences),'durationMs':sum(o['durationMs'] for o in occurrences),'normalization':normalization,'finish':finish,'preview':preview,'spill':spill,**({'spillReferenceAssetId':spill_reference} if spill_reference else {})},**({'receipt':receipt} if receipt else {}))
+                processing={'version':result['version'],'policy':result['policy'],'interpolation':result['interpolation'],'options':result['options'],'source':source,'selection':result['selection'],'outputFrames':len(occurrences),'durationMs':sum(o['durationMs'] for o in occurrences),'normalization':normalization,'finish':finish,'preview':preview,'spill':spill,**({'spillReferenceAssetId':spill_reference} if spill_reference else {})},**({'receipt':receipt} if receipt else {}))
 
 def videos_frame_asset(path,name,provenance):
     return s.register_asset(Path(path).read_bytes(),name,'derived',provenance)

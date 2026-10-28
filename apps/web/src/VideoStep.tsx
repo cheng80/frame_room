@@ -319,6 +319,13 @@ export function VideoStep({s, onSelectClip, initialReferenceRevisionId}: {s: Stu
             {processing.loopMode === 'full' ? <p className="caption">전체 영상에서는 주기 맞춤을 사용하지 않습니다.</p> : null}
             <details className="source-tool-details">
               <summary>주기 보간·시작 자세</summary>
+              <Select label="RIFE TTA · 추가 연산" value={processing.rifeTta ?? 'off'} onChange={e => setProcessingField('rifeTta', e.target.value as 'off' | 'on')}>
+                <option value="off">끄기 · 기본</option><option value="on">공간·시간 TTA · 느릴 수 있음</option>
+              </Select>
+              <Select label="루프 겹침 보정" value={processing.overlapWrap ?? 'off'} onChange={e => setProcessingField('overlapWrap', e.target.value as 'off' | 'auto')}>
+                <option value="off">끄기 · 기본</option><option value="auto">자동 · 확인된 두 걸음·로컬 예산 내</option>
+              </Select>
+              <p className="caption">로컬 보간은 작업당 60초 예산을 사용합니다. 겹침 보정은 조건이나 예산을 통과한 경우만 적용합니다.</p>
               <Select label="주기 보간" value={processing.between} onChange={e => setProcessingField('between', e.target.value as VideoProcessingSettings['between'])}>
                 <option value="auto">자동 · 손상된 보간 대신 원본 사용</option>
                 <option value="on">켜기 · 보간 결과 유지</option>

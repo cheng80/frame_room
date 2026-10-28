@@ -14,8 +14,10 @@ a little off and part of that background survives the matte, the edge band is
 "touched" by leftover *background* (2026-09-11: a (8, 162, 24) green read as
 "framed too tight"). The check therefore classifies every contact pixel by its
 raw colour — the declared key's hue signature (`extract.is_border_key_candidate`,
-the border rule: an edge pixel is border evidence) is **residual background**,
-anything else is the **subject** — and the two fail
+the border rule: an edge pixel is border evidence) in a piece of the keyed frame that
+holds nothing else is **residual background**; anything else is the **subject**, a
+key-tinted pixel joined to the subject included (its antialiased rim, the key blended
+into it, reaches the band first) — and the two fail
 with different messages: residual points at `video-canvas` normalization of the
 base still, subject contact at a taller/wider canvas.
 
@@ -24,6 +26,16 @@ from a `video-canvas --fit tight` frame is clipped on purpose, but a frame where
 leftover key background reaches the edge is still a keying defect. A frame where the
 subject touches the edge carries key-tinted fringe pixels beside it and is accepted with
 them. The contacts stay in the report.
+
+A **speck** is not the subject either: a fleck the model drew drifting across the background,
+well away from the body, that survived the matte. Every keyed frame has its specks erased
+(`drop_specks`) before the edge check reads it, so a few pale pixels drifting through the edge
+band far from the body are erased rather than read as the subject framed too tight. A speck is
+small — under `SPECK_MIN_FRACTION` of the frame's largest component, the body — and far: more
+than `SPECK_APART` of the body's height from it. Its pixels are every opaque one (what the edge
+check reads), corners joining them. Near the body, small detached pieces are the subject's own
+and stay: the outline's loose pixels one transparent pixel off, a shadow drawn under a shoe, a
+shoe's part the matte cut loose. How many each frame lost is in its report row (`specks`).
 """
 
 from __future__ import annotations
@@ -41,7 +53,7 @@ from PIL import Image
 from sprite_gen._deps import np
 from sprite_gen.frames.cutout import cutout
 from sprite_gen.frames.decontam import palette_from_stats
-from sprite_gen.frames.extract import is_border_key_candidate
+from sprite_gen.frames.extract import _border_key_candidate_field, _key_channel_split
 from sprite_gen.frames.extract import _SPILL_FULL_MIN_TINT, DEFAULT_UNMIX_REACH
 from sprite_gen.spec.runio import atomic_write_text
 
@@ -65,6 +77,13 @@ SPILL_REFERENCE_MAX = 0.005  # the still's own key material ≤ the engine's sma
 SPILL_REFERENCE_MARGIN = 1
 SPILL_REFERENCE_MAX_PIXELS = 6_000_000
 EDGE_MAX_PIXELS = 0  # any opaque pixel on the top/left/right edge band = contact
+# Specks (`drop_specks`). A component under SPECK_MIN_FRACTION of the frame's largest one, or under
+# SPECK_MIN_PX, is small; more than SPECK_APART of the largest one's height from it, far. `video-loop`
+# reads the size by the same two numbers when it erases the loose pieces of a cut (`drop_specks` with
+# its own reading, see run_loop).
+SPECK_MIN_FRACTION = 0.01
+SPECK_MIN_PX = 8
+SPECK_APART = 0.1
 # Edge decontamination (`sprite_gen.frames.decontam`). A decoded frame's chroma is blurred by
 # 4:2:0 while its luma is not, so frames use the video fit. One palette serves the whole clip,
 # learned on the first frame, so the colours an edge may take cannot change between frames.
@@ -127,6 +146,83 @@ def extract(clip: Path, raw_dir: Path, stream_index: int | None = None) -> list[
     return files
 
 
+def _components(solid: np.ndarray, *, diagonal: bool = False) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """The components of a boolean picture, as runs of each row: (row, first column, column past the
+    last, component of the run, pixels per component). A run touches a run of the row above when their
+    columns overlap (4-connected), or with `diagonal` also when they meet at a corner (8-connected)."""
+    reach = 1 if diagonal else 0
+    rows, width = solid.shape
+    edges = np.diff(np.pad(solid.astype(np.int8), ((0, 0), (1, 1))), axis=1)
+    ys, starts = np.nonzero(edges == 1)
+    stops = np.nonzero(edges == -1)[1]
+    parent = list(range(len(ys)))
+
+    def root(k: int) -> int:
+        while parent[k] != k:
+            parent[k] = parent[parent[k]]
+            k = parent[k]
+        return k
+
+    bounds = np.searchsorted(ys, np.arange(rows + 1))
+    for y in range(1, rows):
+        a, a_end = int(bounds[y - 1]), int(bounds[y])
+        b, b_end = a_end, int(bounds[y + 1])
+        while a < a_end and b < b_end:
+            if starts[a] < stops[b] + reach and starts[b] < stops[a] + reach:
+                ra, rb = root(a), root(b)
+                if ra != rb:
+                    parent[max(ra, rb)] = min(ra, rb)
+            if stops[a] < stops[b]:
+                a += 1
+            else:
+                b += 1
+    labels = np.array([root(k) for k in range(len(ys))], dtype=np.int64)
+    sizes = np.bincount(labels, weights=stops - starts, minlength=len(ys)).astype(np.int64)
+    return ys, starts, stops, labels, sizes
+
+
+def _near(mask: np.ndarray, reach: int) -> np.ndarray:
+    """Every pixel within `reach` px of `mask`, each way and diagonally (a square of side 2 reach + 1)."""
+    for axis in (0, 1):
+        n = mask.shape[axis]
+        total = np.cumsum(np.pad(mask.astype(np.int32), [(reach + 1, reach) if a == axis else (0, 0) for a in (0, 1)]), axis=axis)
+        mask = (np.take(total, np.arange(2 * reach + 1, 2 * reach + 1 + n), axis=axis)
+                - np.take(total, np.arange(n), axis=axis)) > 0
+    return mask
+
+
+def drop_specks(image: Image.Image, *, alpha_over: int = 0, diagonal: bool = True,
+                apart: float = SPECK_APART) -> tuple[Image.Image, int]:
+    """Erase the specks: (the image, components erased). A component is the pixels over `alpha_over`,
+    joined side by side (and at corners with `diagonal`); a speck is one under SPECK_MIN_FRACTION of
+    the largest, or under SPECK_MIN_PX, whose every pixel is more than `apart` of the largest one's
+    height from it (0: wherever it is). An image with no speck comes back as it was given, the same
+    object; otherwise a copy with the specks' pixels set to (0, 0, 0, 0)."""
+    rgba = np.asarray(image.convert("RGBA"))
+    ys, starts, stops, labels, sizes = _components(rgba[..., 3] > alpha_over, diagonal=diagonal)
+    if not len(ys):
+        return image, 0
+    largest = int(sizes.argmax())
+    small = sizes < max(SPECK_MIN_PX, int(sizes[largest]) * SPECK_MIN_FRACTION)
+    small[np.setdiff1d(np.arange(len(sizes)), labels)] = False  # only the roots are components
+    if small.any() and apart > 0:
+        body = labels == largest
+        reach = int(apart * (int(ys[body].max()) - int(ys[body].min()) + 1))
+        near = np.zeros(rgba.shape[:2], dtype=bool)
+        for y, x0, x1 in zip(ys[body], starts[body], stops[body]):
+            near[y, x0:x1] = True
+        near = _near(near, reach)
+        for y, x0, x1, label in zip(ys, starts, stops, labels):
+            if small[label] and near[y, x0:x1].any():
+                small[label] = False
+    if not small.any():
+        return image, 0
+    out = rgba.copy()
+    for y, x0, x1 in zip(ys[small[labels]], starts[small[labels]], stops[small[labels]]):
+        out[y, x0:x1] = 0
+    return Image.fromarray(out, "RGBA"), int(small.sum())
+
+
 def edge_contact(image: Image.Image) -> dict[str, int]:
     """Opaque pixels in the top/left/right edge bands (the floor edge is expected contact)."""
     alpha = image.convert("RGBA").getchannel("A")
@@ -142,26 +238,37 @@ def classify_edge_contact(raw: Image.Image, keyed: Image.Image, chroma_key: tupl
     """Split the opaque edge-band pixels into `subject` and `residual` (leftover key background).
 
     A contact pixel whose *raw* colour carries the declared key's hue signature
-    (`is_border_key_candidate`) is background the matte failed to erase, not the
-    subject. Without a chroma key
+    (`is_border_key_candidate`) is either background the matte failed to erase or the subject's
+    own rim: a body reaching the band brings its antialiased edge, the key blended into it, there
+    first. It is residual only when the opaque piece of the keyed frame it belongs to — its opaque
+    pixels, corners joining them, the pieces `drop_specks` reads — holds no pixel off the key's
+    signature: background on its own. Joined to one, it is the subject's. Without a chroma key
     (matte route) every contact is the subject.
     """
-    alpha = keyed.convert("RGBA").getchannel("A").load()
-    rgb = raw.convert("RGB").load()
-    w, h = keyed.size
-    band = set()
-    band.update((x, y) for y in range(min(EDGE_ROWS, h)) for x in range(w))
-    band.update((x, y) for x in range(min(EDGE_ROWS, w)) for y in range(h))
-    band.update((x, y) for x in range(max(0, w - EDGE_ROWS), w) for y in range(h))
-    subject = residual = 0
-    for x, y in band:
-        if alpha[x, y] <= 0:
-            continue
-        if chroma_key is not None and is_border_key_candidate(rgb[x, y], chroma_key):
-            residual += 1
-        else:
-            subject += 1
-    return {"subject": subject, "residual": residual}
+    alpha = np.asarray(keyed.convert("RGBA"))[..., 3]
+    h, w = alpha.shape
+    band = np.zeros((h, w), dtype=bool)
+    band[:EDGE_ROWS, :] = True
+    band[:, :EDGE_ROWS] = True
+    band[:, max(0, w - EDGE_ROWS):] = True
+    opaque = alpha > 0
+    contact = band & opaque
+    total = int(contact.sum())
+    keyed_channels, unkeyed_channels = _key_channel_split(chroma_key) if chroma_key is not None else ([], [])
+    if not total or not keyed_channels:
+        return {"subject": total, "residual": 0}
+    keyish = _border_key_candidate_field(np.asarray(raw.convert("RGB"), dtype=np.int32), keyed_channels, unkeyed_channels)
+    suspect = contact & keyish
+    if not suspect.any():
+        return {"subject": total, "residual": 0}
+    ys, starts, stops, labels, _ = _components(opaque, diagonal=True)
+    piece = np.zeros((h, w), dtype=np.int64)
+    for y, x0, x1, label in zip(ys, starts, stops, labels):
+        piece[y, x0:x1] = label
+    owned = np.zeros(len(ys), dtype=bool)  # pieces holding a pixel off the key's signature
+    owned[piece[opaque & ~keyish]] = True
+    residual = int((suspect & ~owned[piece]).sum())
+    return {"subject": total - residual, "residual": residual}
 
 
 def _reference_window(reference: Path, key: str) -> tuple[str, Image.Image | None, tuple[int, int, int] | None, dict[str, Any]]:
@@ -230,7 +337,15 @@ def key_frames(
     spill: str = "small",
     allow_subject: bool = False,
     decontam: str = "off",
+    alpha_mode: str = "chroma",
 ) -> dict[str, Any]:
+    from . import effect
+    if alpha_mode not in effect.ALPHA_MODES:
+        raise SystemExit(f"video-frames: unknown --alpha-mode {alpha_mode!r}")
+    if alpha_mode == "brightness":
+        if decontam != "off":
+            raise SystemExit("video-frames: brightness alpha does not use --decontam")
+        return effect.key_frames(raw_files, keyed_dir)
     if spill not in ("small", "full"):
         raise SystemExit(f"video-frames: key_frames takes a resolved spill mode (small|full), got {spill!r}")
     if decontam not in DECONTAM_MODES:
@@ -251,10 +366,14 @@ def key_frames(
                        spill_require_hue=spill == "full", decontam=decontam, decontam_fit=DECONTAM_FIT,
                        decontam_palette=clip_palette, decontam_edge_band=EDGE_ROWS)
         image = Image.open(dst).convert("RGBA")
+        # The specks go before anything reads the frame: the edge band, the coverage, the loop.
+        image, specks = drop_specks(image)
+        if specks:
+            image.save(dst)
         hist = image.getchannel("A").histogram()
         w, h = image.size
         alpha_zero_pct = round(100 * hist[0] / (w * h), 2)
-        row = {"frame": src.name, "alpha_zero_pct": alpha_zero_pct, "route": stats.get("route")}
+        row = {"frame": src.name, "alpha_zero_pct": alpha_zero_pct, "route": stats.get("route"), "specks": specks}
         if decontam != "off":
             done = stats["decontam"]
             if done.get("applied"):
@@ -282,6 +401,8 @@ def key_frames(
         "frames": len(rows),
         "alpha_zero_pct_min": min(r["alpha_zero_pct"] for r in rows),
         "alpha_zero_pct_max": max(r["alpha_zero_pct"] for r in rows),
+        "specks": {"dropped": sum(r["specks"] for r in rows), "frames": sum(1 for r in rows if r["specks"]),
+                   "min_fraction": SPECK_MIN_FRACTION, "min_px": SPECK_MIN_PX, "apart": SPECK_APART},
         "edge_contacts": contacts,
         "edge_policy": "off" if not check_edges else ("subject-allowed" if allow_subject else "refuse"),
         "rows": rows,
@@ -347,10 +468,24 @@ def _edge_contact_message(contacts: list[dict[str, Any]]) -> str:
     return message
 
 
-def run_frames(clip: Path, out_dir: Path, *, key: str, allow_edge_contact: bool, report_path: Path | None, spill: str = "small", reference: Path | None = None, allow_subject_edge_contact: bool = False, decontam: str = "off") -> dict[str, Any]:
+def run_frames(clip: Path, out_dir: Path, *, key: str, allow_edge_contact: bool, report_path: Path | None, spill: str = "small", reference: Path | None = None, allow_subject_edge_contact: bool = False, decontam: str = "off", source_manifest: Path | None = None, alpha_mode: str = "chroma") -> dict[str, Any]:
+    from . import effect
+    if alpha_mode not in effect.ALPHA_MODES:
+        raise SystemExit(f"video-frames: unknown --alpha-mode {alpha_mode!r}")
+    if alpha_mode == "brightness" and decontam != "off":
+        raise SystemExit("video-frames: brightness alpha does not use --decontam")
+    if source_manifest is not None and reference is None:
+        raise SystemExit("video-frames: --source-manifest needs --reference (the source canvas)")
+    if source_manifest is not None:
+        target = (report_path or out_dir / "frames.report.json").expanduser().resolve()
+        receipt = Path(source_manifest).expanduser().resolve()
+        if (receipt in (target, clip.expanduser().resolve(), Path(reference).expanduser().resolve())
+                or receipt.is_relative_to((out_dir / "keyed").expanduser().resolve())
+                or receipt.is_relative_to((out_dir / "raw").expanduser().resolve())):
+            raise SystemExit("video-frames: source manifest cannot overwrite source files or report")
     if spill not in SPILL_MODES:
         raise SystemExit(f"video-frames: unknown --spill {spill!r}; expected one of {', '.join(SPILL_MODES)}")
-    if spill == "auto" and reference is None:
+    if alpha_mode == "chroma" and spill == "auto" and reference is None:
         raise SystemExit("video-frames: --spill auto needs --reference (the still the clip was made from)")
     if decontam not in DECONTAM_MODES:
         raise SystemExit(f"video-frames: unknown --decontam {decontam!r}; expected one of {', '.join(DECONTAM_MODES)}")
@@ -361,23 +496,36 @@ def run_frames(clip: Path, out_dir: Path, *, key: str, allow_edge_contact: bool,
     meta = probe(clip)
     raw_dir = out_dir / "raw"
     keyed_dir = out_dir / "keyed"
-    decision = decide_spill(Path(reference).expanduser().resolve(), key) if spill == "auto" else {"mode": spill, "reason": "explicit"}
+    decision = ({"mode": "off", "reason": "brightness alpha"} if alpha_mode == "brightness" else
+                decide_spill(Path(reference).expanduser().resolve(), key) if spill == "auto" else {"mode": spill, "reason": "explicit"})
     files = extract(clip, raw_dir, meta["stream_index"])
-    report = key_frames(files, keyed_dir, key=key, check_edges=not allow_edge_contact, spill=decision["mode"], allow_subject=allow_subject_edge_contact, decontam=decontam)
+    report = key_frames(files, keyed_dir, key=key, check_edges=not allow_edge_contact, spill=decision["mode"], allow_subject=allow_subject_edge_contact, decontam=decontam, alpha_mode=alpha_mode)
     payload = {"kind": "sprite-gen-video-frames-report", "clip": str(clip), "out_dir": str(out_dir), "raw_dir": str(raw_dir), "keyed_dir": str(keyed_dir), "key": key, "spill": decision, **meta, **report}
     target = (report_path or (out_dir / "frames.report.json")).expanduser().resolve()
+    if source_manifest is not None:
+        from sprite_gen.video.evidence import engine_identity
+        payload["producer"] = engine_identity()
     atomic_write_text(target, json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
+    if source_manifest is not None:
+        from sprite_gen.video import source
+        Path(source_manifest).parent.mkdir(parents=True, exist_ok=True)
+        record = source.manifest(clip=clip, canvas=Path(reference), frames_report=target,
+                                 files=sorted(keyed_dir.glob("*.png")),
+                                 timestamps=source.timestamps(clip, meta["stream_index"]))
+        atomic_write_text(Path(source_manifest), json.dumps(record, indent=2, allow_nan=False) + "\n")
     payload["report"] = str(target)
     return payload
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--alpha-mode", choices=("chroma", "brightness"), default="chroma", help="chroma key (default), or emitted light on black: brightness alpha, unpremultiplied RGB, no speck/edge cleanup; dark smoke becomes faint")
     parser.add_argument("--clip", required=True, type=Path, help="mp4 from `sprite-gen video`, or one made elsewhere from a `video-canvas` still (a video MCP such as ZCRE); an audio track and a cover image are left out")
     parser.add_argument("--out-dir", required=True, type=Path, help="writes raw/ and keyed/ here")
     parser.add_argument("--key", choices=("auto", "green", "magenta", "white"), default="auto", help="background key (auto reads the corners)")
     parser.add_argument("--allow-edge-contact", action="store_true", help="accept any opaque pixel at the top/left/right edge (subject and leftover key background alike)")
     parser.add_argument("--allow-subject-edge-contact", action="store_true", help="accept the subject touching the top/left/right edge (a `video-canvas --fit tight` clip) but still refuse leftover key background there")
     parser.add_argument("--report", type=Path, help="report JSON (default <out-dir>/frames.report.json)")
+    parser.add_argument("--source-manifest", type=Path, help="write exact clip/canvas/keyed-file digests and source timestamps (requires --reference)")
     parser.add_argument("--spill", choices=SPILL_MODES, default="small", help="small: correct only small key-tinted clusters (default); full: every key tint in the subject is spill; auto: decide from --reference")
     parser.add_argument("--reference", type=Path, help="the still the clip was made from (required by --spill auto)")
     parser.add_argument("--decontam", choices=DECONTAM_MODES, default="off", help="off: the matte as is (default); palette: re-explain key-tinted edges with the subject's own colours (one palette per clip, video fit); auto: the same where it applies, reasons recorded where not")
@@ -388,7 +536,8 @@ def run(**kwargs: object) -> int:
                          allow_edge_contact=bool(kwargs.get("allow_edge_contact")), report_path=kwargs.get("report"),  # type: ignore[arg-type]
                          spill=str(kwargs.get("spill") or "small"), reference=kwargs.get("reference"),  # type: ignore[arg-type]
                          allow_subject_edge_contact=bool(kwargs.get("allow_subject_edge_contact")),
-                         decontam=str(kwargs.get("decontam") or "off"))
+                         decontam=str(kwargs.get("decontam") or "off"), source_manifest=kwargs.get("source_manifest"),
+                         alpha_mode=str(kwargs.get("alpha_mode") or "chroma"))  # type: ignore[arg-type]
     summary = {k: payload[k] for k in ("clip", "keyed_dir", "width", "height", "fps", "frames", "codec", "pix_fmt", "audio_streams", "alpha_zero_pct_min", "alpha_zero_pct_max", "edge_contacts", "edge_policy", "spill", "report")}
     print(json.dumps(summary, ensure_ascii=False, indent=2))
     return 0

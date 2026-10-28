@@ -2,13 +2,14 @@ import type {Clip, Job, Snapshot} from './types';
 import type {Studio} from './useStudio';
 
 export type Region = [number, number, number, number];
-export type FollowFields = {region: [string, string, string, string]; gain: string; freq: string; damping: string; onFold: 'lower' | 'refuse'};
+export type FollowFields = {region: [string, string, string, string]; gain: string; freq: string; damping: string; onFold: 'lower' | 'refuse'; stretchFloor?: string; readOn?: string; readOnClipId?: string};
 export type HandedFields = {item: string; side: string; part: string; direction: string; facing: string; marker: string; referenceAssetId: string};
 export type ClipToolSource = {projectId: string; projectRevision: number; clipId: string; clipRevisionId: string; occurrenceIds: string[]};
 export type ClipToolPreview = {width: number; height: number; frameCount: number; durationsMs: number[]; before: string; beforeStrip: string; firstFrame: string; after?: string; afterStrip?: string; board?: string};
-export type FollowReport = {gainRequested: number; gainApplied: number; foldLimited: boolean; unchanged?: boolean; reachPx?: number};
+export type FollowReport = {gainRequested: number; gainApplied: number; foldLimited: boolean; unchanged?: boolean; reachPx?: number; canApply?: boolean; stretchLimited?: boolean; readOn?: {relation: string; reason?: string}; regionInspection?: {cells: {index: number; jacobianMin: number; solidPx: number; changedPx: number; ownership: string}[]}};
+export type ComparisonReport = {verdict: 'improved' | 'non_regressing' | 'regressed' | 'unknown'; reasons: string[]; canApply: boolean; metric_version: string; schema_version: number; policy_version?: string; sourceStatus?: {source: string; origin: string; sourceId?: string; rawFrames?: number; keyedFrames?: number}; source?: {id: string}; origin?: {id: string}; baseline?: {id: string}; candidate?: {id: string}};
 export type HandedReport = {verdict: 'clear' | 'suspect' | 'inconclusive'; framesShown: number; frameCount: number; suspectFrames: {index: number; occurrenceId: string; reasons: string[]}[]; unchecked: string[]};
-export type ClipToolResult = {version: 'clip-tools-v1'; source: ClipToolSource; settings: Record<string, unknown>; preview: ClipToolPreview} & ({tool: 'follow'; report: FollowReport} | {tool: 'handed'; report: HandedReport});
+export type ClipToolResult = {version: 'clip-tools-v1'; source: ClipToolSource; settings: Record<string, unknown>; preview: ClipToolPreview} & ({tool: 'follow'; report: FollowReport} | {tool: 'handed'; report: HandedReport} | {tool: 'restore'; report: ComparisonReport} | {tool: 'compare'; report: ComparisonReport});
 export type ToolRequest = {job: Job; source: ClipToolSource; settingsKey: string};
 
 export const defaultFollow = (): FollowFields => ({region: ['', '', '', ''], gain: '2.5', freq: '2.4', damping: '0.6', onFold: 'lower'});
@@ -16,7 +17,7 @@ export const defaultHanded = (): HandedFields => ({item: '', side: 'right', part
 export const jobSucceeded = (job?: Job) => !!job && (job.status === 'succeeded' || job.operation === 'apply_follow' && ['completed', 'needs_review'].includes(job.status));
 export const jobPending = (job?: Job) => !!job && ['queued', 'running', 'cancel_requested', 'pending'].includes(job.status);
 export const currentJob = (request: ToolRequest | undefined, jobs: Job[]) => request ? jobs.find(job => job.jobId === request.job.jobId) || request.job : undefined;
-export const settingsKey = (value: FollowFields | HandedFields) => JSON.stringify(value);
+export const settingsKey = (value: unknown) => JSON.stringify(value);
 export const sourceOf = (snapshot: Snapshot, clip: Clip): ClipToolSource => ({projectId: snapshot.projectId, projectRevision: snapshot.revision, clipId: clip.clipId, clipRevisionId: clip.clipRevisionId, occurrenceIds: clip.occurrences.map(o => o.occurrenceId)});
 export const sameSource = (a: ClipToolSource, b: ClipToolSource) => a.projectId === b.projectId && a.projectRevision === b.projectRevision && a.clipId === b.clipId && a.clipRevisionId === b.clipRevisionId && a.occurrenceIds.length === b.occurrenceIds.length && a.occurrenceIds.every((id, i) => id === b.occurrenceIds[i]);
 export function clipCell(snapshot: Snapshot, clip: Clip) {
@@ -57,7 +58,12 @@ export function followParams(snapshot: Snapshot, clip: Clip, fields: FollowField
   if (!Number.isFinite(freq) || freq < 0.2 || freq > 12) throw new Error('반응 주파수는 0.2~12 Hz여야 합니다.');
   if (!Number.isFinite(damping) || damping < 0.05 || damping > 4) throw new Error('감쇠는 0.05~4여야 합니다.');
   if (!['lower', 'refuse'].includes(fields.onFold)) throw new Error('접힘 처리 방법을 선택하세요.');
-  return {clipId: clip.clipId, clipRevisionId: clip.clipRevisionId, region, gain, freq, damping, onFold: fields.onFold};
+  const floor = fields.stretchFloor?.trim() ? Number(fields.stretchFloor) : undefined;
+  if (floor !== undefined && (!Number.isFinite(floor) || floor < 0 || floor > .99)) throw new Error('최소 면적은 0~0.99이어야 합니다.');
+  if (fields.readOn && !/^[0-9a-f]{64}$/.test(fields.readOn)) throw new Error('영역을 읽은 시트의 SHA-256을 입력하세요.');
+  const readOnClip = fields.readOnClipId ? snapshot.clips.find(c => c.clipId === fields.readOnClipId) : undefined;
+  if (fields.readOnClipId && !readOnClip) throw new Error('영역을 읽은 동작을 다시 선택하세요.');
+  return {clipId: clip.clipId, clipRevisionId: clip.clipRevisionId, region, gain, freq, damping, onFold: fields.onFold, ...(floor !== undefined ? {stretchFloor: floor} : {}), ...(fields.readOn ? {readOn: fields.readOn} : {}), ...(readOnClip ? {readOnClipId: readOnClip.clipId, readOnClipRevisionId: readOnClip.clipRevisionId} : {})};
 }
 export function handedParams(snapshot: Snapshot, clip: Clip, fields: HandedFields): Record<string, unknown> {
   const sourceError = validateClipSource(snapshot, clip, false); if (sourceError) throw new Error(sourceError);
@@ -74,13 +80,14 @@ const strings = (value: unknown): value is string[] => Array.isArray(value) && v
 /** Result names are not URLs. Only artifact entries returned by the job may supply media URLs. */
 export function readClipToolResult(job?: Job): ClipToolResult | undefined {
   const result: unknown = job?.result;
-  if (!object(result) || result.version !== 'clip-tools-v1' || !['follow', 'handed'].includes(String(result.tool)) || !object(result.source) || !object(result.preview) || !object(result.report) || !object(result.settings)) return;
+  if (!object(result) || result.version !== 'clip-tools-v1' || !['follow', 'handed', 'restore', 'compare'].includes(String(result.tool)) || !object(result.source) || !object(result.preview) || !object(result.report) || !object(result.settings)) return;
   const source = result.source, preview = result.preview, report = result.report;
   if (!['projectId', 'clipId', 'clipRevisionId'].every(k => typeof source[k] === 'string') || !Number.isInteger(source.projectRevision) || !strings(source.occurrenceIds)) return;
   const occurrenceIds = source.occurrenceIds;
   if (![preview.width, preview.height, preview.frameCount].every(n => typeof n === 'number' && Number.isInteger(n) && n > 0) || Number(preview.frameCount) > 64 || Number(preview.width) > 1024 || Number(preview.height) > 1024 || !Array.isArray(preview.durationsMs) || preview.durationsMs.length !== preview.frameCount || preview.frameCount !== source.occurrenceIds.length || !preview.durationsMs.every(n => Number.isInteger(n) && n > 0) || !['before', 'beforeStrip', 'firstFrame'].every(k => typeof preview[k] === 'string')) return;
   if (result.tool === 'follow' && (!Number.isFinite(report.gainRequested) || !Number.isFinite(report.gainApplied) || typeof report.foldLimited !== 'boolean' || typeof preview.after !== 'string' || typeof preview.afterStrip !== 'string')) return;
   if (result.tool === 'handed' && (!['clear', 'suspect', 'inconclusive'].includes(String(report.verdict)) || !Number.isInteger(report.framesShown) || report.frameCount !== preview.frameCount || !Array.isArray(report.suspectFrames) || !report.suspectFrames.every(f => object(f) && Number.isInteger(f.index) && Number(f.index) >= 0 && Number(f.index) < Number(preview.frameCount) && typeof f.occurrenceId === 'string' && occurrenceIds[Number(f.index)] === f.occurrenceId && strings(f.reasons)) || !strings(report.unchecked))) return;
+  if (['restore', 'compare'].includes(String(result.tool)) && (!['improved', 'non_regressing', 'regressed', 'unknown'].includes(String(report.verdict)) || !strings(report.reasons) || typeof report.canApply !== 'boolean' || typeof preview.after !== 'string' || typeof preview.afterStrip !== 'string' || (result.tool === 'restore' ? report.schema_version !== 4 || report.comparison_schema !== 6 || report.metric_version !== 'source-restoration-v5' || report.policy_version !== 'key-protected-source-copy-one-step-cap-jump-ghost-guard-v1' : report.schema_version !== 1 || report.metric_version !== 'same-sample-defects-v1'))) return;
   return result as ClipToolResult;
 }
 export const artifactUrl = (job: Job, name: string | undefined) => name ? job.artifacts?.find(a => a.name === name)?.url : undefined;
@@ -88,7 +95,7 @@ export function previewMatches(request: ToolRequest | undefined, job: Job | unde
   const result = readClipToolResult(job);
   if (!request || !job || job.operation !== 'preview_follow' || job.inputRevision !== source.projectRevision || !jobSucceeded(job) || !result || result.tool !== 'follow' || !sameSource(request.source, source) || !sameSource(result.source, source) || request.settingsKey !== settingsKey(fields)) return false;
   const settings = result.settings;
-  return settings.clipId === source.clipId && settings.clipRevisionId === source.clipRevisionId && Array.isArray(settings.region) && settings.region.length === 4 && settings.region.every((v, i) => v === numeric(fields.region[i])) && settings.gain === numeric(fields.gain) && settings.freq === numeric(fields.freq) && settings.damping === numeric(fields.damping) && settings.onFold === fields.onFold && [result.preview.before, result.preview.beforeStrip, result.preview.firstFrame, result.preview.after, result.preview.afterStrip].every(name => !!artifactUrl(job, name));
+  return result.report.canApply !== false && settings.clipId === source.clipId && settings.clipRevisionId === source.clipRevisionId && Array.isArray(settings.region) && settings.region.length === 4 && settings.region.every((v, i) => v === numeric(fields.region[i])) && settings.gain === numeric(fields.gain) && settings.freq === numeric(fields.freq) && settings.damping === numeric(fields.damping) && settings.onFold === fields.onFold && settings.stretchFloor === (fields.stretchFloor?.trim() ? Number(fields.stretchFloor) : undefined) && settings.readOn === (fields.readOn || undefined) && settings.readOnClipId === (fields.readOnClipId || undefined) && [result.preview.before, result.preview.beforeStrip, result.preview.firstFrame, result.preview.after, result.preview.afterStrip].every(name => !!artifactUrl(job, name));
 }
 export function regionFromDrag(start: [number, number], end: [number, number], width: number, height: number): Region {
   const x1 = Math.max(0, Math.min(width, start[0])), y1 = Math.max(0, Math.min(height, start[1]));

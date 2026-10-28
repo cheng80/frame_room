@@ -22,6 +22,7 @@ from sprite_gen.video import loop as video_loop
 from sprite_gen.video import clip_prompt as video_prompt
 from sprite_gen.video import align as video_align
 from sprite_gen.video import follow as video_follow
+from sprite_gen.video import compare as video_compare, restoration as video_restoration, source as video_source, follow_inspect as video_follow_inspect
 from sprite_gen.video import rife_install
 from sprite_gen.effects import recolor, shadow
 from sprite_gen.scene import render, inspect_scene
@@ -375,6 +376,10 @@ COMMANDS: dict[str, tuple[str, Callable[[argparse.ArgumentParser], None], Callab
         video_follow.add_arguments,
         video_follow.run,
     ),
+    "video-loop-compare": ("Compare delivered cells.", video_compare.add_arguments, video_compare.run),
+    "video-loop-repair": ("Restore verified source cells.", video_restoration.add_arguments, video_restoration.run),
+    "video-source-manifest": ("Record extracted source bytes.", video_source.add_arguments, video_source.run),
+    "video-follow-inspect": ("Inspect carried regions; nothing moved.", video_follow_inspect.add_arguments, video_follow_inspect.run),
     "rife": (
         "install: download the pinned RIFE (rife-ncnn-vulkan, sha256-checked) into the user data directory, where the loop repair finds it.",
         rife_install.add_arguments,

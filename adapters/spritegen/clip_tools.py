@@ -73,7 +73,7 @@ def validate_params(snapshot, operation, params):
     clip, width, height = clip_shape(snapshot, params)
     out = {"clipId": clip["clipId"], "clipRevisionId": clip["clipRevisionId"]}
     if operation == "preview_follow":
-        allowed = set(out) | {"region", "gain", "freq", "damping", "onFold"}
+        allowed = set(out) | {"region", "gain", "freq", "damping", "onFold", "stretchFloor", "readOn", "readOnClipId", "readOnClipRevisionId"}
         if not clip.get("loop") or len(clip["occurrences"]) < 4:
             raise s.AppError("CLIP_TOOL_LOOP", "부위 흔들림은 4~64슬롯의 반복 동작에 적용할 수 있습니다.")
         region = params.get("region")
@@ -87,6 +87,25 @@ def validate_params(snapshot, operation, params):
                    damping=_number(params.get("damping", .6), .05, 4, "감쇠"), onFold=params.get("onFold", "lower"))
         if out["onFold"] not in ("lower", "refuse"):
             raise s.AppError("CLIP_TOOL_SETTING", "과도한 변형의 처리 방법을 확인하세요.")
+        if 'stretchFloor' in params:
+            out['stretchFloor'] = _number(params['stretchFloor'], 0, .99, '최소 면적')
+        if params.get('readOn'):
+            if not isinstance(params['readOn'], str) or not re.fullmatch('[0-9a-f]{64}', params['readOn']):
+                raise s.AppError('CLIP_TOOL_SETTING', '영역을 읽은 시트의 SHA-256을 입력하세요.')
+            out['readOn'] = params['readOn']
+        if params.get('readOnClipId'):
+            origin = _find(snapshot['clips'], 'clipId', params['readOnClipId'], '영역을 읽은 동작을 선택하세요.')
+            if origin['clipRevisionId'] != params.get('readOnClipRevisionId'):
+                raise s.AppError('CLIP_TOOL_STALE', '영역을 읽은 동작이 변경되었습니다.', 409)
+            out.update(readOnClipId=origin['clipId'], readOnClipRevisionId=origin['clipRevisionId'])
+    elif operation in ('preview_restore', 'compare_clips'):
+        allowed = set(out)
+        if operation == 'compare_clips':
+            allowed |= {'candidateClipId', 'candidateClipRevisionId'}
+            candidate = _find(snapshot['clips'], 'clipId', params.get('candidateClipId'), '비교할 동작을 선택하세요.')
+            if candidate['clipRevisionId'] != params.get('candidateClipRevisionId'):
+                raise s.AppError('CLIP_TOOL_STALE', '비교 후보가 변경되었습니다.', 409)
+            out.update(candidateClipId=candidate['clipId'], candidateClipRevisionId=candidate['clipRevisionId'])
     elif operation == "check_handed":
         allowed = set(out) | {"item", "side", "part", "direction", "facing", "marker", "referenceAssetId"}
         item = params.get("item")
@@ -115,16 +134,17 @@ def validate_params(snapshot, operation, params):
     return out
 
 
-def render_clip(snapshot, params, asset_path):
+def render_clip(snapshot, params, asset_path, *, allow_render_errors=False):
     from alignment.pipeline import render_occurrence
     clip, width, height = clip_shape(snapshot, params)
-    cells, anchors, fids, aids = [], [], [], []
+    cells, anchors, fids, aids, render_errors = [], [], [], [], []
     pending = {"FRAME_UNAPPROVED", "ANCHOR_UNAPPROVED", "BODY_MEASUREMENT_UNAPPROVED"}
     for slot in clip["occurrences"]:
         image, qa = render_occurrence(snapshot, clip, slot, asset_path, include_outline=False)
         errors = [e for e in qa["errors"] if e.get("code") not in pending]
-        if errors:
+        if errors and not allow_render_errors:
             raise s.AppError("CLIP_TOOL_RENDER", "원본 동작의 잘림·자료·정렬 오류를 먼저 해결하세요.", 422, {"errors": errors})
+        render_errors.extend(errors)
         cells.append(image)
         anchors.append(dict(zip(("x", "y"), qa["anchor"])))
         fids.append(slot["frameVersionId"])
@@ -136,6 +156,9 @@ def render_clip(snapshot, params, asset_path):
               "cell": {"width": width, "height": height}, "loop": bool(clip.get("loop")),
               "stateId": clip.get("stateId"), "referenceRevisionId": clip.get("referenceRevisionId"),
               "defaultFps": clip.get("defaultFps", 10), "durationMs": sum(durations)}
+    from .clip_comparison import pixels
+    source['pixelHashes'] = pixels(cells)
+    if render_errors: source['renderErrors'] = render_errors
     return cells, durations, source
 
 
@@ -153,16 +176,39 @@ def _response(motion, durations, *, freq, zeta, gain):
     return np.interp(times, np.r_[even, total], np.r_[offsets, offsets[0]])
 
 
-def follow_frames(cells, durations, params):
+def transported_reading(snapshot, clip, cells, durations, origin_clip, origin_cells, origin_durations, strip_bytes):
     from sprite_gen.video import follow
+    from .clip_comparison import read_evidence
+    e, _, _, _ = read_evidence(snapshot, clip, cells, durations)
+    origin, _, _, _ = read_evidence(snapshot, origin_clip, origin_cells, origin_durations)
+    if (e['source']['videoSha256'] != origin['source']['videoSha256']
+            or any(e['basis'][k] != origin['basis'][k] for k in ('cell', 'sourceRect', 'normalization', 'finish', 'sourceRange'))):
+        raise ValueError('read-on-source-window-or-coordinate-mismatch')
+    indices = []
+    for sample, keyed in zip(e['basis']['samples'], e['keyedFrames']):
+        matches = [i for i, (old, key) in enumerate(zip(origin['basis']['samples'], origin['keyedFrames']))
+                   if sample['index'] == old['index'] and sample['timeMs'] == old['timeMs']
+                   and not sample.get('interpolation') and not old.get('interpolation') and keyed['sha256'] == key['sha256']]
+        if len(matches) != 1: raise ValueError('read-on-interpolated-or-unmatched-sample')
+        indices.append(matches[0])
+    w, h = cells[0].size
+    meta = dict(frames=len(origin_cells), w=w, h=h, scale=1, source_rect=[0, 0, w, h],
+                cycle_frames=len(origin_cells), sample_indices=list(range(len(origin_cells))))
+    cut = follow.cut_origin(strip_bytes, meta)
+    transported = {**meta, 'frames': len(cells), 'cycle_align': {'origin': cut, 'cells_from': [{'source': i} for i in indices]}}
+    return follow.transported_motion(transported, cells, cut['strip_sha256'])
+
+
+def follow_frames(cells, durations, params, *, motion=None):
+    from sprite_gen.video import follow, follow_inspect
     try:
-        rows, cols, _ = follow.body_motion(cells)
+        rows, cols, _, worn = motion[:4] if motion is not None else follow.body_motion(cells)
     except ValueError as exc:
         raise s.AppError("CLIP_TOOL_BODY", "몸 움직임을 측정할 불투명한 그림이 필요합니다.") from exc
     region = tuple(params["region"])
     cx, cy, rx, ry = region
     width, height = cells[0].size
-    shifts = np.column_stack((cols - cols[0], rows - rows[0]))
+    shifts = np.column_stack((cols, rows)) if motion is not None else np.column_stack((cols - cols[0], rows - rows[0]))
     if any(cx + x - rx < 0 or cy + y - ry < 0 or cx + x + rx > width or cy + y + ry > height for x, y in shifts):
         raise s.AppError("CLIP_TOOL_REGION", "움직이는 타원이 셀 밖으로 나갑니다. 영역을 줄이거나 위치를 옮겨 주세요.")
     settings = dict(freq=params["freq"], zeta=params["damping"], gain=1.0)
@@ -177,9 +223,16 @@ def follow_frames(cells, durations, params):
         gain = follow.lowered_gain(gain, per_gain, radius)
         if gain < follow.GAIN_MEASURED:
             raise s.AppError("CLIP_TOOL_FOLD", "강도를 낮춰도 영역이 너무 작습니다. 영역을 넓혀 주세요.")
+    floor = params.get('stretchFloor')
+    if floor is not None:
+        per_area, _ = follow.stretch_per_gain((rx, ry), dx, dy)
+        limited = follow.floor_gain(gain, per_area, floor)
+        if limited < gain and (params['onFold'] == 'refuse' or limited < follow.GAIN_MEASURED):
+            raise s.AppError('CLIP_TOOL_STRETCH', '최소 면적을 유지할 수 없습니다. 강도를 낮추거나 영역을 넓혀 주세요.')
+        gain = limited
     dx, dy = dx * gain, dy * gain
     # Gain zero and a rigid body must be an exact identity, including invisible RGB.
-    out = [cell.copy() if abs(x) + abs(y) < 1e-10 else follow.move_regions(cell, [region], tuple(shift), (float(x), float(y)))
+    out = [cell.copy() if abs(x) + abs(y) < 1e-10 else follow.move_regions(cell, [([region], (float(x), float(y)))], tuple(shift))
            for cell, shift, x, y in zip(cells, shifts, dx, dy)]
     report = {"gainRequested": requested, "gainApplied": gain, "foldLimited": gain != requested,
               "reachPx": round(float(np.max(np.hypot(dx, dy))), 5), "bodyMotionPx": [round(float(np.ptp(cols)), 5), round(float(np.ptp(rows)), 5)],
@@ -188,6 +241,20 @@ def follow_frames(cells, durations, params):
               "unchanged": all(a.tobytes() == b.tobytes() for a, b in zip(cells, out)),
               "timingMethod": "uniform" if len(set(durations)) == 1 else "time-weighted-periodic",
               "durationMs": sum(durations), "frameCount": len(cells)}
+    yy, xx = np.mgrid[:height, :width].astype(np.float32)
+    inspected = []
+    for index, (cell, after, shift, x, y) in enumerate(zip(cells, out, shifts, dx, dy)):
+        field = follow.move_field(xx, yy, [([region], (float(x), float(y)))], tuple(shift))
+        area = None if field is None else follow_inspect.jacobian(field[1], field[2])
+        mask = follow.region_weight(xx, yy, region, tuple(shift)) > 0
+        least, at = follow_inspect._least(area, mask)
+        inspected.append(dict(index=index, jacobianMin=least, jacobianMinAt=at,
+                              solidPx=int((mask & (np.asarray(cell)[..., 3] >= 128)).sum()),
+                              changedPx=int((np.asarray(cell) != np.asarray(after)).any(axis=-1).sum()), ownership='unknown'))
+    report.update(canApply=True, regionInspection={'schema_version': 2, 'policy': follow_inspect.policy(),
+                  'cells': inspected, 'carry_basis': follow.CARRY_BASIS, 'wornPx': worn},
+                  stretchFloor=floor, stretchLimited=gain != requested,
+                  readOn={'relation': 'same' if params.get('readOn') else 'current', 'sha256': params.get('readOn')})
     return out, report
 
 

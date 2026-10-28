@@ -72,6 +72,8 @@ export function CandidateComparison({s,frame,clip,navigation}:{s:Studio;frame:Fr
   </EditorDialog>;
   return <>
     {controls()}
+    <p className="caption">외형 기준과 후보의 시각 비교입니다. 최종 셀의 원본 복원·측정 비교는 동작 보완·검사에서 실행합니다.</p>
+    {clip?.comparisonEvidence && <p className="caption">복원 source {short(clip.comparisonEvidence.source?.id)} · 최초 origin {short(clip.comparisonEvidence.origin?.id)}</p>}
     <button type="button" className="comparison-expand" onClick={()=>setExpanded(true)}>두 이미지 크게 비교</button>
     {comparison()}
     {/* The inspector can be hidden at narrow widths; its modal stays outside. */}

@@ -34,12 +34,12 @@
     {
       "path": "sprite_gen/_modules.py",
       "upstreamSha256": "e0c2e1017d73a492c50ff96e366674537f5079a74939b399cbfdd8e367afd7ef",
-      "forkSha256": "167193aa3e6c56a45c5dd96ae8ba12adf7d77c2ae69c8df04f9c2c91b4a054a7"
+      "forkSha256": "89e3333c2e9ca6aeb0142574c876a1f7cb7273a509fac714e46d727385713c5b"
     },
     {
       "path": "sprite_gen/cli.py",
       "upstreamSha256": "a57b90a48b65af75d2ebced3ff61eba7b0ab79638aced92e98beb3c89190ead5",
-      "forkSha256": "70e5c97c71585339f01644f737bcf9528bd9249809d7a6c42588638d7686570c"
+      "forkSha256": "020006c8de5a8826ef5fac470573782badd1e1b01aa4f34b02e0482f8221846b"
     },
     {
       "path": "sprite_gen/compose/compose_atlas.py",
@@ -114,7 +114,7 @@
     {
       "path": "sprite_gen/gen/video.py",
       "upstreamSha256": "655e3abe34ff9adcac07d29a6ec167b89f1bc47f4d54bebf913d936e2f6fa8cb",
-      "forkSha256": "5e070f6040e48024a29f81d2125cfc3995d94dd5ff8a46196b141170df2266f6"
+      "forkSha256": "f4cdbcb16c08f74b69e2f96fb14ea26039825d8a90e13697fafb0e3b5f4b7ecd"
     },
     {
       "path": "sprite_gen/qa/handed.py",
@@ -129,22 +129,22 @@
     {
       "path": "sprite_gen/util/resample.py",
       "upstreamSha256": null,
-      "forkSha256": "7689e90b4bc6e8eacdd1565c759a36876c23c2efdb5d7fff80c84913afd856e9"
+      "forkSha256": "6ef1a7cbdbd7d0e53c6fd9fd8dae53bc2e98c6918ad461b1e8ae623fd803a82d"
     },
     {
       "path": "sprite_gen/video/align.py",
       "upstreamSha256": null,
-      "forkSha256": "8c5bac8826a548796b85f1d2ab0a908cb72be0261867b6b4793eb88187b09b73"
+      "forkSha256": "e8120d2b745f6326d87d72ea492c00babb455de12728543475556c8399490dcc"
     },
     {
       "path": "sprite_gen/video/auto_motion.py",
       "upstreamSha256": "8294e9b4ca734c8241e0eaf3ebc6b933bba26246c0d70ccc7f37e17cf7faabe7",
-      "forkSha256": "e3a397d33b31b974b2102a7520b1c8d69282ee7e91c9c00bfb7caab822ed3e3a"
+      "forkSha256": "547810137c87e3eef52af2be052dc49765ce118041b5008ed3c3bb6f8b9f9846"
     },
     {
       "path": "sprite_gen/video/batch.py",
       "upstreamSha256": "ed664fbb40ad655c5e031e74feb4f8d9a683993d4210d155d4dd82d56abc716a",
-      "forkSha256": "c85a49e291ec5580969e4a1b35a6a633c83a07902b7b7ddd2a9afd708a47e117"
+      "forkSha256": "158b8b9398dc0cc2d6acdcf64dcb08d02fb0ca1b8bcac25dbd4c6cde381cf3d5"
     },
     {
       "path": "sprite_gen/video/body_plan.py",
@@ -154,7 +154,7 @@
     {
       "path": "sprite_gen/video/canvas.py",
       "upstreamSha256": "386a90bc6bd71bf5cdc09172865ac8f1e7a87bb8087c9dc6f487fad788404b44",
-      "forkSha256": "2fbc5d3e836f640abcb53b9bfc317132406ae0b16887bfcba37916697183a203"
+      "forkSha256": "0b142578dd5a13c5c9eb27ae191377ab030118a3a48f804a7a85d1f5975ee31f"
     },
     {
       "path": "sprite_gen/video/clip_prompt.py",
@@ -164,17 +164,17 @@
     {
       "path": "sprite_gen/video/follow.py",
       "upstreamSha256": null,
-      "forkSha256": "e2706670bc9ac72f1500f63913162bee6e242e32fae68ad4dd70e6e460343fe8"
+      "forkSha256": "9ef9d0b957060d22d1cc41e3674c37e04140f3bff6cf66ea65feae9804ddca4a"
     },
     {
       "path": "sprite_gen/video/frames.py",
       "upstreamSha256": "6165b06ea709173bb811a3a09baaef86b6cca380da4c4a46dc2d0a0ddcc31109",
-      "forkSha256": "08143c3ba4ba74d58e8fe2380b9dccfaf01589d24c34b5ecc0a23d978a4729ce"
+      "forkSha256": "3dc46ca140f0b0e65da26291f0f9891c4051157424c9f05732a93ddc0222b7be"
     },
     {
       "path": "sprite_gen/video/gait_fallback.py",
       "upstreamSha256": null,
-      "forkSha256": "fb21af3398fd4f10a5e040798d749fef3cbe50f7bc948d587cf76f8d0f28fa8b"
+      "forkSha256": "83c34b0cc9dd076b268005cacbee4cce0362d08f25ddb16b024f512ec3ce8480"
     },
     {
       "path": "sprite_gen/video/held.py",
@@ -189,27 +189,27 @@
     {
       "path": "sprite_gen/video/local_cycle.py",
       "upstreamSha256": "24950d17a10b64060d3162002d5050d720878ce8e816209d7978cfca5d5783ce",
-      "forkSha256": "05613d9e0f5f38df22bf20046c7f09db073d8ab5b3042ca05c5614a5616a0c9e"
+      "forkSha256": "ba1884034786ec9e0be3277e8d1dea0c191d4112940064bd97d7769c66dfef1c"
     },
     {
       "path": "sprite_gen/video/loop.py",
       "upstreamSha256": "5475953492d1cb8dee53364152498f232a952b51e006591aaf404b170a147980",
-      "forkSha256": "151ee6748100b3176fde2161bce6dfceec59973c76172fd3b0d8a664bfdea22b"
+      "forkSha256": "67268900aaaa37855599ded5fb8e6ae9c7d189c7f433cf89b8be6e372494522b"
     },
     {
       "path": "sprite_gen/video/period.py",
       "upstreamSha256": null,
-      "forkSha256": "b58268527aaed1194131bf896eb79095456776ef4f32a6af0b4d40588310e0d1"
+      "forkSha256": "a5dcb02e5562e8aeaa7b6cad14a61871441d60f87375d9d2287b3c6847c21153"
     },
     {
       "path": "sprite_gen/video/repair.py",
       "upstreamSha256": null,
-      "forkSha256": "554b25cb3dbd869a7202c82c450a594953c4dcc77d2d59aac39ea3c233671f09"
+      "forkSha256": "bf73fbacb1408dec1be30d79e2b12cbfe14080908ac7503656ddb5f40450ca5b"
     },
     {
       "path": "sprite_gen/video/rife.py",
       "upstreamSha256": null,
-      "forkSha256": "d5e6edf3b0e5582a4b05fbbfba202767fa718e6b393a1a25d222c65affda6454"
+      "forkSha256": "327e2708278b2f2675c8d5b16e7b6b068cb37b1fb189534bb2f706caeb36b102"
     },
     {
       "path": "sprite_gen/video/rife_install.py",
@@ -299,12 +299,12 @@
     {
       "path": "tests/video/test_attack_headroom.py",
       "upstreamSha256": null,
-      "forkSha256": "4259abce84d29cc30a6e35df47805f77196bf94a02655a0d87c243d732ea4762"
+      "forkSha256": "057707266ecd1b12acd55146fcc87156ac8dda7fdb7e48ff1483b596a98d1587"
     },
     {
       "path": "tests/video/test_auto_motion.py",
       "upstreamSha256": "9b0c79f1564efcb481fca442eee9e5e98d9f160db976ed0a81380c71269ac661",
-      "forkSha256": "5081fcf95f0c80756f5fdcfb0c5bc1c8dd740a3b491bf23b2228c132260b3ee1"
+      "forkSha256": "6e9292f44f923d68d411842d79549dbef388472fe6369f3bb3162f5b071ea256"
     },
     {
       "path": "tests/video/test_auto_motion_uncorrected.py",
@@ -344,62 +344,62 @@
     {
       "path": "tests/video/test_cycle_align.py",
       "upstreamSha256": null,
-      "forkSha256": "64ec6f1b18c81b12a2e32792b110c867d74f51d3f322951a51e8e58f1d2f96a3"
+      "forkSha256": "29581e8a4e0fd743f1e66edd0fefa6487d10e8358cae0ae71d49c2bf58dbb670"
     },
     {
       "path": "tests/video/test_cycle_align_foot.py",
       "upstreamSha256": null,
-      "forkSha256": "68e3e2c555fceb4c5c09540048ce533ff9dc919e196b66492b05569ef9104c35"
+      "forkSha256": "a5cc913a79235c48c248276a830fd29d7374f40ed1a81ce77bbe474fc810cc00"
     },
     {
       "path": "tests/video/test_cycle_align_foot_margin.py",
       "upstreamSha256": null,
-      "forkSha256": "01089499ead6b4122abd9d0867ef35e2062caf0e943aaf9817351d9d4b6d805c"
+      "forkSha256": "b31f626d4754db31f98b73235e5e910f839ff7108700267284ea78b2fe595a89"
     },
     {
       "path": "tests/video/test_cycle_suspects.py",
       "upstreamSha256": null,
-      "forkSha256": "0e9add93d9406eaa44d9e32b477a83942b5fa3b2e573542a89433abe16649b84"
+      "forkSha256": "1fc3b4991ce9dd802066e097af20bba48d64dd1db99c8e22bfa895e51fcf73fa"
     },
     {
       "path": "tests/video/test_duration_window_oneshot.py",
       "upstreamSha256": "5292c0baa1e8555b9bf64f98850709b0c569a60300d39bd8e2f610181e02f9c9",
-      "forkSha256": "867171de6db094179f3482148bbbec3e93d7f00dcd2e49c7e14de14cb5589767"
+      "forkSha256": "112e5de4c3786dca9a7f83a44b85d8f6f0832fbc47d5aef4ba37f68f34f87cbc"
     },
     {
       "path": "tests/video/test_follow.py",
       "upstreamSha256": null,
-      "forkSha256": "61a4deb643e688443dc583b3f22f07da35ddb2c3f923986c888fb21b4c130944"
+      "forkSha256": "d60ef587621e982a112f221167cee7a9657d87d3d15b1a697af2f975d75d87d1"
     },
     {
       "path": "tests/video/test_gait_fallback.py",
       "upstreamSha256": null,
-      "forkSha256": "13722e3b387e084e0bc53946b9eb5025bf209e171f1eb29dc60978c215397464"
+      "forkSha256": "6a14c387cc52ae20b3e993d9d1542ab0be412be483911913253a1a8528e2a2af"
     },
     {
       "path": "tests/video/test_gait_fallback_resample.py",
       "upstreamSha256": null,
-      "forkSha256": "89d133918960cf6767ec93fe60ef1fc361208c538588d06a2a9500065b7da9cc"
+      "forkSha256": "040d726fac227ae79109d3c686ca4bb136c1fe60f89771bf0c768a1a63221001"
     },
     {
       "path": "tests/video/test_held_drawings.py",
       "upstreamSha256": null,
-      "forkSha256": "fc88a6e1525ad6bf0c7c7b95f9048a1e0b97c3ad2fa1360b6695ceed7def90ac"
+      "forkSha256": "633711f02802305b9596a1dc9bad3106aa2663e47eef1a029752a2d03a4a5497"
     },
     {
       "path": "tests/video/test_loop_repair.py",
       "upstreamSha256": null,
-      "forkSha256": "db3fbd4d3d6fce5d16c18a5453e0364bbea1ad35e540f0366698738c5e03d4d1"
+      "forkSha256": "aef5cbde94d25125f1aa8ca81b34d47daeed248182f0a7a218d7ba132346d24a"
     },
     {
       "path": "tests/video/test_motion_anchor.py",
       "upstreamSha256": "4cdd5ffe55bf8fc29eb00e600dd073b1ea0021da090ab9cbe7918ef45a357586",
-      "forkSha256": "dac4c6d7f9411d079989cb7329cf7d39af0ecb873a02ec6257cf4366c83a9033"
+      "forkSha256": "edc99eab87552d83b3325b3732649bcb8808549ca4d705b6d3d263de4515bc5a"
     },
     {
       "path": "tests/video/test_rife.py",
       "upstreamSha256": null,
-      "forkSha256": "ba8b39feb5680b6366357a86a8e337af2df437ceaccdac461b72afd0ca6f3286"
+      "forkSha256": "004185b988cd57a25352398ccec96fb685e665c5bac62f7d9b0d11d1dcffe36c"
     },
     {
       "path": "tests/video/test_rife_install.py",
@@ -409,17 +409,227 @@
     {
       "path": "tests/video/test_strip_resample.py",
       "upstreamSha256": null,
-      "forkSha256": "0c17678ed3f3efa12a91de75d4e32263861c3cd307f98baecbe1b20451d2f176"
+      "forkSha256": "6585da2db5c38de7548b7167a327bb5e1f21f472e09cd15dfc4ebee986e6873d"
     },
     {
       "path": "tests/video/test_video_pipeline.py",
       "upstreamSha256": "0a77949a54dc6827548e236fa61eb5f105339149376135be8e46b038f5881ea2",
-      "forkSha256": "ca917141b198d9c7a96d6776c62cbc0ad239ad58c1ae55cad29526f20952abcc"
+      "forkSha256": "473336367cc7726da315f5c36af76fba947796fd4f2df8422d8b148f0f448129"
     },
     {
       "path": "tests/video/test_walk_defaults.py",
       "upstreamSha256": null,
       "forkSha256": "8323273f324f44c229655cdb0964e1487c9ef1030f44f3177a678695a946867a"
+    },
+    {
+      "path": "sprite_gen/gen/xai.py",
+      "upstreamSha256": "e4b9c32eddbae0d2e6bf1bc01195bf9457d6bfc5461d72c452f43e1166232d70",
+      "forkSha256": "cbaa8edabe5379abb85dcd15b64302263fbf711f7e2cfe063c149043223e4228"
+    },
+    {
+      "path": "sprite_gen/util/cli_kwargs.py",
+      "upstreamSha256": "81c0cf6d1e39c15fc794ff7c739ad0cc652d446223188111d4e384be22fd9afa",
+      "forkSha256": "81c0cf6d1e39c15fc794ff7c739ad0cc652d446223188111d4e384be22fd9afa"
+    },
+    {
+      "path": "sprite_gen/util/gif_utils.py",
+      "upstreamSha256": "f27f42ccd753421a7cd116bf1cc479f08e9c86e225d366a7a24ff718a65fdf5f",
+      "forkSha256": "f27f42ccd753421a7cd116bf1cc479f08e9c86e225d366a7a24ff718a65fdf5f"
+    },
+    {
+      "path": "sprite_gen/util/lsq.py",
+      "upstreamSha256": "941249e8d421bbf522cf1909e8fd5b7f9551bb9285e8a0fc9e1b43c268e7b059",
+      "forkSha256": "941249e8d421bbf522cf1909e8fd5b7f9551bb9285e8a0fc9e1b43c268e7b059"
+    },
+    {
+      "path": "sprite_gen/video/crossings.py",
+      "upstreamSha256": "21ac803d71f4ae00d440322e3159f7dbf53ede5628fa834247c994c5c44b4b3e",
+      "forkSha256": "21ac803d71f4ae00d440322e3159f7dbf53ede5628fa834247c994c5c44b4b3e"
+    },
+    {
+      "path": "sprite_gen/video/effect.py",
+      "upstreamSha256": "0c1daf3d4855f1774548f294808a29ad74b1af42f4e136331e9db6271e9e5283",
+      "forkSha256": "0c1daf3d4855f1774548f294808a29ad74b1af42f4e136331e9db6271e9e5283"
+    },
+    {
+      "path": "sprite_gen/video/evidence.py",
+      "upstreamSha256": "f4c1109db02974fc83551c147581fbfb8d67d170c1f70066e4119365509a4c9d",
+      "forkSha256": "f4c1109db02974fc83551c147581fbfb8d67d170c1f70066e4119365509a4c9d"
+    },
+    {
+      "path": "sprite_gen/video/interpolation_quality.py",
+      "upstreamSha256": "2e5952355543d5dad3753a830aa516ce30cf762cb9aba4d647e325832f6ae252",
+      "forkSha256": "2e5952355543d5dad3753a830aa516ce30cf762cb9aba4d647e325832f6ae252"
+    },
+    {
+      "path": "sprite_gen/video/motion_anchor.py",
+      "upstreamSha256": "bd1e3de7c43dfcb8ab7883a64d6a7df5596124ad701edc8f3e5c77000393f858",
+      "forkSha256": "bd1e3de7c43dfcb8ab7883a64d6a7df5596124ad701edc8f3e5c77000393f858"
+    },
+    {
+      "path": "sprite_gen/video/nonloop.py",
+      "upstreamSha256": "752cd7614bfb65143402f77ae224c3c5852de02bf61b9960ed443202a8bfc20f",
+      "forkSha256": "752cd7614bfb65143402f77ae224c3c5852de02bf61b9960ed443202a8bfc20f"
+    },
+    {
+      "path": "sprite_gen/video/source.py",
+      "upstreamSha256": "03c317d35d822284cc12a15c9849a65011e6b3aacb1d3690e596d15f685e73a5",
+      "forkSha256": "03c317d35d822284cc12a15c9849a65011e6b3aacb1d3690e596d15f685e73a5"
+    },
+    {
+      "path": "tests/conftest.py",
+      "upstreamSha256": "23f1b923a78c8ab3045b8a95dcd06351313edf3deff61bf90fa46fac868927f5",
+      "forkSha256": "23f1b923a78c8ab3045b8a95dcd06351313edf3deff61bf90fa46fac868927f5"
+    },
+    {
+      "path": "tests/test_lsq.py",
+      "upstreamSha256": "ef0a539a58656ee12c73ff8f994cb9d1c0315e44c0f3a7dd71c5ff318ce9db7b",
+      "forkSha256": "ef0a539a58656ee12c73ff8f994cb9d1c0315e44c0f3a7dd71c5ff318ce9db7b"
+    },
+    {
+      "path": "tests/util/test_gif_utils.py",
+      "upstreamSha256": "ed9d11af81530fc20011842c837cf2b396156e912650164d2dd85754a290dd33",
+      "forkSha256": "ed9d11af81530fc20011842c837cf2b396156e912650164d2dd85754a290dd33"
+    },
+    {
+      "path": "tests/video/test_between_cache.py",
+      "upstreamSha256": "27e6828bdad419fae8e6296d4247f130301f15d4ded0b170ffe09f47251c45d6",
+      "forkSha256": "27e6828bdad419fae8e6296d4247f130301f15d4ded0b170ffe09f47251c45d6"
+    },
+    {
+      "path": "tests/video/test_body_anchor_gate.py",
+      "upstreamSha256": "a583243221d3985e1abda99da7c800fa10218b97cdf2bc7f4dbf2ff94e10836c",
+      "forkSha256": "a583243221d3985e1abda99da7c800fa10218b97cdf2bc7f4dbf2ff94e10836c"
+    },
+    {
+      "path": "tests/video/test_crossfade.py",
+      "upstreamSha256": "d227c0f3b8ad23ea8ea5b738d01f9d0aba6344e1ad363779dc012ea604523e3b",
+      "forkSha256": "d227c0f3b8ad23ea8ea5b738d01f9d0aba6344e1ad363779dc012ea604523e3b"
+    },
+    {
+      "path": "tests/video/test_crossings.py",
+      "upstreamSha256": "64a73ec44f0b80cf0398f2d77c4de14768a7533b617867098496780ffa65744e",
+      "forkSha256": "64a73ec44f0b80cf0398f2d77c4de14768a7533b617867098496780ffa65744e"
+    },
+    {
+      "path": "tests/video/test_edge_speck_lead_in.py",
+      "upstreamSha256": "e8a165104fee04eaed9ad313c65b770a7fe3b9005d33f3184f0ba87fddae1fe3",
+      "forkSha256": "e8a165104fee04eaed9ad313c65b770a7fe3b9005d33f3184f0ba87fddae1fe3"
+    },
+    {
+      "path": "tests/video/test_explicit_window.py",
+      "upstreamSha256": "4e6cfa7666d1b3d3d6f3e1bdcb6802f4472cf5876a3bba8a836fd51c7916ec54",
+      "forkSha256": "4e6cfa7666d1b3d3d6f3e1bdcb6802f4472cf5876a3bba8a836fd51c7916ec54"
+    },
+    {
+      "path": "tests/video/test_gait_guard_anchor_wide.py",
+      "upstreamSha256": "4d5543d2b2c38f039c498a67bba53b1464b33ee4efffcac9a867bd695c3cf7e1",
+      "forkSha256": "47d5c5cd843f7b32876b703a9a68520de49a9d17b73a6a91ededcebe6e56bac1"
+    },
+    {
+      "path": "tests/video/test_gait_harmonic_ambiguity.py",
+      "upstreamSha256": "0f82564b32723df0dcc331c07d2012c791c16e0ce291453a0c9355a42728dd66",
+      "forkSha256": "0f82564b32723df0dcc331c07d2012c791c16e0ce291453a0c9355a42728dd66"
+    },
+    {
+      "path": "tests/video/test_ghost_retake.py",
+      "upstreamSha256": "d1af125a8a2707a090f362b54712f9bf8c0bc8aed47a716c3846fbfd462212e2",
+      "forkSha256": "d1af125a8a2707a090f362b54712f9bf8c0bc8aed47a716c3846fbfd462212e2"
+    },
+    {
+      "path": "tests/video/test_ghost_screen.py",
+      "upstreamSha256": "74ca3ba15bfa4d0ef9e503c0d975b5c2c0e423e9f607121ecfc9d15f58a97aa8",
+      "forkSha256": "74ca3ba15bfa4d0ef9e503c0d975b5c2c0e423e9f607121ecfc9d15f58a97aa8"
+    },
+    {
+      "path": "tests/video/test_idle_still.py",
+      "upstreamSha256": "fb68c7c49e64ada56d25acf1bf05b51192529faf49de98a745fd78d780f1a1e4",
+      "forkSha256": "8ee26638200f581fec9195faa68d62699786d2dcfc8c4c9898ef03158d5a6c5b"
+    },
+    {
+      "path": "tests/video/test_loop_ease.py",
+      "upstreamSha256": "c916ed64f1c2c80b708535a07863ed129b1a0c5ba99bfb6f09566f1fff8dd02c",
+      "forkSha256": "c916ed64f1c2c80b708535a07863ed129b1a0c5ba99bfb6f09566f1fff8dd02c"
+    },
+    {
+      "path": "tests/video/test_loop_flow.py",
+      "upstreamSha256": "e9b0b2af17d3b668e55ae60e26cb6952bea82c08804f75ed0aaab82793d1d547",
+      "forkSha256": "e9b0b2af17d3b668e55ae60e26cb6952bea82c08804f75ed0aaab82793d1d547"
+    },
+    {
+      "path": "tests/video/test_loop_overlap.py",
+      "upstreamSha256": "3ec01ac264c5d53292f894a667dbb90e0ff74a35ef80967d5671d416ee1801d6",
+      "forkSha256": "3ec01ac264c5d53292f894a667dbb90e0ff74a35ef80967d5671d416ee1801d6"
+    },
+    {
+      "path": "tests/video/test_loop_prop_seam.py",
+      "upstreamSha256": "eb3a1823ee169af9f670432dd2201bda69a9a60e056c090edfcfc70ca00de893",
+      "forkSha256": "eb3a1823ee169af9f670432dd2201bda69a9a60e056c090edfcfc70ca00de893"
+    },
+    {
+      "path": "tests/video/test_loop_prop_seam_held.py",
+      "upstreamSha256": "3707b6f7ca9aaa8620d880ab887312f8efdbaed66edc23725b246cfd7d5ccd16",
+      "forkSha256": "3707b6f7ca9aaa8620d880ab887312f8efdbaed66edc23725b246cfd7d5ccd16"
+    },
+    {
+      "path": "tests/video/test_one_step_cut.py",
+      "upstreamSha256": "fb0685a92a6451fe600b77767a0f510a8a56851cb803737b0898b602a1ae2036",
+      "forkSha256": "fb0685a92a6451fe600b77767a0f510a8a56851cb803737b0898b602a1ae2036"
+    },
+    {
+      "path": "tests/video/test_outline_shift.py",
+      "upstreamSha256": "447987b644171bfae4d6ebbf4948f82e8339ec123ddf70a4c7b1af870f27af5a",
+      "forkSha256": "447987b644171bfae4d6ebbf4948f82e8339ec123ddf70a4c7b1af870f27af5a"
+    },
+    {
+      "path": "tests/video/test_walk_steps.py",
+      "upstreamSha256": "18d4611929901828707fea6fafcce93a566bf59807b60f1c5cd0460558abb90c",
+      "forkSha256": "18d4611929901828707fea6fafcce93a566bf59807b60f1c5cd0460558abb90c"
+    },
+    {
+      "path": "sprite_gen/video/compare.py",
+      "upstreamSha256": "60a1a80dc52542378b612c08b43c099af287bbdc9793ff5c9db00672a51ceacd",
+      "forkSha256": "60a1a80dc52542378b612c08b43c099af287bbdc9793ff5c9db00672a51ceacd"
+    },
+    {
+      "path": "sprite_gen/video/follow_inspect.py",
+      "upstreamSha256": "96c3f5f2b29e8ab22b21a339fdac1960fbadc87502de3ec2aa182d467c71638d",
+      "forkSha256": "96c3f5f2b29e8ab22b21a339fdac1960fbadc87502de3ec2aa182d467c71638d"
+    },
+    {
+      "path": "sprite_gen/video/playback.py",
+      "upstreamSha256": "4d44978d27e657854c63da04faab076a37e49f8e26a03ed18bc33babc6409e04",
+      "forkSha256": "4d44978d27e657854c63da04faab076a37e49f8e26a03ed18bc33babc6409e04"
+    },
+    {
+      "path": "sprite_gen/video/restoration.py",
+      "upstreamSha256": "2d4d25c9077b45ff3016ca19c7145a2445f3dc4e65dfe8c87f5be277ff8906f2",
+      "forkSha256": "2d4d25c9077b45ff3016ca19c7145a2445f3dc4e65dfe8c87f5be277ff8906f2"
+    },
+    {
+      "path": "tests/video/test_follow_inspect.py",
+      "upstreamSha256": "ec2f78a760dbca4093d39126f1d6166501cdeed3b4f3f7e12a0bfed4b04605f8",
+      "forkSha256": "ec2f78a760dbca4093d39126f1d6166501cdeed3b4f3f7e12a0bfed4b04605f8"
+    },
+    {
+      "path": "tests/video/test_follow_read_on.py",
+      "upstreamSha256": "e15145f69644c9198d41ebadafd8c9bce9309cd119dce3c1996263318ce27e2d",
+      "forkSha256": "e15145f69644c9198d41ebadafd8c9bce9309cd119dce3c1996263318ce27e2d"
+    },
+    {
+      "path": "tests/video/test_follow_stretch_floor.py",
+      "upstreamSha256": "12a0f7d458eb72e7495cf050248f94595ccb8444d132b0227083297f781d4551",
+      "forkSha256": "12a0f7d458eb72e7495cf050248f94595ccb8444d132b0227083297f781d4551"
+    },
+    {
+      "path": "tests/video/test_loop_compare.py",
+      "upstreamSha256": "c8d9dcdb9f603a036617ff6bd1b1c840d80ed80e32fabe2c6f577a262e76b9d3",
+      "forkSha256": "c8d9dcdb9f603a036617ff6bd1b1c840d80ed80e32fabe2c6f577a262e76b9d3"
+    },
+    {
+      "path": "tests/video/test_source_restoration.py",
+      "upstreamSha256": "ecfed29168ac75282ef28813da7ffeb60699c12245e021c545a1a07b21071762",
+      "forkSha256": "ecfed29168ac75282ef28813da7ffeb60699c12245e021c545a1a07b21071762"
     }
   ],
   "environment": {
@@ -1031,5 +1241,478 @@
       "purpose": "lossless-alpha engine WebP export regression verification"
     }
   },
-  "qualityVersion": "2.34.0"
+  "qualityVersion": "2.34.0",
+  "localAdaptations": [
+    {
+      "milestone": "M1",
+      "date": "2026-10-22",
+      "files": [
+        {
+          "path": "sprite_gen/gen/video.py",
+          "beforeSha256": "5e070f6040e48024a29f81d2125cfc3995d94dd5ff8a46196b141170df2266f6",
+          "forkSha256": "f4cdbcb16c08f74b69e2f96fb14ea26039825d8a90e13697fafb0e3b5f4b7ecd"
+        },
+        {
+          "path": "sprite_gen/gen/xai.py",
+          "beforeSha256": "e4b9c32eddbae0d2e6bf1bc01195bf9457d6bfc5461d72c452f43e1166232d70",
+          "forkSha256": "cbaa8edabe5379abb85dcd15b64302263fbf711f7e2cfe063c149043223e4228"
+        }
+      ],
+      "reason": "App-only absolute socket receive deadline for JSON/download, shared bearer download budget and durable attempt callback; no POST retry or provider fallback. Exclusive fsynced MP4 temporary publication preserves originals and rejects output symlinks."
+    },
+    {
+      "milestone": "M2",
+      "upstreamCommit": "59b2738a2e76ed7043d9691a230396ed6374a336",
+      "scope": "video loop/repair/interpolation dependency bundle; base and other user features unchanged",
+      "files": [
+        {
+          "path": "sprite_gen/util/cli_kwargs.py",
+          "beforeSha256": null,
+          "upstreamSha256": "81c0cf6d1e39c15fc794ff7c739ad0cc652d446223188111d4e384be22fd9afa",
+          "forkSha256": "81c0cf6d1e39c15fc794ff7c739ad0cc652d446223188111d4e384be22fd9afa"
+        },
+        {
+          "path": "sprite_gen/util/gif_utils.py",
+          "beforeSha256": "e4909495235358d006559c5a49dd32e75a722bd95b7125e2c039ba6a4a779f53",
+          "upstreamSha256": "f27f42ccd753421a7cd116bf1cc479f08e9c86e225d366a7a24ff718a65fdf5f",
+          "forkSha256": "f27f42ccd753421a7cd116bf1cc479f08e9c86e225d366a7a24ff718a65fdf5f"
+        },
+        {
+          "path": "sprite_gen/util/lsq.py",
+          "beforeSha256": null,
+          "upstreamSha256": "941249e8d421bbf522cf1909e8fd5b7f9551bb9285e8a0fc9e1b43c268e7b059",
+          "forkSha256": "941249e8d421bbf522cf1909e8fd5b7f9551bb9285e8a0fc9e1b43c268e7b059"
+        },
+        {
+          "path": "sprite_gen/util/resample.py",
+          "beforeSha256": "7689e90b4bc6e8eacdd1565c759a36876c23c2efdb5d7fff80c84913afd856e9",
+          "upstreamSha256": "6ef1a7cbdbd7d0e53c6fd9fd8dae53bc2e98c6918ad461b1e8ae623fd803a82d",
+          "forkSha256": "6ef1a7cbdbd7d0e53c6fd9fd8dae53bc2e98c6918ad461b1e8ae623fd803a82d"
+        },
+        {
+          "path": "sprite_gen/video/align.py",
+          "beforeSha256": "8c5bac8826a548796b85f1d2ab0a908cb72be0261867b6b4793eb88187b09b73",
+          "upstreamSha256": "e8120d2b745f6326d87d72ea492c00babb455de12728543475556c8399490dcc",
+          "forkSha256": "e8120d2b745f6326d87d72ea492c00babb455de12728543475556c8399490dcc"
+        },
+        {
+          "path": "sprite_gen/video/auto_motion.py",
+          "beforeSha256": "e3a397d33b31b974b2102a7520b1c8d69282ee7e91c9c00bfb7caab822ed3e3a",
+          "upstreamSha256": "547810137c87e3eef52af2be052dc49765ce118041b5008ed3c3bb6f8b9f9846",
+          "forkSha256": "547810137c87e3eef52af2be052dc49765ce118041b5008ed3c3bb6f8b9f9846"
+        },
+        {
+          "path": "sprite_gen/video/batch.py",
+          "beforeSha256": "c85a49e291ec5580969e4a1b35a6a633c83a07902b7b7ddd2a9afd708a47e117",
+          "upstreamSha256": "4ff847b0808ce403567a2df895688494684e1df4caf6709a5e0d1731cb10d92e",
+          "forkSha256": "158b8b9398dc0cc2d6acdcf64dcb08d02fb0ca1b8bcac25dbd4c6cde381cf3d5"
+        },
+        {
+          "path": "sprite_gen/video/canvas.py",
+          "beforeSha256": "2fbc5d3e836f640abcb53b9bfc317132406ae0b16887bfcba37916697183a203",
+          "upstreamSha256": "a090915cae3d779908a274631c1186ea2af1baa3273e0074d4ef4b3461ac9ad9",
+          "forkSha256": "0b142578dd5a13c5c9eb27ae191377ab030118a3a48f804a7a85d1f5975ee31f"
+        },
+        {
+          "path": "sprite_gen/video/crossings.py",
+          "beforeSha256": null,
+          "upstreamSha256": "21ac803d71f4ae00d440322e3159f7dbf53ede5628fa834247c994c5c44b4b3e",
+          "forkSha256": "21ac803d71f4ae00d440322e3159f7dbf53ede5628fa834247c994c5c44b4b3e"
+        },
+        {
+          "path": "sprite_gen/video/effect.py",
+          "beforeSha256": null,
+          "upstreamSha256": "0c1daf3d4855f1774548f294808a29ad74b1af42f4e136331e9db6271e9e5283",
+          "forkSha256": "0c1daf3d4855f1774548f294808a29ad74b1af42f4e136331e9db6271e9e5283"
+        },
+        {
+          "path": "sprite_gen/video/evidence.py",
+          "beforeSha256": null,
+          "upstreamSha256": "f4c1109db02974fc83551c147581fbfb8d67d170c1f70066e4119365509a4c9d",
+          "forkSha256": "f4c1109db02974fc83551c147581fbfb8d67d170c1f70066e4119365509a4c9d"
+        },
+        {
+          "path": "sprite_gen/video/follow.py",
+          "beforeSha256": "e2706670bc9ac72f1500f63913162bee6e242e32fae68ad4dd70e6e460343fe8",
+          "upstreamSha256": "9ef9d0b957060d22d1cc41e3674c37e04140f3bff6cf66ea65feae9804ddca4a",
+          "forkSha256": "66977cd5afd001a67a2ca1b49a412b499665538fca9bae96ea1b629a87416862"
+        },
+        {
+          "path": "sprite_gen/video/frames.py",
+          "beforeSha256": "08143c3ba4ba74d58e8fe2380b9dccfaf01589d24c34b5ecc0a23d978a4729ce",
+          "upstreamSha256": "3dc46ca140f0b0e65da26291f0f9891c4051157424c9f05732a93ddc0222b7be",
+          "forkSha256": "3dc46ca140f0b0e65da26291f0f9891c4051157424c9f05732a93ddc0222b7be"
+        },
+        {
+          "path": "sprite_gen/video/gait_fallback.py",
+          "beforeSha256": "fb21af3398fd4f10a5e040798d749fef3cbe50f7bc948d587cf76f8d0f28fa8b",
+          "upstreamSha256": "83c34b0cc9dd076b268005cacbee4cce0362d08f25ddb16b024f512ec3ce8480",
+          "forkSha256": "83c34b0cc9dd076b268005cacbee4cce0362d08f25ddb16b024f512ec3ce8480"
+        },
+        {
+          "path": "sprite_gen/video/interpolation_quality.py",
+          "beforeSha256": null,
+          "upstreamSha256": "2e5952355543d5dad3753a830aa516ce30cf762cb9aba4d647e325832f6ae252",
+          "forkSha256": "2e5952355543d5dad3753a830aa516ce30cf762cb9aba4d647e325832f6ae252"
+        },
+        {
+          "path": "sprite_gen/video/local_cycle.py",
+          "beforeSha256": "05613d9e0f5f38df22bf20046c7f09db073d8ab5b3042ca05c5614a5616a0c9e",
+          "upstreamSha256": "ba1884034786ec9e0be3277e8d1dea0c191d4112940064bd97d7769c66dfef1c",
+          "forkSha256": "ba1884034786ec9e0be3277e8d1dea0c191d4112940064bd97d7769c66dfef1c"
+        },
+        {
+          "path": "sprite_gen/video/loop.py",
+          "beforeSha256": "151ee6748100b3176fde2161bce6dfceec59973c76172fd3b0d8a664bfdea22b",
+          "upstreamSha256": "67268900aaaa37855599ded5fb8e6ae9c7d189c7f433cf89b8be6e372494522b",
+          "forkSha256": "67268900aaaa37855599ded5fb8e6ae9c7d189c7f433cf89b8be6e372494522b"
+        },
+        {
+          "path": "sprite_gen/video/motion_anchor.py",
+          "beforeSha256": "300ff17217c3f2420c04a03f04b2927720e164a8ea679eb5a1b6e8d39eb4b0e7",
+          "upstreamSha256": "bd1e3de7c43dfcb8ab7883a64d6a7df5596124ad701edc8f3e5c77000393f858",
+          "forkSha256": "bd1e3de7c43dfcb8ab7883a64d6a7df5596124ad701edc8f3e5c77000393f858"
+        },
+        {
+          "path": "sprite_gen/video/nonloop.py",
+          "beforeSha256": null,
+          "upstreamSha256": "752cd7614bfb65143402f77ae224c3c5852de02bf61b9960ed443202a8bfc20f",
+          "forkSha256": "752cd7614bfb65143402f77ae224c3c5852de02bf61b9960ed443202a8bfc20f"
+        },
+        {
+          "path": "sprite_gen/video/period.py",
+          "beforeSha256": "b58268527aaed1194131bf896eb79095456776ef4f32a6af0b4d40588310e0d1",
+          "upstreamSha256": "a5dcb02e5562e8aeaa7b6cad14a61871441d60f87375d9d2287b3c6847c21153",
+          "forkSha256": "a5dcb02e5562e8aeaa7b6cad14a61871441d60f87375d9d2287b3c6847c21153"
+        },
+        {
+          "path": "sprite_gen/video/repair.py",
+          "beforeSha256": "554b25cb3dbd869a7202c82c450a594953c4dcc77d2d59aac39ea3c233671f09",
+          "upstreamSha256": "68c4a51ad8a1ea391eaec758e4bf87b2c6db9a1519738bc380841507c32adcc2",
+          "forkSha256": "bf73fbacb1408dec1be30d79e2b12cbfe14080908ac7503656ddb5f40450ca5b"
+        },
+        {
+          "path": "sprite_gen/video/rife.py",
+          "beforeSha256": "d5e6edf3b0e5582a4b05fbbfba202767fa718e6b393a1a25d222c65affda6454",
+          "upstreamSha256": "15bc3ad01d073d3949d282ac40ee66d097d4e4c28b8dbec2a13d7ae78cf76292",
+          "forkSha256": "327e2708278b2f2675c8d5b16e7b6b068cb37b1fb189534bb2f706caeb36b102"
+        },
+        {
+          "path": "sprite_gen/video/source.py",
+          "beforeSha256": null,
+          "upstreamSha256": "03c317d35d822284cc12a15c9849a65011e6b3aacb1d3690e596d15f685e73a5",
+          "forkSha256": "03c317d35d822284cc12a15c9849a65011e6b3aacb1d3690e596d15f685e73a5"
+        },
+        {
+          "path": "tests/conftest.py",
+          "beforeSha256": "3e1bbf6049b5b3ff70b782c4f1f4db2e519dc827e27f7ce032b552234924f51b",
+          "upstreamSha256": "23f1b923a78c8ab3045b8a95dcd06351313edf3deff61bf90fa46fac868927f5",
+          "forkSha256": "23f1b923a78c8ab3045b8a95dcd06351313edf3deff61bf90fa46fac868927f5"
+        },
+        {
+          "path": "tests/test_lsq.py",
+          "beforeSha256": null,
+          "upstreamSha256": "ef0a539a58656ee12c73ff8f994cb9d1c0315e44c0f3a7dd71c5ff318ce9db7b",
+          "forkSha256": "ef0a539a58656ee12c73ff8f994cb9d1c0315e44c0f3a7dd71c5ff318ce9db7b"
+        },
+        {
+          "path": "tests/util/test_gif_utils.py",
+          "beforeSha256": null,
+          "upstreamSha256": "ed9d11af81530fc20011842c837cf2b396156e912650164d2dd85754a290dd33",
+          "forkSha256": "ed9d11af81530fc20011842c837cf2b396156e912650164d2dd85754a290dd33"
+        },
+        {
+          "path": "tests/video/test_attack_headroom.py",
+          "beforeSha256": "4259abce84d29cc30a6e35df47805f77196bf94a02655a0d87c243d732ea4762",
+          "upstreamSha256": "85e15df3c924eb6f2a03bf4027ffe671a301f90d0cee9c38175d7e47ff3edeca",
+          "forkSha256": "057707266ecd1b12acd55146fcc87156ac8dda7fdb7e48ff1483b596a98d1587"
+        },
+        {
+          "path": "tests/video/test_auto_motion.py",
+          "beforeSha256": "5081fcf95f0c80756f5fdcfb0c5bc1c8dd740a3b491bf23b2228c132260b3ee1",
+          "upstreamSha256": "6e9292f44f923d68d411842d79549dbef388472fe6369f3bb3162f5b071ea256",
+          "forkSha256": "6e9292f44f923d68d411842d79549dbef388472fe6369f3bb3162f5b071ea256"
+        },
+        {
+          "path": "tests/video/test_between_cache.py",
+          "beforeSha256": null,
+          "upstreamSha256": "27e6828bdad419fae8e6296d4247f130301f15d4ded0b170ffe09f47251c45d6",
+          "forkSha256": "27e6828bdad419fae8e6296d4247f130301f15d4ded0b170ffe09f47251c45d6"
+        },
+        {
+          "path": "tests/video/test_body_anchor_gate.py",
+          "beforeSha256": null,
+          "upstreamSha256": "a583243221d3985e1abda99da7c800fa10218b97cdf2bc7f4dbf2ff94e10836c",
+          "forkSha256": "a583243221d3985e1abda99da7c800fa10218b97cdf2bc7f4dbf2ff94e10836c"
+        },
+        {
+          "path": "tests/video/test_crossfade.py",
+          "beforeSha256": null,
+          "upstreamSha256": "d227c0f3b8ad23ea8ea5b738d01f9d0aba6344e1ad363779dc012ea604523e3b",
+          "forkSha256": "d227c0f3b8ad23ea8ea5b738d01f9d0aba6344e1ad363779dc012ea604523e3b"
+        },
+        {
+          "path": "tests/video/test_crossings.py",
+          "beforeSha256": null,
+          "upstreamSha256": "64a73ec44f0b80cf0398f2d77c4de14768a7533b617867098496780ffa65744e",
+          "forkSha256": "64a73ec44f0b80cf0398f2d77c4de14768a7533b617867098496780ffa65744e"
+        },
+        {
+          "path": "tests/video/test_cycle_align.py",
+          "beforeSha256": "64ec6f1b18c81b12a2e32792b110c867d74f51d3f322951a51e8e58f1d2f96a3",
+          "upstreamSha256": "fd2e98da1038e1f963bd0a64468c90c05d4f49e4f8c113decc72b988724c3708",
+          "forkSha256": "29581e8a4e0fd743f1e66edd0fefa6487d10e8358cae0ae71d49c2bf58dbb670"
+        },
+        {
+          "path": "tests/video/test_cycle_align_foot.py",
+          "beforeSha256": "68e3e2c555fceb4c5c09540048ce533ff9dc919e196b66492b05569ef9104c35",
+          "upstreamSha256": "a5cc913a79235c48c248276a830fd29d7374f40ed1a81ce77bbe474fc810cc00",
+          "forkSha256": "a5cc913a79235c48c248276a830fd29d7374f40ed1a81ce77bbe474fc810cc00"
+        },
+        {
+          "path": "tests/video/test_cycle_align_foot_margin.py",
+          "beforeSha256": "01089499ead6b4122abd9d0867ef35e2062caf0e943aaf9817351d9d4b6d805c",
+          "upstreamSha256": "969fae502009016e21490fe8b6785a15245a97e75c76999a67dbdafc0d5855fc",
+          "forkSha256": "b31f626d4754db31f98b73235e5e910f839ff7108700267284ea78b2fe595a89"
+        },
+        {
+          "path": "tests/video/test_cycle_suspects.py",
+          "beforeSha256": "0e9add93d9406eaa44d9e32b477a83942b5fa3b2e573542a89433abe16649b84",
+          "upstreamSha256": "4de77fc1f64c605d602ef7342df4aa907821beb608e59c948c1a9dc976c25ae7",
+          "forkSha256": "1fc3b4991ce9dd802066e097af20bba48d64dd1db99c8e22bfa895e51fcf73fa"
+        },
+        {
+          "path": "tests/video/test_duration_window_oneshot.py",
+          "beforeSha256": "867171de6db094179f3482148bbbec3e93d7f00dcd2e49c7e14de14cb5589767",
+          "upstreamSha256": "ba2986acec1d7ea795d329d5a498cb0bf08367cdc9aefb42e50d9b895c1dbf43",
+          "forkSha256": "112e5de4c3786dca9a7f83a44b85d8f6f0832fbc47d5aef4ba37f68f34f87cbc"
+        },
+        {
+          "path": "tests/video/test_edge_speck_lead_in.py",
+          "beforeSha256": null,
+          "upstreamSha256": "e8a165104fee04eaed9ad313c65b770a7fe3b9005d33f3184f0ba87fddae1fe3",
+          "forkSha256": "e8a165104fee04eaed9ad313c65b770a7fe3b9005d33f3184f0ba87fddae1fe3"
+        },
+        {
+          "path": "tests/video/test_explicit_window.py",
+          "beforeSha256": null,
+          "upstreamSha256": "4e6cfa7666d1b3d3d6f3e1bdcb6802f4472cf5876a3bba8a836fd51c7916ec54",
+          "forkSha256": "4e6cfa7666d1b3d3d6f3e1bdcb6802f4472cf5876a3bba8a836fd51c7916ec54"
+        },
+        {
+          "path": "tests/video/test_gait_fallback.py",
+          "beforeSha256": "13722e3b387e084e0bc53946b9eb5025bf209e171f1eb29dc60978c215397464",
+          "upstreamSha256": "a70b98827a77b39af6b9b8f3a12532f96614cf6895def46ee7bd6225759a00c4",
+          "forkSha256": "6a14c387cc52ae20b3e993d9d1542ab0be412be483911913253a1a8528e2a2af"
+        },
+        {
+          "path": "tests/video/test_gait_fallback_resample.py",
+          "beforeSha256": "89d133918960cf6767ec93fe60ef1fc361208c538588d06a2a9500065b7da9cc",
+          "upstreamSha256": "040d726fac227ae79109d3c686ca4bb136c1fe60f89771bf0c768a1a63221001",
+          "forkSha256": "040d726fac227ae79109d3c686ca4bb136c1fe60f89771bf0c768a1a63221001"
+        },
+        {
+          "path": "tests/video/test_gait_guard_anchor_wide.py",
+          "beforeSha256": "35fd14138849a6b4d0f3a8d9f3892eadb56ed35da8978eddc2cc4d0b71355a51",
+          "upstreamSha256": "4d5543d2b2c38f039c498a67bba53b1464b33ee4efffcac9a867bd695c3cf7e1",
+          "forkSha256": "47d5c5cd843f7b32876b703a9a68520de49a9d17b73a6a91ededcebe6e56bac1"
+        },
+        {
+          "path": "tests/video/test_gait_harmonic_ambiguity.py",
+          "beforeSha256": "b4f5104328b11a2cc664f4e135856756d026b4325c909a70a226fc862a1aeda2",
+          "upstreamSha256": "0f82564b32723df0dcc331c07d2012c791c16e0ce291453a0c9355a42728dd66",
+          "forkSha256": "0f82564b32723df0dcc331c07d2012c791c16e0ce291453a0c9355a42728dd66"
+        },
+        {
+          "path": "tests/video/test_ghost_retake.py",
+          "beforeSha256": null,
+          "upstreamSha256": "d1af125a8a2707a090f362b54712f9bf8c0bc8aed47a716c3846fbfd462212e2",
+          "forkSha256": "d1af125a8a2707a090f362b54712f9bf8c0bc8aed47a716c3846fbfd462212e2"
+        },
+        {
+          "path": "tests/video/test_ghost_screen.py",
+          "beforeSha256": null,
+          "upstreamSha256": "74ca3ba15bfa4d0ef9e503c0d975b5c2c0e423e9f607121ecfc9d15f58a97aa8",
+          "forkSha256": "74ca3ba15bfa4d0ef9e503c0d975b5c2c0e423e9f607121ecfc9d15f58a97aa8"
+        },
+        {
+          "path": "tests/video/test_held_drawings.py",
+          "beforeSha256": "fc88a6e1525ad6bf0c7c7b95f9048a1e0b97c3ad2fa1360b6695ceed7def90ac",
+          "upstreamSha256": "633711f02802305b9596a1dc9bad3106aa2663e47eef1a029752a2d03a4a5497",
+          "forkSha256": "633711f02802305b9596a1dc9bad3106aa2663e47eef1a029752a2d03a4a5497"
+        },
+        {
+          "path": "tests/video/test_idle_still.py",
+          "beforeSha256": "37a6f631aeff926bf2c3fd6cfb0eadffec7b016bcb7068c142d434e76b6c6832",
+          "upstreamSha256": "fb68c7c49e64ada56d25acf1bf05b51192529faf49de98a745fd78d780f1a1e4",
+          "forkSha256": "8ee26638200f581fec9195faa68d62699786d2dcfc8c4c9898ef03158d5a6c5b"
+        },
+        {
+          "path": "tests/video/test_loop_ease.py",
+          "beforeSha256": null,
+          "upstreamSha256": "c916ed64f1c2c80b708535a07863ed129b1a0c5ba99bfb6f09566f1fff8dd02c",
+          "forkSha256": "c916ed64f1c2c80b708535a07863ed129b1a0c5ba99bfb6f09566f1fff8dd02c"
+        },
+        {
+          "path": "tests/video/test_loop_flow.py",
+          "beforeSha256": null,
+          "upstreamSha256": "e9b0b2af17d3b668e55ae60e26cb6952bea82c08804f75ed0aaab82793d1d547",
+          "forkSha256": "e9b0b2af17d3b668e55ae60e26cb6952bea82c08804f75ed0aaab82793d1d547"
+        },
+        {
+          "path": "tests/video/test_loop_overlap.py",
+          "beforeSha256": null,
+          "upstreamSha256": "3ec01ac264c5d53292f894a667dbb90e0ff74a35ef80967d5671d416ee1801d6",
+          "forkSha256": "3ec01ac264c5d53292f894a667dbb90e0ff74a35ef80967d5671d416ee1801d6"
+        },
+        {
+          "path": "tests/video/test_loop_prop_seam.py",
+          "beforeSha256": null,
+          "upstreamSha256": "eb3a1823ee169af9f670432dd2201bda69a9a60e056c090edfcfc70ca00de893",
+          "forkSha256": "eb3a1823ee169af9f670432dd2201bda69a9a60e056c090edfcfc70ca00de893"
+        },
+        {
+          "path": "tests/video/test_loop_prop_seam_held.py",
+          "beforeSha256": null,
+          "upstreamSha256": "3707b6f7ca9aaa8620d880ab887312f8efdbaed66edc23725b246cfd7d5ccd16",
+          "forkSha256": "3707b6f7ca9aaa8620d880ab887312f8efdbaed66edc23725b246cfd7d5ccd16"
+        },
+        {
+          "path": "tests/video/test_loop_repair.py",
+          "beforeSha256": "db3fbd4d3d6fce5d16c18a5453e0364bbea1ad35e540f0366698738c5e03d4d1",
+          "upstreamSha256": "d4ff70bb59ad76be4f600111c5799fa09b5d883bd62369e0b8370b05c604bdce",
+          "forkSha256": "aef5cbde94d25125f1aa8ca81b34d47daeed248182f0a7a218d7ba132346d24a"
+        },
+        {
+          "path": "tests/video/test_motion_anchor.py",
+          "beforeSha256": "dac4c6d7f9411d079989cb7329cf7d39af0ecb873a02ec6257cf4366c83a9033",
+          "upstreamSha256": "edc99eab87552d83b3325b3732649bcb8808549ca4d705b6d3d263de4515bc5a",
+          "forkSha256": "edc99eab87552d83b3325b3732649bcb8808549ca4d705b6d3d263de4515bc5a"
+        },
+        {
+          "path": "tests/video/test_one_step_cut.py",
+          "beforeSha256": null,
+          "upstreamSha256": "fb0685a92a6451fe600b77767a0f510a8a56851cb803737b0898b602a1ae2036",
+          "forkSha256": "fb0685a92a6451fe600b77767a0f510a8a56851cb803737b0898b602a1ae2036"
+        },
+        {
+          "path": "tests/video/test_outline_shift.py",
+          "beforeSha256": null,
+          "upstreamSha256": "447987b644171bfae4d6ebbf4948f82e8339ec123ddf70a4c7b1af870f27af5a",
+          "forkSha256": "447987b644171bfae4d6ebbf4948f82e8339ec123ddf70a4c7b1af870f27af5a"
+        },
+        {
+          "path": "tests/video/test_rife.py",
+          "beforeSha256": "ba8b39feb5680b6366357a86a8e337af2df437ceaccdac461b72afd0ca6f3286",
+          "upstreamSha256": "004185b988cd57a25352398ccec96fb685e665c5bac62f7d9b0d11d1dcffe36c",
+          "forkSha256": "004185b988cd57a25352398ccec96fb685e665c5bac62f7d9b0d11d1dcffe36c"
+        },
+        {
+          "path": "tests/video/test_strip_resample.py",
+          "beforeSha256": "0c17678ed3f3efa12a91de75d4e32263861c3cd307f98baecbe1b20451d2f176",
+          "upstreamSha256": "298b1315a05430b220f84e029ffa640455d27f908961855438d5641ba2db1a40",
+          "forkSha256": "6585da2db5c38de7548b7167a327bb5e1f21f472e09cd15dfc4ebee986e6873d"
+        },
+        {
+          "path": "tests/video/test_video_pipeline.py",
+          "beforeSha256": "ca917141b198d9c7a96d6776c62cbc0ad239ad58c1ae55cad29526f20952abcc",
+          "upstreamSha256": "b4eb7dd9ca151ae18fb70292b6cfac15a9682654b498564f31e1cfadbe173039",
+          "forkSha256": "473336367cc7726da315f5c36af76fba947796fd4f2df8422d8b148f0f448129"
+        },
+        {
+          "path": "tests/video/test_walk_steps.py",
+          "beforeSha256": null,
+          "upstreamSha256": "18d4611929901828707fea6fafcce93a566bf59807b60f1c5cd0460558abb90c",
+          "forkSha256": "18d4611929901828707fea6fafcce93a566bf59807b60f1c5cd0460558abb90c"
+        }
+      ]
+    },
+    {
+      "milestone": "M3",
+      "upstreamCommit": "59b2738a2e76ed7043d9691a230396ed6374a336",
+      "scope": "source restoration, comparison and follow inspection; canonical app bridge separately identified",
+      "files": [
+        {
+          "path": "sprite_gen/_modules.py",
+          "beforeSha256": "167193aa3e6c56a45c5dd96ae8ba12adf7d77c2ae69c8df04f9c2c91b4a054a7",
+          "upstreamSha256": "e4d926fb05810845bd6a4527c8d3dbc260599145a14d91308ba807df0cc27e18",
+          "forkSha256": "89e3333c2e9ca6aeb0142574c876a1f7cb7273a509fac714e46d727385713c5b"
+        },
+        {
+          "path": "sprite_gen/cli.py",
+          "beforeSha256": "70e5c97c71585339f01644f737bcf9528bd9249809d7a6c42588638d7686570c",
+          "upstreamSha256": "25f2394d813ca3f0902ed761e3b6e0aa4b0ee8611f21a0532aacf20521282279",
+          "forkSha256": "020006c8de5a8826ef5fac470573782badd1e1b01aa4f34b02e0482f8221846b"
+        },
+        {
+          "path": "sprite_gen/video/compare.py",
+          "beforeSha256": null,
+          "upstreamSha256": "60a1a80dc52542378b612c08b43c099af287bbdc9793ff5c9db00672a51ceacd",
+          "forkSha256": "60a1a80dc52542378b612c08b43c099af287bbdc9793ff5c9db00672a51ceacd"
+        },
+        {
+          "path": "sprite_gen/video/follow.py",
+          "beforeSha256": "66977cd5afd001a67a2ca1b49a412b499665538fca9bae96ea1b629a87416862",
+          "upstreamSha256": "9ef9d0b957060d22d1cc41e3674c37e04140f3bff6cf66ea65feae9804ddca4a",
+          "forkSha256": "9ef9d0b957060d22d1cc41e3674c37e04140f3bff6cf66ea65feae9804ddca4a"
+        },
+        {
+          "path": "sprite_gen/video/follow_inspect.py",
+          "beforeSha256": null,
+          "upstreamSha256": "96c3f5f2b29e8ab22b21a339fdac1960fbadc87502de3ec2aa182d467c71638d",
+          "forkSha256": "96c3f5f2b29e8ab22b21a339fdac1960fbadc87502de3ec2aa182d467c71638d"
+        },
+        {
+          "path": "sprite_gen/video/playback.py",
+          "beforeSha256": null,
+          "upstreamSha256": "4d44978d27e657854c63da04faab076a37e49f8e26a03ed18bc33babc6409e04",
+          "forkSha256": "4d44978d27e657854c63da04faab076a37e49f8e26a03ed18bc33babc6409e04"
+        },
+        {
+          "path": "sprite_gen/video/restoration.py",
+          "beforeSha256": null,
+          "upstreamSha256": "2d4d25c9077b45ff3016ca19c7145a2445f3dc4e65dfe8c87f5be277ff8906f2",
+          "forkSha256": "2d4d25c9077b45ff3016ca19c7145a2445f3dc4e65dfe8c87f5be277ff8906f2"
+        },
+        {
+          "path": "tests/video/test_follow.py",
+          "beforeSha256": "61a4deb643e688443dc583b3f22f07da35ddb2c3f923986c888fb21b4c130944",
+          "upstreamSha256": "987e98d2701844b47ae7181e4c765c3ca14839747a08a6003e688a37f6eb241e",
+          "forkSha256": "d60ef587621e982a112f221167cee7a9657d87d3d15b1a697af2f975d75d87d1"
+        },
+        {
+          "path": "tests/video/test_follow_inspect.py",
+          "beforeSha256": null,
+          "upstreamSha256": "ec2f78a760dbca4093d39126f1d6166501cdeed3b4f3f7e12a0bfed4b04605f8",
+          "forkSha256": "ec2f78a760dbca4093d39126f1d6166501cdeed3b4f3f7e12a0bfed4b04605f8"
+        },
+        {
+          "path": "tests/video/test_follow_read_on.py",
+          "beforeSha256": null,
+          "upstreamSha256": "e15145f69644c9198d41ebadafd8c9bce9309cd119dce3c1996263318ce27e2d",
+          "forkSha256": "e15145f69644c9198d41ebadafd8c9bce9309cd119dce3c1996263318ce27e2d"
+        },
+        {
+          "path": "tests/video/test_follow_stretch_floor.py",
+          "beforeSha256": null,
+          "upstreamSha256": "12a0f7d458eb72e7495cf050248f94595ccb8444d132b0227083297f781d4551",
+          "forkSha256": "12a0f7d458eb72e7495cf050248f94595ccb8444d132b0227083297f781d4551"
+        },
+        {
+          "path": "tests/video/test_loop_compare.py",
+          "beforeSha256": null,
+          "upstreamSha256": "c8d9dcdb9f603a036617ff6bd1b1c840d80ed80e32fabe2c6f577a262e76b9d3",
+          "forkSha256": "c8d9dcdb9f603a036617ff6bd1b1c840d80ed80e32fabe2c6f577a262e76b9d3"
+        },
+        {
+          "path": "tests/video/test_source_restoration.py",
+          "beforeSha256": null,
+          "upstreamSha256": "ecfed29168ac75282ef28813da7ffeb60699c12245e021c545a1a07b21071762",
+          "forkSha256": "ecfed29168ac75282ef28813da7ffeb60699c12245e021c545a1a07b21071762"
+        }
+      ]
+    }
+  ],
+  "videoQualityVersion": "2.45.3-m2",
+  "clipToolsQualityVersion": "2.45.3-m3"
 }

@@ -103,6 +103,33 @@ beforeEach(() => {
 afterEach(() => {mounted.splice(0).forEach(h => h.unmount()); vi.restoreAllMocks(); vi.unstubAllGlobals();});
 
 describe('saved clip request validation', () => {
+  it('invalidates a preview when stretch floor/read-on changes or correspondence is uncertain', async () => {
+    const h = studioHarness(); await preview(h);
+    expect(h.button('새 동작으로 저장').props.disabled).toBe(false);
+    h.change('최소 픽셀 면적 (선택, 0~0.99)', '0.5');
+    expect(h.button('새 동작으로 저장').props.disabled).toBe(true);
+    h.change('최소 픽셀 면적 (선택, 0~0.99)', '');
+    h.change('영역을 읽은 시트 SHA-256 (선택)', '0'.repeat(64));
+    expect(h.button('새 동작으로 저장').props.disabled).toBe(true);
+    h.change('영역을 읽은 시트 SHA-256 (선택)', '');
+    (s.jobs[0].result as any).report.canApply = false;
+    (s.jobs[0].result as any).report.readOn = {relation: 'uncertain', reason: 'sample-unverified'};
+    h.render(); expect(h.button('새 동작으로 저장').props.disabled).toBe(true);
+    expect(text(h.tree)).toContain('영역 대응이 불확실');
+  });
+  it('requests source restoration and rejects mixed evidence schemas in the result reader', async () => {
+    const h = studioHarness(); h.change('보완·검사 도구', 'restore');
+    await h.submit();
+    expect(s.job).toHaveBeenCalledWith('preview_restore', [], {clipId: 'clip', clipRevisionId: 'clip-r1'});
+    const job = resultJob(), result = job.result as any;
+    result.tool = 'restore'; result.report = {verdict: 'unknown', reasons: ['source-unknown'], canApply: false,
+      metric_version: 'source-restoration-v5', policy_version: 'key-protected-source-copy-one-step-cap-jump-ghost-guard-v1', schema_version: 4, comparison_schema: 6};
+    expect(readClipToolResult(job)?.tool).toBe('restore');
+    result.report.schema_version = 1; expect(readClipToolResult(job)).toBeUndefined();
+    result.report.schema_version = 4; result.report.comparison_schema = 5; expect(readClipToolResult(job)).toBeUndefined();
+    result.tool = 'compare'; result.report = {verdict: 'unknown', reasons: [], canApply: false, metric_version: 'same-sample-defects-v1', schema_version: 1};
+    expect(readClipToolResult(job)?.tool).toBe('compare');
+  });
   it('sends the four region coordinates and all follow controls from the saved clip', async () => {
     const original = structuredClone(project), h = studioHarness(); setRegion(h);
     s.snapshot!.clips[0].clipRevisionId = 'unsaved-preview';

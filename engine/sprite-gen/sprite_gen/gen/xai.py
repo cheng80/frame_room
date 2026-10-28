@@ -7,7 +7,10 @@ that login. Never spawn an agent or switch sources after a login failure.
 """
 from __future__ import annotations
 
+import http.client
+import io
 import json
+import time
 import os
 import urllib.error
 import urllib.request
@@ -131,7 +134,58 @@ def resolve_credential(*, env: dict[str, str] | None = None, now: datetime | Non
 HttpCall = Callable[[str, str, str, dict | None], tuple[int, Any]]
 
 
-def http_json(method: str, url: str, token: str, body: dict | None = None, *, timeout: float = HTTP_TIMEOUT_SECONDS) -> tuple[int, Any]:
+class _DeadlineReader(io.RawIOBase):
+    """Reset the socket's timeout before every receive, including header reads."""
+    def __init__(self, raw, sock, deadline):
+        self.raw, self.sock, self.deadline = raw, sock, deadline
+
+    def readable(self):
+        return True
+
+    def readinto(self, buffer):
+        left = self.deadline - time.monotonic()
+        if left <= 0:
+            raise TimeoutError("HTTP response deadline exceeded")
+        self.sock.settimeout(left)
+        return self.raw.readinto(buffer)
+
+    def close(self):
+        try:
+            self.raw.close()
+        finally:
+            super().close()
+
+
+def http_open(request, *, timeout, deadline):
+    """App-only absolute deadline; keep standalone callers' urlopen behavior."""
+    deadline = min(deadline, time.monotonic() + timeout)
+
+    def response(sock, *args, **kwargs):
+        result = http.client.HTTPResponse(sock, *args, **kwargs)
+        result.fp = io.BufferedReader(_DeadlineReader(result.fp.detach(), sock, deadline))
+        return result
+
+    def connection(kind, host, **kwargs):
+        left = deadline - time.monotonic()
+        if left <= 0:
+            raise TimeoutError("HTTP request deadline exceeded")
+        kwargs['timeout'] = left
+        result = kind(host, **kwargs)
+        result.response_class = response
+        return result
+
+    class HTTP(urllib.request.HTTPHandler):
+        def http_open(self, req):
+            return self.do_open(lambda host, **kw: connection(http.client.HTTPConnection, host, **kw), req)
+
+    class HTTPS(urllib.request.HTTPSHandler):
+        def https_open(self, req):
+            return self.do_open(lambda host, **kw: connection(http.client.HTTPSConnection, host, **kw), req, context=self._context)
+
+    return urllib.request.build_opener(HTTP(), HTTPS()).open(request, timeout=timeout)
+
+
+def http_json(method: str, url: str, token: str, body: dict | None = None, *, timeout: float = HTTP_TIMEOUT_SECONDS, deadline: float | None = None) -> tuple[int, Any]:
     data = None if body is None else json.dumps(body).encode("utf-8")
     request = urllib.request.Request(url, data=data, method=method)
     request.add_header("Authorization", f"Bearer {token}")
@@ -139,12 +193,15 @@ def http_json(method: str, url: str, token: str, body: dict | None = None, *, ti
     if body is not None:
         request.add_header("Content-Type", "application/json")
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
+        with (urllib.request.urlopen(request, timeout=timeout) if deadline is None else http_open(request, timeout=timeout, deadline=deadline)) as response:
             raw = response.read().decode("utf-8")
             return response.status, (json.loads(raw) if raw else {})
     except (json.JSONDecodeError, UnicodeDecodeError) as exc:
         raise SystemExit("xai: response was not valid JSON") from exc
     except urllib.error.HTTPError as exc:
+        if deadline is not None and exc.code in (401, 403):
+            exc.close()
+            return exc.code, {}
         raw = exc.read().decode("utf-8", "replace")
         try:
             return exc.code, json.loads(raw)

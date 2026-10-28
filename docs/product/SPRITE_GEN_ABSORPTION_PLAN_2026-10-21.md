@@ -1,6 +1,6 @@
 # sprite-gen 전체 기능의 프레임룸 흡수 계획
 
-2026-10-21 KST · **전체 범위 확정, M0 구현·독립 검수 완료 · 다음 단계 M1**
+2026-10-22 KST · **전체 범위 확정, M0–M3 제품 구현·독립 검수 완료 · M3 세션 결산 후 M4a**
 
 사용자 결정은 **전체 기능 흡수**다. 앞서 선택한 품질·복구 우선은 구현 순서에 적용하며 기능을 제외하는 기준으로 사용하지 않는다. `v2.45.3`의 공개 사용자 기능을 모두 프레임룸의 실행·편집·저장·출력 경로에 연결한다. 엔진에 이미 있어도 앱에서 쓸 수 없는 기능은 연결할 대상으로 포함한다. M0–M6 전체가 필수 범위이며 단계별 출시는 중간 성과다. 2026-10-21 사용자 요청으로 M0부터 구현 착수를 승인받았다. 유료 생성·Git 게시는 이번 착수 범위와 구분한다.
 
@@ -232,9 +232,10 @@ game-pack은 **현재 편집 결과의 canonical bake**를 입력으로 삼는�
 
 ## 7. 역할·의존성·착수 전 결정
 
-- **PM — GPT 6.1 sol · High:** 범위·인수 조건·반영 목록·진행 문서·검수 지적 조율과 완료 보고.
-- **구현 — Claude Opus 5.5 · High:** M0의 함수별 이식 조사, 코드·회귀 시험·계약·도움말 구현과 검수 수정.
-- **검수 — GPT 6.1 sol · High:** 변경 영향·실제 앱 연결·원본/비용/저장 보호·실행 증거 검수. 사용자 후속 지시로 Medium에서 High로 변경했다. PM은 검수 결과를 실제 코드 수정으로 대신 처리하지 않음.
+- **PM — GPT 6.1 Sol · xHigh:** 범위·인수 조건·반영 목록·진행 문서·검수 지적 조율과 완료 보고.
+- **구현 — GPT 6.1 Sol · xHigh:** 코드·회귀 시험·계약·도움말 구현과 검수 수정. PM과 별도 세션으로 실행한다.
+- **검토 — GPT 6.1 Sol · xHigh:** 변경 영향·실제 앱 연결·원본/비용/저장 보호·실행 증거 검수. 구현과 독립된 세션으로 실행하며 PM은 제품 코드를 직접 수정하지 않는다.
+- 2026-10-22 사용자 변경 지시: 모든 역할은 Orca CLI `--agent codex --model gpt-6.1-sol --effort xhigh`로 실행한다. **Opus 5.5는 사용자 재허용 전까지 금지**다. 아래 M0 실행 기록의 모델명은 당시 이력으로 보존한다.
 - 세션·위임·메시지·진행 확인은 Orca CLI만 사용한다. 동일한 `video_processing.py`/엔진 공통 파일의 병렬 수정은 피하고, 독립 fixture/계약 조사와 읽기 전용 검수만 병렬화한다.
 - 의존성: M0→M1/M2, M2→M3, M1+M2→M4a→M4b. M5의 도구는 각 자료형 계약과 M1 저장 보호를 확보한 후 나눠 진행한다. M6의 영상 작업은 M1, 편집 파생은 M3/M4, scene은 필요한 M4/M5 자료형·출력 계약을 선행한다. M6을 마지막까지 조사하지 않고 M0에서 전체 대장과 담당을 확정한다. 코드 소유가 겹치는 통합은 순차 수행한다.
 
@@ -266,3 +267,38 @@ Orca 시작 영수증의 requested/effective 모델·추론 일치와 두 작업
 첫 구현 후 출력 경로·임시 파일·함수별 이식 근거·보고서 보장 범위를 검수하고 Claude Opus 5.5 · High 수정 작업을 추가했다. 최초 구현 세션이 사용자 제어 상태로 전환돼 재사용하지 않았으며, 새 작업 전용 세션에서 수정했다. 수정 Task `task_0e13b1c40dd8`와 최종 검수 Task `task_9a0c7b9cd503` 모두 성공으로 완료했다. 구현·수정 결과와 한계는 [M0 보고서](absorption/M0_REPORT_2026-10-21.md)에 기록한다.
 
 **M0 완료 판정:** GPT 6.1 sol · High 검수자가 M0/engine guard 47건, 전체 통합 2,521 통과·1 skip(연구 원본 부재), 고정 upstream·대장·파일/함수 이식계획·baseline 검사와 독립 replay 2/2를 직접 확인했다. 검수 구간 DB·project JSON 9파일 해시는 동일했다. 최초 접근 이전의 DB 해시가 없어 작업 시작 전부터의 모든 바이트 불변을 소급 증명하지는 않는다. 원인 미확정 삭제/출력 경합은 M1 보존 작업으로 남긴다. 기능 대장 84항목의 상태는 모두 구현 예정이며, M0 기준 구축 완료를 전체 기능 흡수 완료로 해석하지 않는다.
+
+## 10. M1 완료 기록
+
+2026-10-22 새 PM이 Run `run_5dbba83351d2`를 생성했다. PM·구현·독립 검수는 모두 GPT 6.1 Sol · xHigh이며 두 worker의 requested/effective와 turn start를 확인했다. 구현 Task `task_55937e2c26b7`, 검수 Task `task_fcce5da0fbd5`를 유지해 검수 수정까지 같은 두 세션에서 수행했다. PM은 제품 코드를 수정하지 않았다.
+
+**M1 완료:** POST 최대 1회, 같은 ID 조회/다운로드 제한 재시도, 절대 수신 deadline, 검증 후 원자적 MP4 게시, 원본 우선 복구, 저장만 재시도, 삭제/출력/작업 등록 강제 경합 보호를 구현하고 독립 검수에 합격했다. 검수에서 찾은 느린 body 시간 초과·토큰 반사·다운로드 재시도 누락·symlink 원본 덮어쓰기·legacy receipt 비밀 재노출을 수정하고 재현 시험으로 확인했다.
+
+최종 전체 integration 2,577 통과·1 skip(저장소에 없는 연구 원본), 영향+엔진 235건, 웹 541건·빌드, doctor 407파일·diff 검사 통과다. 독립 검수는 안전 transport 54건·TLS 4건과 ego smoke/DOM을 확인했다. 사용자 파일은 구현 1,029개·검수 970개의 전후 해시가 일치한다. 상세 명령·실패 이력·검증 범위는 [실행/인수](absorption/M1_RUN_2026-10-22.md), [구현](absorption/M1_IMPLEMENTATION_2026-10-22.md), [독립 검수](absorption/M1_REVIEW_2026-10-22.md)에 기록한다.
+
+M0 JSON·baseline과 원본/DB/인증/공용 스킬은 보존했다. M1 엔진 차이는 lock의 전후 해시로 명시하며 M0와 같은 결과라고 주장하지 않는다. M2–M6 및 영상 참조/종료 입력은 아직 미구현이다. 유료 생성·Git 게시·배포는 하지 않았다. 실제 provider 인증/일시 장애·RIFE 성능·전체 UI 여정은 미검증이다. M2 착수 전 새 PM에게 이관하며 미커밋 M1을 승인 없이 커밋하거나 되돌리지 않는다.
+
+
+## 11. M2 완료·기능 경계 인계
+
+2026-10-22 새 PM `term_33b48ee3-9f56-4528-a4bb-a346b368d768`가 M1 기능 경계 인계를 수락했다. 이전 PM의 확인 `msg_a97a9e1ed596`에 따라 이후 M2 배정·문서 소유권은 새 PM이다. Run `run_70d73cc5d001`의 구현·독립검수를 각각 GPT 6.1 Sol xHigh로 시작했고 requested/effective 일치·turn_started를 확인했다. 범위·완료 조건·실제 증거는 [M2 실행 기록](absorption/M2_RUN_2026-10-22.md)에 남긴다.
+
+M1 미커밋 변경과 역사적 M0 기준을 보존하고, VERSION/engine digest/legacy retry 제품 보호를 M2 선행 범위로 수행한다. 실제 provider·유료 생성·Git 게시·배포는 승인 범위가 아니다. M2 9개 대장 항목은 실제 앱 호출·저장·검증 근거와 대조하며 엔진 코드 존재만으로 완료 처리하지 않는다.
+
+
+**M2 완료:** 새 recipe VERSION·실제 엔진/보간 identity와 구 recipe 재개 차단, 관측 두 걸음/불확실 근거·ghost/flow/torso·최종 rendered seam·프로젝트 캐시·TTA/overlap 명시 선택을 기존 앱 호출열에 통합하고 독립 검수에 합격했다. 완성 결과의 저장만 retry·원본/채택 셀/계보·기본8장 비보간·기존 시간과 수동 범위는 유지한다. M0 대장의 M2 9항목에 실제 호출·저장·시험 근거를 보고서에 매핑했다. 전체84항목 완료를 뜻하지 않는다.
+
+최종 앱2598passed/1skipped, 엔진video/util762passed(15markerwarnings), 웹543passed/build, doctor433/diff통과. 독립 core103·guard47·cache교체2·enginecache31 및 자체 실제영상 API/worker/출력/library/폴더DB·ego smoke/DOM을 확인했다. 같은 MP4의 M1/M2 구간33–59·8셀·개별ms·PNG/GIF/WebP가 일치하고 사용자1029파일은 변경·누락·추가0이다. 양 worker는 succeeded 후 transcript captured·released2/reclaimable0으로 정리했다. 자세한 근거는 [M2 실행](absorption/M2_RUN_2026-10-22.md), [구현](absorption/M2_IMPLEMENTATION_2026-10-22.md), [독립검수](absorption/M2_REVIEW_2026-10-22.md)다.
+
+실제 RIFE544px off/on cold/warm 실행은 확인했으나 overlap은 실제60초예산에서 중단돼 성공/품질개선으로 집계하지 않는다. CPU/다른장치성능·TTA미술품질우월성·전체UI여정은 미검증이며 ego추가펼치기click은timeout이다. 실제auth/config·공용스킬·자료는 동일하지만 넓은사후manifest의Grok런타임4파일변화는 원인미확정으로 분리했다. 기반pin·qualityVersion 및 M0역사JSON/M1변경을 보존했고 M1+M2는 미커밋이며 유료생성·Git게시·배포는 하지 않았다. M2→M3 기능 경계에서 새PM으로 이관한다.
+
+
+## 12. M3 제품 최종 수용·세션 결산
+
+2026-10-22 새 PM `term_6a03edc7-a106-4325-8d75-23aaa0ea7c12`가 M2→M3 소유권을 인수하고 Run `run_db69615cf19f`에서 구현1·독립검수1을 GPT 6.1 Sol xHigh로 운영했다. 두 requested/effective와 실제 turn start를 확인했고 PM은 제품 코드를 수정하지 않았다. M1+M2 미커밋 사본 대비 M3 제품/계약/시험34파일을 구분하며 역사M0 JSON/baseline·M1/M2 원문을 보존했다.
+
+source/origin/baseline 콘텐츠 ID·최종 셀/좌표/개별ms/sample mapping, source-restoration-v5 repair4/comparison6와 same-sample-defects-v1 schema1·정책 identity, 불확실/legacy·stale preview 차단, 새 동작 저장·별도 출력/library/폴더DB·저장만 retry/ZIP/cold 재열기를 기존 경로에 통합했다. 일반 비교와 원본 복원 제약을 분리하고 실제 nonzero follow의 portable 계보를 검증하며, read-on 원본12/대상8 SHA의 열수 경계도 보완했다. M0의 M3 6항목별 실제 연결은 [구현 보고서](absorption/M3_IMPLEMENTATION_2026-10-22.md)에 매핑한다.
+
+최종 고정509 SHA·tested-source-subset-start가 일치하고 앱2653pass/1skip, engine876/web545/build(동일SHA 재사용), doctor442/diff가 통과했다. 독립14경계·영향227·실제보존MP4/출력/library/폴더DB·ZIP/fresh 인덱스 재열기와 source2/unknown21·origin23legacy를 확인했다. 인수차단R1의 보고서/실identity 바인딩과 no-op 부모증거·follow비교·read-on 경계는 같은 구현 세션에서 수정했으며 최종ego7의stale·복원실제저장·파일/폴더DB 일치와보고서를수용했고 두worker_done succeeded를확인했다. 검수release는captured/closed, 구현release는retained/user_takeover로사용자확인중이다. [실행·검증·정리](absorption/M3_RUN_2026-10-22.md), [독립 검수](absorption/M3_REVIEW_2026-10-22.md). M3 제품은합격·미해결finding0이며 세션결산은위실제상태와구분한다. 전체84항목완료를뜻하지않는다.
+
+기존1029 사용자자료·공용skill/auth/config의 SHA/크기 변경·누락0, 별도 M1/M2 세션정리아카이브10추가를 분리해 보존했다(메타는사용자요청정리라고기록하나원요청/생성주체/승인원문은이Run에서직접미확인). 실제영상의 accepted 복원 제안·미술 우월성·유료/provider/observer·다른장치 성능·전체UI/screenshot은 미검증이며, 기존 엔진 문서10링크 실패는 시작 사본에서도 같은 문제다. 누적10MB 검수프로젝트의 CPU지연을 일반성능 개선으로 주장하지 않는다. Git게시/배포는 수행하지 않았다. M3 완료·정리 뒤 사용률 수치가 없는 환경의 기능 경계 규칙에 따라 M4a 새PM으로 이관하며, M0–M6 전체 진행 승인과 M4b/M5/M6 필수 범위는 유지한다.

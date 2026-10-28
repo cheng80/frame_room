@@ -87,6 +87,12 @@ STATE_CANVAS: dict[str, CanvasProfile] = {
 # row would give it (a 3:2 still about three fifths), because the wide canvas's
 # height follows the still's width there.
 WIDE_OVERRIDE = CanvasProfile(SHAPE_WIDE, 16 / 9, 0.35, 0.28, 0.2, "forced wide: room in front and behind, and a jump's head-room above, whatever the state")
+GAIT_WIDE = CanvasProfile(SHAPE_WIDE, 16 / 9, 0.0, 0.28, 0.2, "forced wide for a walk or run: room in front and behind, none above — its feet stay on the ground")
+# A state's own row for a forced shape, read before the shape's default (`profile_for`).
+STATE_SHAPE_CANVAS: dict[tuple[str, str], CanvasProfile] = {
+    ("walk", SHAPE_WIDE): GAIT_WIDE,
+    ("run", SHAPE_WIDE): GAIT_WIDE,
+}
 SHAPE_DEFAULTS: dict[str, CanvasProfile] = {
     SHAPE_SQUARE: STATE_CANVAS["default"],
     SHAPE_TALL: STATE_CANVAS["jump"],
@@ -102,12 +108,13 @@ KEYS = ("auto", "green", "magenta", "white")  # auto: the corners decide; white:
 
 
 def profile_for(state: str | None, shape: str | None = None) -> CanvasProfile:
-    """Resolve the canvas profile: an explicit `shape` wins, else the state's row, else default."""
+    """Resolve the canvas profile: an explicit `shape` wins — the state's own row for that shape
+    (`STATE_SHAPE_CANVAS`), else the shape's default — else the state's row, else default."""
+    key = (state or "").strip().lower()
     if shape is not None:
         if shape not in SHAPES:
             raise SystemExit(f"video-canvas: unknown --shape {shape!r}; expected one of {', '.join(SHAPES)}")
-        return SHAPE_DEFAULTS[shape]
-    key = (state or "").strip().lower()
+        return STATE_SHAPE_CANVAS.get((key, shape), SHAPE_DEFAULTS[shape])
     return STATE_CANVAS.get(key, STATE_CANVAS["default"])
 
 
